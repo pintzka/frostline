@@ -9,6 +9,7 @@ Daniel er 13 år og eier prosjektet, Carl er forelder og eier repoet. Svar på n
 - **Én endring om gangen.** Hver endring i egen gren og pull request. `main` endres aldri direkte.
 - **Tester først.** `npm run check` (typecheck + tester + bygg) må være grønn før en PR. Ny spillogikk får tester i `tests/`.
 - **Daniel bestemmer følelsen.** Etter hver fase spiller Daniel og svarer på spørsmålene i `docs/PLAYTEST.md`. Neste fase starter først når han er fornøyd.
+- Hele reviewen med 30 forslag, rotårsaker og plan ligger i `docs/PLAN.md`. Les den før du foreslår neste steg.
 - Måltall (fart, hopphøyde, spinnfart, poeng) står i `docs/DESIGN.md` og `src/core/config.ts`. Endre tallene der, ikke hardkod dem andre steder.
 - Fysikken går med fast steg (240 Hz) og skal være deterministisk. Ren logikk (fysikk, triks, poeng) skal ikke importere three.js.
 
