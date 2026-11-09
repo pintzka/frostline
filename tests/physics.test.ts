@@ -43,3 +43,59 @@ describe('skiløper-fysikk', () => {
     expect(a).toEqual(b);
   });
 });
+
+/** Skiløper som allerede kjører rett ned med gitt fart. */
+function moving(speed: number) {
+  const s = createSkier();
+  s.vz = speed;
+  return s;
+}
+
+describe('carving', () => {
+  const kmh60 = 60 / 3.6;
+
+  it('bygger opp kanten mykt i stedet for å svinge med en gang', () => {
+    const s = moving(kmh60);
+    for (let i = 0; i < 0.02 * CONFIG.physicsHz; i++) stepSkier(s, { steer: 1, brake: 0 }, dt);
+    expect(Math.abs(s.edge)).toBeLessThan(0.3);
+    for (let i = 0; i < 1 * CONFIG.physicsHz; i++) stepSkier(s, { steer: 1, brake: 0 }, dt);
+    expect(Math.abs(s.edge)).toBeGreaterThan(0.95);
+  });
+
+  it('slipper kanten mykt når styringen slippes', () => {
+    const s = moving(kmh60);
+    for (let i = 0; i < 1 * CONFIG.physicsHz; i++) stepSkier(s, { steer: 1, brake: 0 }, dt);
+    stepSkier(s, { steer: 0, brake: 0 }, dt);
+    expect(Math.abs(s.edge)).toBeGreaterThan(0.9);
+  });
+
+  it('snur med ca. 15 m radius ved full styring i 60 km/t', () => {
+    const s = moving(kmh60);
+    // la kanten bygge seg opp, og mål så buen farten faktisk følger
+    for (let i = 0; i < 0.5 * CONFIG.physicsHz; i++) stepSkier(s, { steer: 1, brake: 0 }, dt);
+    const dir0 = Math.atan2(s.vx, s.vz);
+    const v0 = speedOf(s);
+    const T = 0.4;
+    for (let i = 0; i < T * CONFIG.physicsHz; i++) stepSkier(s, { steer: 1, brake: 0 }, dt);
+    const dir1 = Math.atan2(s.vx, s.vz);
+    const v = (v0 + speedOf(s)) / 2;
+    const radius = v / (Math.abs(dir1 - dir0) / T);
+    expect(radius).toBeGreaterThan(12);
+    expect(radius).toBeLessThan(19);
+  });
+
+  it('beholder farten gjennom slalåmsvinger', () => {
+    const s = moving(kmh60);
+    for (let turn = 0; turn < 6; turn++) {
+      const steer = turn % 2 === 0 ? 0.7 : -0.7;
+      for (let i = 0; i < 1 * CONFIG.physicsHz; i++) stepSkier(s, { steer, brake: 0 }, dt);
+    }
+    expect(speedOf(s)).toBeGreaterThan(kmh60 * 0.9);
+  });
+
+  it('holder seg innenfor toppfarten også når den svinger', () => {
+    const s = moving(CONFIG.maxSpeed);
+    for (let i = 0; i < 4 * CONFIG.physicsHz; i++) stepSkier(s, { steer: 1, brake: 0 }, dt);
+    expect(speedOf(s)).toBeLessThanOrEqual(CONFIG.maxSpeed + 1e-6);
+  });
+});
