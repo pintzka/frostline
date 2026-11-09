@@ -11,3 +11,4 @@ Tips: Ta opptak av feilen med Windows + Shift + R og legg det ved.
 ## Logg
 | Dato | Versjon | Best | Mest feil | Endre først |
 |---|---|---|---|---|
+| 2026-11-09 | fase-1-carving | «Alt er bra» | Ingenting meldt | Fortsett til neste steg |

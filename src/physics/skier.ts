@@ -10,6 +10,8 @@ export interface SkierState {
   vx: number; vy: number; vz: number;
   /** Retningen skiene peker (rad). 0 = rett ned bakken (+z). */
   heading: number;
+  /** Hvor mye skiene står på kant, -1 (venstre) til 1 (høyre). Følger styringen mykt. */
+  edge: number;
   grounded: boolean;
 }
 
@@ -22,7 +24,7 @@ export interface SkierInput {
 
 export function createSkier(): SkierState {
   const z = 5;
-  return { x: 0, y: heightAt(0, z), z, vx: 0, vy: 0, vz: 2, heading: 0, grounded: true };
+  return { x: 0, y: heightAt(0, z), z, vx: 0, vy: 0, vz: 2, heading: 0, edge: 0, grounded: true };
 }
 
 export function speedOf(s: SkierState): number {
@@ -31,7 +33,12 @@ export function speedOf(s: SkierState): number {
 
 export function stepSkier(s: SkierState, inp: SkierInput, dt: number): void {
   const g = CONFIG.gravity;
-  s.heading += -inp.steer * CONFIG.turnRate * dt;
+
+  // kanten bygges opp og slippes mykt, selv om tastaturet bare er av/på
+  s.edge += (inp.steer - s.edge) * (1 - Math.exp(-CONFIG.edgeResponse * dt));
+  // i høy fart begrenses svingen av hvor hardt kanten kan presse
+  const turnRate = Math.min(CONFIG.turnRate, CONFIG.carveAccel / Math.max(speedOf(s), 1e-3));
+  s.heading += -s.edge * turnRate * dt;
 
   if (s.grounded) {
     const [nx, ny, nz] = normalAt(s.x, s.z);
@@ -47,16 +54,21 @@ export function stepSkier(s: SkierState, inp: SkierInput, dt: number): void {
     const fl = Math.hypot(fx, fy, fz);
     fx /= fl; fy /= fl; fz /= fl;
 
-    // carving: fjern sidelengs fart gradvis (skiene griper)
+    // carving: skiene vrir farten inn i sin egen retning og beholder den
     const vAlong = s.vx * fx + s.vy * fy + s.vz * fz;
     const sx = s.vx - vAlong * fx, sy = s.vy - vAlong * fy, sz = s.vz - vAlong * fz;
-    const grip = Math.min(1, CONFIG.edgeGrip * dt);
-    s.vx -= sx * grip; s.vy -= sy * grip; s.vz -= sz * grip;
+    const side = Math.hypot(sx, sy, sz);
+    const keep = Math.exp(-CONFIG.edgeGrip * dt);
+    const newSide = side * keep;
+    const newAlong = (vAlong < 0 ? -1 : 1) * Math.sqrt(vAlong * vAlong + side * side - newSide * newSide);
+    s.vx = newAlong * fx + sx * keep;
+    s.vy = newAlong * fy + sy * keep;
+    s.vz = newAlong * fz + sz * keep;
 
-    // friksjon + luftmotstand + brems
+    // friksjon + luftmotstand + skrens + brems
     const v = speedOf(s);
     if (v > 1e-6) {
-      const drag = CONFIG.dragCoef * v * v + CONFIG.snowFriction * g + inp.brake * 6;
+      const drag = CONFIG.dragCoef * v * v + CONFIG.snowFriction * g + CONFIG.skidFriction * side + inp.brake * 6;
       ax -= (s.vx / v) * drag; ay -= (s.vy / v) * drag; az -= (s.vz / v) * drag;
     }
 

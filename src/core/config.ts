@@ -10,10 +10,16 @@ export const CONFIG = {
   /** Luftmotstand og snøfriksjon. */
   dragCoef: 0.0045,
   snowFriction: 0.03,
-  /** Hvor fort skiene svinger (rad/s) ved full styring. */
+  /** Hvor fort skiene svinger (rad/s) ved full styring i lav fart. */
   turnRate: 1.6,
-  /** Hvor mye fart som går tapt sidelengs (carving-grep), 0–1 per sekund. */
+  /** Hvor hardt kanten kan presse i en sving (m/s²). Gir ca. 15 m radius i 60 km/t, større radius i høyere fart. */
+  carveAccel: 18.5,
+  /** Hvor fort kanten settes og slippes (per sekund). Høyere = kvikkere, lavere = mykere. */
+  edgeResponse: 7,
+  /** Hvor fort farten vris inn i skienes retning (per sekund). Farten beholdes. */
   edgeGrip: 6,
+  /** Hvor mye skrens bremser (m/s² per m/s sidelengs fart). */
+  skidFriction: 0.25,
   /** Kamera */
   camDistance: 5.5,
   camHeight: 2.0,
