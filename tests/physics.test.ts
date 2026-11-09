@@ -51,6 +51,45 @@ function moving(speed: number) {
   return s;
 }
 
+describe('fart og brems (måltall i DESIGN.md)', () => {
+  const kmh60 = 60 / 3.6;
+
+  it('når 60 km/t på 3–4 sekunder fra start', () => {
+    const s = createSkier();
+    let t = 0;
+    while (speedOf(s) < kmh60 && t < 20) { stepSkier(s, { steer: 0, brake: 0 }, dt); t += dt; }
+    expect(t).toBeGreaterThanOrEqual(3);
+    expect(t).toBeLessThanOrEqual(4);
+  });
+
+  it('nærmer seg toppfarten av seg selv, uten å treffe en vegg', () => {
+    const s = createSkier();
+    for (let i = 0; i < 40 * CONFIG.physicsHz; i++) stepSkier(s, { steer: 0, brake: 0 }, dt);
+    expect(speedOf(s)).toBeGreaterThan(CONFIG.maxSpeed * 0.9);
+    expect(speedOf(s)).toBeLessThan(CONFIG.maxSpeed);
+  });
+
+  it('bremser fra 60 km/t til stopp på under 3 sekunder', () => {
+    const s = moving(kmh60);
+    let t = 0;
+    while (speedOf(s) > 0.01 && t < 20) { stepSkier(s, { steer: 0, brake: 1 }, dt); t += dt; }
+    expect(t).toBeLessThan(3);
+  });
+
+  it('står helt stille mens man holder bremsen', () => {
+    const s = moving(kmh60);
+    for (let i = 0; i < 5 * CONFIG.physicsHz; i++) stepSkier(s, { steer: 0, brake: 1 }, dt);
+    expect(speedOf(s)).toBeLessThan(1e-6);
+  });
+
+  it('begynner å gli igjen når bremsen slippes', () => {
+    const s = moving(kmh60);
+    for (let i = 0; i < 5 * CONFIG.physicsHz; i++) stepSkier(s, { steer: 0, brake: 1 }, dt);
+    for (let i = 0; i < 1 * CONFIG.physicsHz; i++) stepSkier(s, { steer: 0, brake: 0 }, dt);
+    expect(speedOf(s)).toBeGreaterThan(1);
+  });
+});
+
 describe('carving', () => {
   const kmh60 = 60 / 3.6;
 
