@@ -31,6 +31,11 @@ export function createSkier(): SkierState {
   return { x: 0, y: heightAt(0, z), z, vx: 0, vy: 0, vz: 2, heading: 0, edge: 0, lean: 0, leanRate: 0, grounded: true };
 }
 
+/** Sant når skiløperen er så nær slutten av bakken at runden bør starte på nytt. */
+export function reachedEnd(s: SkierState): boolean {
+  return s.z > PARK.length - CONFIG.runEndMargin;
+}
+
 export function speedOf(s: SkierState): number {
   return Math.hypot(s.vx, s.vy, s.vz);
 }
