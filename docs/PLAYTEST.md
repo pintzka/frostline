@@ -17,3 +17,4 @@ Tips: Ta opptak av feilen med Windows + Shift + R og legg det ved.
 | 2026-11-10 | fase-1-sno | «Sporene ser bra ut» | Sporene startet midt under skiløperen (rettet: starter ved bakenden av skiene) | Sporene kan forbedres senere |
 | 2026-11-10 | fase-1-lening | «Det ser mye bedre ut nå» | 1) Hele figuren vippet så skiene løftet seg (rettet: bare kroppen lener seg, maks 25°). 2) Leningen snappet på plass (rettet: myk fjær, ca. 1 s) | Gå til neste steg |
 | 2026-11-10 | fase-1-restart | Testet sammen med leningen | Ingenting meldt | Gå til neste steg |
+| 2026-11-10 | fase-2-pause | «Dette er bra» | Ingenting meldt (ønsket fordi spillet kjørte i det uendelige) | Fortsett |
