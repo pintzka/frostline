@@ -26,8 +26,8 @@ export const CONFIG = {
   maxLean: 0.45,
   /** Hvor mye skiene vipper på kanten, som andel av kroppens lening. */
   skiEdgeTilt: 0.4,
-  /** Hvor fort skiløperen legger seg over og reiser seg (per sekund). */
-  leanResponse: 6,
+  /** Hvor fort kroppen legger seg over og reiser seg. 4 ≈ 1 sekund til full lening. Lavere = roligere. */
+  leanSpeed: 4,
   /** Hvor mye skrens bremser (m/s² per m/s sidelengs fart). */
   skidFriction: 0.25,
   /** Kamera: fast avstand bak (m) og høyde over snøen (m). */

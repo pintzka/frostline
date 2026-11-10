@@ -115,6 +115,12 @@ describe('lening i svinger', () => {
     expect(lean(1, 1, moving(2)).lean).toBeLessThan(lean(1, 1, moving(kmh60)).lean);
   });
 
+  it('snapper ikke over: etter 0,2 s er den mindre enn halvveis', () => {
+    const s = lean(1, 0.2);
+    expect(s.lean).toBeGreaterThan(0);
+    expect(s.lean).toBeLessThan(CONFIG.maxLean * 0.5);
+  });
+
   it('legger seg mykt over, og reiser seg igjen når styringen slippes', () => {
     const s = moving(kmh60);
     stepSkier(s, { steer: 1, brake: 0 }, dt);
