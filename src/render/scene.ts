@@ -25,7 +25,8 @@ export function createScene(root: HTMLElement) {
   scene.add(sun, sun.target);
 
   // preparert bakke: riller langs fallinja og korn som suser forbi, så farten synes
-  const segX = 80, segZ = 600;
+  // 0,5 m mellom punktene langs bakken, så kantene på hoppene blir skarpe
+  const segX = 80, segZ = PARK.length * 2;
   const geo = new THREE.PlaneGeometry(PARK.width + 40, PARK.length, segX, segZ);
   geo.rotateX(-Math.PI / 2);
   geo.translate(0, 0, PARK.length / 2 - 20);

@@ -35,7 +35,9 @@ describe('kamera', () => {
   });
 
   it('ligger ca. camHeight over snøen', () => {
-    const { pose } = simulate(10, 60, () => 0);
+    // 6 s: på bakken, før det første hoppet
+    const { pose, s } = simulate(6, 60, () => 0);
+    expect(s.grounded).toBe(true);
     expect(pose.py - heightAt(pose.px, pose.pz)).toBeCloseTo(CONFIG.camHeight, 0);
   });
 

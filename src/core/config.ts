@@ -30,6 +30,8 @@ export const CONFIG = {
   leanSpeed: 4,
   /** Hvor mye skrens bremser (m/s² per m/s sidelengs fart). */
   skidFriction: 0.25,
+  /** Faller bakken rett foran mer enn dette (m) bort under skiene på ett steg, letter skiløperen. */
+  takeoffGap: 0.02,
   /** Runden starter på nytt så mange meter før bakken tar slutt. */
   runEndMargin: 40,
   /** Kamera: fast avstand bak (m) og høyde over snøen (m). */

@@ -17,6 +17,8 @@ export interface SkierState {
   /** Hvor fort leningen endrer seg (rad/s). Gjør at leningen starter rolig i stedet for å rykke. */
   leanRate: number;
   grounded: boolean;
+  /** Sekunder i lufta i det siste (eller pågående) hoppet. */
+  airTime: number;
 }
 
 export interface SkierInput {
@@ -28,7 +30,7 @@ export interface SkierInput {
 
 export function createSkier(): SkierState {
   const z = 5;
-  return { x: 0, y: heightAt(0, z), z, vx: 0, vy: 0, vz: 2, heading: 0, edge: 0, lean: 0, leanRate: 0, grounded: true };
+  return { x: 0, y: heightAt(0, z), z, vx: 0, vy: 0, vz: 2, heading: 0, edge: 0, lean: 0, leanRate: 0, grounded: true, airTime: 0 };
 }
 
 /** Sant når skiløperen er så nær slutten av bakken at runden bør starte på nytt. */
@@ -45,8 +47,8 @@ export function stepSkier(s: SkierState, inp: SkierInput, dt: number): void {
 
   // kanten bygges opp og slippes mykt, selv om tastaturet bare er av/på
   s.edge += (inp.steer - s.edge) * (1 - Math.exp(-CONFIG.edgeResponse * dt));
-  // i høy fart begrenses svingen av hvor hardt kanten kan presse
-  const turnRate = Math.min(CONFIG.turnRate, CONFIG.carveAccel / Math.max(speedOf(s), 1e-3));
+  // i høy fart begrenses svingen av hvor hardt kanten kan presse; i lufta har kanten ingenting å ta i
+  const turnRate = s.grounded ? Math.min(CONFIG.turnRate, CONFIG.carveAccel / Math.max(speedOf(s), 1e-3)) : 0;
   s.heading += -s.edge * turnRate * dt;
 
   // len inn i svingen like mye som svingen presser (som en ekte skiløper), men aldri mer enn maks
@@ -56,6 +58,14 @@ export function stepSkier(s: SkierState, inp: SkierInput, dt: number): void {
   const w = CONFIG.leanSpeed;
   s.leanRate += (w * w * (wantLean - s.lean) - 2 * w * s.leanRate) * dt;
   s.lean = Math.max(-CONFIG.maxLean, Math.min(CONFIG.maxLean, s.lean + s.leanRate * dt));
+
+  // letter vi? Faller bakken rett foran bort raskere enn vi ville falt i fritt fall (kanten på et hopp),
+  // flyr vi videre med farten vi har, før helningen på baksiden får bøye farten nedover
+  if (s.grounded) {
+    const aheadY = heightAt(s.x + s.vx * dt, s.z + s.vz * dt);
+    const flyY = s.y + s.vy * dt - 0.5 * g * dt * dt;
+    if (flyY - aheadY > CONFIG.takeoffGap) { s.grounded = false; s.airTime = 0; }
+  }
 
   if (s.grounded) {
     const [nx, ny, nz] = normalAt(s.x, s.z);
@@ -95,15 +105,17 @@ export function stepSkier(s: SkierState, inp: SkierInput, dt: number): void {
     // hold farten langs bakken
     const vn = s.vx * nx + s.vy * ny + s.vz * nz;
     s.vx -= vn * nx; s.vy -= vn * ny; s.vz -= vn * nz;
-  } else {
-    s.vy -= g * dt;
-  }
 
-  // toppfart
-  const v = speedOf(s);
-  if (v > CONFIG.maxSpeed) {
-    const k = CONFIG.maxSpeed / v;
-    s.vx *= k; s.vy *= k; s.vz *= k;
+    // toppfart (bare på bakken; i lufta bestemmer tyngdekraften)
+    const vt = speedOf(s);
+    if (vt > CONFIG.maxSpeed) {
+      const k = CONFIG.maxSpeed / vt;
+      s.vx *= k; s.vy *= k; s.vz *= k;
+    }
+  } else {
+    // i lufta: vanlig tyngdekraft, ingen forsterkning
+    s.vy -= g * dt;
+    s.airTime += dt;
   }
 
   s.x += s.vx * dt; s.y += s.vy * dt; s.z += s.vz * dt;
@@ -114,9 +126,20 @@ export function stepSkier(s: SkierState, inp: SkierInput, dt: number): void {
   if (s.x > half) { s.x = half; s.vx = -Math.abs(s.vx) * 0.3; }
 
   const h = heightAt(s.x, s.z);
-  if (s.grounded || s.y <= h) {
-    // fase 0: ingen hopp ennå, så vi følger alltid bakken
+  if (s.grounded) {
+    if (s.y - h > CONFIG.takeoffGap) {
+      // bakken forsvant under skiene (kanten på et hopp): nå flyr du
+      s.grounded = false;
+      s.airTime = 0;
+    } else {
+      s.y = h;
+    }
+  } else if (s.y <= h) {
+    // landing: farten rett inn i bakken tas opp av beina, farten langs bakken beholdes
     s.y = h;
     s.grounded = true;
+    const [nx, ny, nz] = normalAt(s.x, s.z);
+    const vn = s.vx * nx + s.vy * ny + s.vz * nz;
+    if (vn < 0) { s.vx -= vn * nx; s.vy -= vn * ny; s.vz -= vn * nz; }
   }
 }

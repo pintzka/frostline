@@ -10,8 +10,11 @@ export function createHud(root: HTMLElement) {
   help.textContent = 'Styr: ← → / A D · Brems: ↓ / S · Start på nytt: R · Mobil: trykk venstre/høyre';
   root.appendChild(help);
   return {
-    update(speedMs: number, distance: number) {
-      el.textContent = `${Math.round(speedMs * 3.6)} km/t · ${Math.round(distance)} m`;
+    /** airTime: sekunder i lufta i siste (eller pågående) hopp. Vises når hoppet var mer enn et lite hopp. */
+    update(speedMs: number, distance: number, airTime = 0, inAir = false) {
+      let text = `${Math.round(speedMs * 3.6)} km/t · ${Math.round(distance)} m`;
+      if (airTime > 0.3) text += ` · ${inAir ? 'I lufta' : 'Lufttid'} ${airTime.toFixed(1).replace('.', ',')} s`;
+      el.textContent = text;
     },
   };
 }

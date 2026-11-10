@@ -45,6 +45,18 @@ describe('skispor', () => {
     }
   });
 
+  it('stopper i lufta og fortsetter der skiløperen lander, uten å slette sporet', () => {
+    const t = createTrail();
+    for (let i = 0; i < 20; i++) t.update(0, 0, i, 0, true);
+    // flyr 40 m, oppdatert hvert bilde
+    for (let z = 20; z < 60; z += 0.4) expect(t.update(0, 0, z, 0, false)).toBe(false);
+    t.update(0, 0, 60, 0, true);
+    const pts = t.points();
+    expect(pts.length).toBe(21);
+    expect(pts[20].start).toBe(true);
+    expect(pts.slice(0, 20).some((p) => p.start)).toBe(false);
+  });
+
   it('starter et nytt spor ved restart i stedet for å tegne en strek over bakken', () => {
     const t = createTrail();
     for (let i = 0; i < 20; i++) t.update(0, 0, i, 0);
