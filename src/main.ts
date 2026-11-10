@@ -8,6 +8,7 @@ import { createScene } from './render/scene';
 import { createHud } from './ui/hud';
 import { createPlaceholderSkier } from './character/placeholder';
 import { normalAt } from './park/terrain';
+import { createSkiTrails } from './render/trailMesh';
 
 const root = document.getElementById('app')!;
 const { renderer, scene, sun } = createScene(root);
@@ -18,6 +19,7 @@ const hud = createHud(root);
 
 const mesh = createPlaceholderSkier();
 scene.add(mesh);
+const trails = createSkiTrails(scene);
 
 let skier = createSkier();
 let prev = { ...skier };
@@ -48,6 +50,7 @@ const loop = createLoop({
     q.setFromUnitVectors(Y, up);
     qYaw.setFromAxisAngle(Y, skier.heading);
     mesh.quaternion.copy(q).multiply(qYaw);
+    trails.update(target.x, target.y, target.z, skier.heading);
 
     sun.position.set(target.x + 30, target.y + 60, target.z - 20);
     sun.target.position.copy(target);
