@@ -7,7 +7,7 @@ export function createHud(root: HTMLElement) {
   root.appendChild(el);
   const help = document.createElement('div');
   help.style.cssText = 'position:fixed;left:16px;bottom:16px;color:#fffc;font:14px system-ui,sans-serif;pointer-events:none;';
-  help.textContent = 'Styr: ← → / A D · Brems: ↓ / S · Start på nytt: R · Mobil: trykk venstre/høyre';
+  help.textContent = 'Styr: ← → / A D · Brems: ↓ / S · Start på nytt: R · Pause: P / Esc · Mobil: trykk venstre/høyre';
   root.appendChild(help);
   return {
     update(speedMs: number, distance: number) {

@@ -6,6 +6,7 @@ import { createInput } from './input/input';
 import { createChaseCamera } from './camera/chase';
 import { createScene } from './render/scene';
 import { createHud } from './ui/hud';
+import { createPauseUi } from './ui/pause';
 import { createPlaceholderSkier } from './character/placeholder';
 import { normalAt } from './park/terrain';
 import { createSkiTrails } from './render/trailMesh';
@@ -65,3 +66,4 @@ const loop = createLoop({
   },
 });
 loop.start();
+createPauseUi(root, loop);
