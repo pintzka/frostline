@@ -12,6 +12,10 @@ export interface SkierState {
   heading: number;
   /** Hvor mye skiene står på kant, -1 (venstre) til 1 (høyre). Følger styringen mykt. */
   edge: number;
+  /** Hvor mye skiløperen lener seg inn i svingen (rad). Positiv = mot høyre. */
+  lean: number;
+  /** Hvor fort leningen endrer seg (rad/s). Gjør at leningen starter rolig i stedet for å rykke. */
+  leanRate: number;
   grounded: boolean;
 }
 
@@ -24,7 +28,7 @@ export interface SkierInput {
 
 export function createSkier(): SkierState {
   const z = 5;
-  return { x: 0, y: heightAt(0, z), z, vx: 0, vy: 0, vz: 2, heading: 0, edge: 0, grounded: true };
+  return { x: 0, y: heightAt(0, z), z, vx: 0, vy: 0, vz: 2, heading: 0, edge: 0, lean: 0, leanRate: 0, grounded: true };
 }
 
 export function speedOf(s: SkierState): number {
@@ -39,6 +43,14 @@ export function stepSkier(s: SkierState, inp: SkierInput, dt: number): void {
   // i høy fart begrenses svingen av hvor hardt kanten kan presse
   const turnRate = Math.min(CONFIG.turnRate, CONFIG.carveAccel / Math.max(speedOf(s), 1e-3));
   s.heading += -s.edge * turnRate * dt;
+
+  // len inn i svingen like mye som svingen presser (som en ekte skiløper), men aldri mer enn maks
+  const sideAccel = speedOf(s) * s.edge * turnRate;
+  const wantLean = Math.max(-CONFIG.maxLean, Math.min(CONFIG.maxLean, Math.atan(sideAccel / g)));
+  // myk fjær (kritisk dempet): starter rolig, glir på plass og skyter ikke over
+  const w = CONFIG.leanSpeed;
+  s.leanRate += (w * w * (wantLean - s.lean) - 2 * w * s.leanRate) * dt;
+  s.lean = Math.max(-CONFIG.maxLean, Math.min(CONFIG.maxLean, s.lean + s.leanRate * dt));
 
   if (s.grounded) {
     const [nx, ny, nz] = normalAt(s.x, s.z);

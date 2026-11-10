@@ -17,7 +17,8 @@ addEventListener('resize', () => chase.resize(innerWidth / innerHeight));
 const input = createInput(renderer.domElement);
 const hud = createHud(root);
 
-const mesh = createPlaceholderSkier();
+const skierModel = createPlaceholderSkier();
+const mesh = skierModel.root;
 scene.add(mesh);
 const trails = createSkiTrails(scene);
 
@@ -50,6 +51,7 @@ const loop = createLoop({
     q.setFromUnitVectors(Y, up);
     qYaw.setFromAxisAngle(Y, skier.heading);
     mesh.quaternion.copy(q).multiply(qYaw);
+    skierModel.setLean(prev.lean + (skier.lean - prev.lean) * alpha);
     trails.update(target.x, target.y, target.z, skier.heading);
 
     sun.position.set(target.x + 30, target.y + 60, target.z - 20);
