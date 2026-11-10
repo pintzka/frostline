@@ -30,6 +30,8 @@ const up = new THREE.Vector3();
 const q = new THREE.Quaternion();
 const qYaw = new THREE.Quaternion();
 const Y = new THREE.Vector3(0, 1, 0);
+const Z = new THREE.Vector3(0, 0, 1);
+const qLean = new THREE.Quaternion();
 
 const loop = createLoop({
   hz: CONFIG.physicsHz,
@@ -49,7 +51,8 @@ const loop = createLoop({
     up.set(nx, ny, nz);
     q.setFromUnitVectors(Y, up);
     qYaw.setFromAxisAngle(Y, skier.heading);
-    mesh.quaternion.copy(q).multiply(qYaw);
+    qLean.setFromAxisAngle(Z, prev.lean + (skier.lean - prev.lean) * alpha);
+    mesh.quaternion.copy(q).multiply(qYaw).multiply(qLean);
     trails.update(target.x, target.y, target.z, skier.heading);
 
     sun.position.set(target.x + 30, target.y + 60, target.z - 20);

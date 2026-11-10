@@ -22,6 +22,10 @@ export const CONFIG = {
   edgeResponse: 7,
   /** Hvor fort farten vris inn i skienes retning (per sekund). Farten beholdes. */
   edgeGrip: 6,
+  /** Hvor mye skiløperen kan lene seg inn i en sving (rad). 0,7 ≈ 40°. */
+  maxLean: 0.7,
+  /** Hvor fort skiløperen legger seg over og reiser seg (per sekund). */
+  leanResponse: 6,
   /** Hvor mye skrens bremser (m/s² per m/s sidelengs fart). */
   skidFriction: 0.25,
   /** Kamera: fast avstand bak (m) og høyde over snøen (m). */

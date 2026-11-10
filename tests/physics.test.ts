@@ -90,6 +90,41 @@ describe('fart og brems (måltall i DESIGN.md)', () => {
   });
 });
 
+describe('lening i svinger', () => {
+  const kmh60 = 60 / 3.6;
+  function lean(steer: number, seconds: number, start = moving(kmh60)) {
+    for (let i = 0; i < seconds * CONFIG.physicsHz; i++) stepSkier(start, { steer, brake: 0 }, dt);
+    return start;
+  }
+
+  it('står rett når den kjører rett fram', () => {
+    expect(Math.abs(lean(0, 2).lean)).toBeLessThan(1e-6);
+  });
+
+  it('lener seg mot høyre i en høyresving og mot venstre i en venstresving', () => {
+    expect(lean(1, 1).lean).toBeGreaterThan(0.3);
+    expect(lean(-1, 1).lean).toBeLessThan(-0.3);
+  });
+
+  it('lener seg aldri mer enn maks', () => {
+    const s = lean(1, 3, moving(CONFIG.maxSpeed));
+    expect(Math.abs(s.lean)).toBeLessThanOrEqual(CONFIG.maxLean + 1e-9);
+  });
+
+  it('lener seg mindre i lav fart enn i høy fart', () => {
+    expect(lean(1, 1, moving(4)).lean).toBeLessThan(lean(1, 1, moving(kmh60)).lean);
+  });
+
+  it('legger seg mykt over, og reiser seg igjen når styringen slippes', () => {
+    const s = moving(kmh60);
+    stepSkier(s, { steer: 1, brake: 0 }, dt);
+    expect(s.lean).toBeLessThan(0.05);
+    lean(1, 1, s);
+    lean(0, 2, s);
+    expect(Math.abs(s.lean)).toBeLessThan(0.05);
+  });
+});
+
 describe('carving', () => {
   const kmh60 = 60 / 3.6;
 
