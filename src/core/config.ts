@@ -30,6 +30,8 @@ export const CONFIG = {
   leanSpeed: 4,
   /** Hvor mye skrens bremser (m/s² per m/s sidelengs fart). */
   skidFriction: 0.25,
+  /** Runden starter på nytt så mange meter før bakken tar slutt. */
+  runEndMargin: 40,
   /** Kamera: fast avstand bak (m) og høyde over snøen (m). */
   camDistance: 5.5,
   camHeight: 2.0,

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { CONFIG } from '../src/core/config';
-import { createSkier, speedOf, stepSkier } from '../src/physics/skier';
-import { heightAt } from '../src/park/terrain';
+import { createSkier, reachedEnd, speedOf, stepSkier } from '../src/physics/skier';
+import { heightAt, PARK } from '../src/park/terrain';
 
 const dt = 1 / CONFIG.physicsHz;
 function run(seconds: number, steer = 0, brake = 0) {
@@ -128,6 +128,20 @@ describe('lening i svinger', () => {
     lean(1, 1, s);
     lean(0, 2, s);
     expect(Math.abs(s.lean)).toBeLessThan(0.05);
+  });
+});
+
+describe('slutten av bakken', () => {
+  it('er ikke nådd ved start', () => {
+    expect(reachedEnd(createSkier())).toBe(false);
+  });
+
+  it('nås før bakken tar slutt', () => {
+    const s = createSkier();
+    let t = 0;
+    while (!reachedEnd(s) && t < 120) { stepSkier(s, { steer: 0, brake: 0 }, dt); t += dt; }
+    expect(reachedEnd(s)).toBe(true);
+    expect(s.z).toBeLessThan(PARK.length - 20);
   });
 });
 

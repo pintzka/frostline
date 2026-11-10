@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { CONFIG } from './core/config';
 import { createLoop } from './core/loop';
-import { createSkier, speedOf, stepSkier } from './physics/skier';
+import { createSkier, reachedEnd, speedOf, stepSkier } from './physics/skier';
 import { createInput } from './input/input';
 import { createChaseCamera } from './camera/chase';
 import { createScene } from './render/scene';
@@ -35,7 +35,8 @@ const Y = new THREE.Vector3(0, 1, 0);
 const loop = createLoop({
   hz: CONFIG.physicsHz,
   step(dt) {
-    if (input.pressed('KeyR')) { skier = createSkier(); }
+    // R, eller slutten av bakken: ny runde med en gang
+    if (input.pressed('KeyR') || reachedEnd(skier)) { skier = createSkier(); }
     prev = { ...skier };
     stepSkier(skier, input.read(), dt);
   },
