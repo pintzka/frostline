@@ -13,3 +13,4 @@ Tips: Ta opptak av feilen med Windows + Shift + R og legg det ved.
 |---|---|---|---|---|
 | 2026-11-09 | fase-1-carving | «Alt er bra» | Ingenting meldt | Fortsett til neste steg |
 | 2026-11-10 | fase-1-brems-og-fart | Godkjent | Ingenting meldt | Lag PR |
+| 2026-11-10 | fase-1-kamera | «Det er fint» | Ingenting meldt | Gå videre |
