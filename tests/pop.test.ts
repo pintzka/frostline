@@ -64,8 +64,25 @@ describe('pop', () => {
       stepSkier(s, { steer: 0, brake: 0, pop: false }, dt);
       maxH = Math.max(maxH, s.y - heightAt(s.x, s.z));
     }
-    expect(maxH).toBeGreaterThan(0.04);
+    // en ordentlig ollie: ca. 35 cm opp ved full lading
+    expect(maxH).toBeGreaterThan(0.25);
+    expect(maxH).toBeLessThan(0.5);
     expect(s.grounded).toBe(true);
+  });
+
+  it('er svakere på rampen til et hopp, så du ikke flyr forbi landingen', () => {
+    // hvor mye fart ett slipp gir: samme steg med og uten pop, fullt ladet
+    const gain = (z: number) => {
+      const base = moving(20);
+      base.z = z; base.y = heightAt(0, z);
+      const withPop = { ...base, popCharge: 1, popHeld: true };
+      const without = { ...base };
+      stepSkier(withPop, { steer: 0, brake: 0, pop: false }, dt);
+      stepSkier(without, { steer: 0, brake: 0, pop: false }, dt);
+      return Math.hypot(withPop.vx - without.vx, withPop.vy - without.vy, withPop.vz - without.vz);
+    };
+    const k = PARK.kickers[1];
+    expect(gain(k.z - 3)).toBeLessThan(gain(100) * 0.6);
   });
 
   it('gjør ingenting hvis du slipper i lufta', () => {

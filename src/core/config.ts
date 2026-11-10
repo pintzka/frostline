@@ -32,9 +32,14 @@ export const CONFIG = {
   skidFriction: 0.25,
   /** Faller bakken rett foran mer enn dette (m) bort under skiene på ett steg, letter skiløperen. */
   takeoffGap: 0.02,
-  /** Pop: sekunder å lade fullt, fart opp fra bakken ved full lading (m/s), og andel du får ved et kort trykk. */
+  /**
+   * Pop: sekunder å lade fullt, fart opp fra bakken ved full lading (m/s), og andel du får ved et kort trykk.
+   * popSpeed gjelder på vanlig bakke (ollie, ca. 35 cm). På rampen til et hopp gjør rampen mesteparten
+   * av jobben, så der brukes popSpeedRamp, ellers flyr du forbi landingen.
+   */
   popChargeTime: 0.5,
-  popSpeed: 1.0,
+  popSpeed: 2.6,
+  popSpeedRamp: 1.0,
   popMinCharge: 0.35,
   /** Slipper du pop så kort tid (s) før kanten, er det en perfekt pop, som gir så mye ekstra. */
   popPerfectWindow: 0.12,

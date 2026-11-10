@@ -1,5 +1,5 @@
 import { CONFIG } from '../core/config';
-import { heightAt, normalAt, PARK } from '../park/terrain';
+import { heightAt, normalAt, PARK, rampLength } from '../park/terrain';
 
 /**
  * Skiløperens fysikk. Ren logikk uten three.js, så den kan testes.
@@ -53,11 +53,20 @@ function atLip(s: SkierState): boolean {
   });
 }
 
+/** Står skiløperen på rampen til et hopp? Der gjør rampen mesteparten av jobben, så pop er svakere. */
+function onRamp(s: SkierState): boolean {
+  return PARK.kickers.some((k) => {
+    const u = s.z - k.z;
+    return u >= -rampLength(k) && u <= 0.5 && Math.abs(s.x) < k.width / 2 + 1;
+  });
+}
+
 /** Spretter opp fra bakken. Sterkere jo lenger du har ladet, og ekstra sterkt på kanten. */
 function doPop(s: SkierState): void {
   const [nx, ny, nz] = normalAt(s.x, s.z);
   const perfect = atLip(s);
-  let strength = CONFIG.popSpeed * (CONFIG.popMinCharge + (1 - CONFIG.popMinCharge) * s.popCharge);
+  const full = onRamp(s) ? CONFIG.popSpeedRamp : CONFIG.popSpeed;
+  let strength = full * (CONFIG.popMinCharge + (1 - CONFIG.popMinCharge) * s.popCharge);
   if (perfect) strength *= CONFIG.popPerfectBoost;
   s.vx += nx * strength; s.vy += ny * strength; s.vz += nz * strength;
   s.grounded = false;
