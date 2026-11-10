@@ -32,5 +32,9 @@ export function createPlaceholderSkier() {
       upper.rotation.z = lean;
       for (const ski of skis) ski.rotation.z = lean * CONFIG.skiEdgeTilt;
     },
+    /** Krøker seg sammen mens pop lades (0–1), så du ser at det lades. */
+    setCrouch(amount: number) {
+      upper.scale.y = 1 - 0.25 * amount;
+    },
   };
 }

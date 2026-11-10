@@ -19,6 +19,14 @@ export interface SkierState {
   grounded: boolean;
   /** Sekunder i lufta i det siste (eller pågående) hoppet. */
   airTime: number;
+  /** Hvor mye pop er ladet opp (0–1) mens pop-knappen holdes. */
+  popCharge: number;
+  /** Om pop-knappen var holdt forrige steg (for å merke når den slippes). */
+  popHeld: boolean;
+  /** Siste pop: '' (ingen ennå), 'pop' eller 'perfekt'. */
+  lastPop: '' | 'pop' | 'perfekt';
+  /** Sekunder siden siste pop (for visning på skjermen). */
+  popAge: number;
 }
 
 export interface SkierInput {
@@ -26,11 +34,36 @@ export interface SkierInput {
   steer: number;
   /** 0–1, brems/plog */
   brake: number;
+  /** Holdes for å lade pop, slippes for å sprette. */
+  pop?: boolean;
 }
 
 export function createSkier(): SkierState {
   const z = 5;
-  return { x: 0, y: heightAt(0, z), z, vx: 0, vy: 0, vz: 2, heading: 0, edge: 0, lean: 0, leanRate: 0, grounded: true, airTime: 0 };
+  return { x: 0, y: heightAt(0, z), z, vx: 0, vy: 0, vz: 2, heading: 0, edge: 0, lean: 0, leanRate: 0, grounded: true, airTime: 0,
+    popCharge: 0, popHeld: false, lastPop: '', popAge: 99 };
+}
+
+/** Er skiløperen akkurat foran kanten på et hopp (innenfor vinduet for perfekt pop)? */
+function atLip(s: SkierState): boolean {
+  const window = Math.max(1, s.vz) * CONFIG.popPerfectWindow;
+  return PARK.kickers.some((k) => {
+    const d = k.z - s.z;
+    return d >= 0 && d <= window && Math.abs(s.x) < k.width / 2;
+  });
+}
+
+/** Spretter opp fra bakken. Sterkere jo lenger du har ladet, og ekstra sterkt på kanten. */
+function doPop(s: SkierState): void {
+  const [nx, ny, nz] = normalAt(s.x, s.z);
+  const perfect = atLip(s);
+  let strength = CONFIG.popSpeed * (CONFIG.popMinCharge + (1 - CONFIG.popMinCharge) * s.popCharge);
+  if (perfect) strength *= CONFIG.popPerfectBoost;
+  s.vx += nx * strength; s.vy += ny * strength; s.vz += nz * strength;
+  s.grounded = false;
+  s.airTime = 0;
+  s.lastPop = perfect ? 'perfekt' : 'pop';
+  s.popAge = 0;
 }
 
 /** Sant når skiløperen er så nær slutten av bakken at runden bør starte på nytt. */
@@ -58,6 +91,17 @@ export function stepSkier(s: SkierState, inp: SkierInput, dt: number): void {
   const w = CONFIG.leanSpeed;
   s.leanRate += (w * w * (wantLean - s.lean) - 2 * w * s.leanRate) * dt;
   s.lean = Math.max(-CONFIG.maxLean, Math.min(CONFIG.maxLean, s.lean + s.leanRate * dt));
+
+  // pop: lad mens knappen holdes på bakken, sprett når den slippes (i lufta skjer ingenting)
+  s.popAge += dt;
+  const holding = !!inp.pop;
+  if (holding) {
+    if (s.grounded) s.popCharge = Math.min(1, s.popCharge + dt / CONFIG.popChargeTime);
+  } else {
+    if (s.popHeld && s.grounded && s.popCharge > 0) doPop(s);
+    s.popCharge = 0;
+  }
+  s.popHeld = holding;
 
   // letter vi? Faller bakken rett foran bort raskere enn vi ville falt i fritt fall (kanten på et hopp),
   // flyr vi videre med farten vi har, før helningen på baksiden får bøye farten nedover

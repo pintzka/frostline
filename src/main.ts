@@ -56,6 +56,7 @@ const loop = createLoop({
     qYaw.setFromAxisAngle(Y, skier.heading);
     mesh.quaternion.copy(q).multiply(qYaw);
     skierModel.setLean(prev.lean + (skier.lean - prev.lean) * alpha);
+    skierModel.setCrouch(skier.popCharge);
     trails.update(target.x, target.y, target.z, skier.heading, skier.grounded);
 
     sun.position.set(target.x + 30, target.y + 60, target.z - 20);
@@ -63,7 +64,10 @@ const loop = createLoop({
 
     const v = speedOf(skier);
     chase.update({ x: target.x, y: target.y, z: target.z, vx: skier.vx, vz: skier.vz, heading: skier.heading, speed: v }, frameDt);
-    hud.update(v, skier.z - startZ, skier.airTime, !skier.grounded);
+    hud.update({
+      speed: v, distance: skier.z - startZ, airTime: skier.airTime, inAir: !skier.grounded,
+      popCharge: skier.popCharge, lastPop: skier.lastPop, popAge: skier.popAge,
+    });
     renderer.render(scene, chase.camera);
   },
 });

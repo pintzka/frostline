@@ -2,12 +2,16 @@ import type { SkierInput } from '../physics/skier';
 
 /**
  * Tastatur + berøring. Arbeidsstrøm 2 (Kamera og input) eier denne fila.
- * Piltaster/A-D styrer, S/pil ned bremser. På mobil: venstre/høyre halvdel av skjermen.
+ * Piltaster/A-D styrer, S/pil ned bremser, mellomrom lader pop (slipp for å sprette). På mobil: venstre/høyre halvdel av skjermen.
  */
 export function createInput(target: HTMLElement) {
   const keys = new Set<string>();
   let touchSteer = 0;
-  addEventListener('keydown', (e) => keys.add(e.code));
+  addEventListener('keydown', (e) => {
+    keys.add(e.code);
+    // mellomrom skal lade pop, ikke rulle siden
+    if (e.code === 'Space') e.preventDefault();
+  });
   addEventListener('keyup', (e) => keys.delete(e.code));
   addEventListener('blur', () => keys.clear());
 
@@ -21,13 +25,14 @@ export function createInput(target: HTMLElement) {
   target.addEventListener('touchmove', onTouch, { passive: false });
   target.addEventListener('touchend', onTouch, { passive: false });
 
-  const state: SkierInput = { steer: 0, brake: 0 };
+  const state: SkierInput = { steer: 0, brake: 0, pop: false };
   return {
     read(): SkierInput {
       const left = keys.has('ArrowLeft') || keys.has('KeyA');
       const right = keys.has('ArrowRight') || keys.has('KeyD');
       state.steer = (right ? 1 : 0) - (left ? 1 : 0) || touchSteer;
       state.brake = keys.has('ArrowDown') || keys.has('KeyS') ? 1 : 0;
+      state.pop = keys.has('Space');
       return state;
     },
     pressed(code: string) { return keys.has(code); },

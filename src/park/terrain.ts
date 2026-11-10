@@ -32,17 +32,18 @@ export interface Kicker {
 export const DECK = { height: 0.85, drop: 1 };
 
 /** Landingens deler (m): kort kant inn, bratt del der du lander, og lang myk utkjøring. */
-export const LANDING = { knuckle: 6, steep: 22, runout: 55 };
+export const LANDING = { knuckle: 6, steep: 32, runout: 75 };
 
 export const PARK = {
   width: 80,
   length: 600,
   kickers: [
     // tallene er funnet ved å teste mange kombinasjoner i en hel kjøring fra start:
-    // myk rampe (maks 2,1 g) og landing under 10°, også 5 % saktere og 3 % raskere enn normalt
-    { name: 'Lite', z: 160, lipDeg: 12, radius: 55, width: 9, landingStart: 19, landingDeg: 9 },
-    { name: 'Medium', z: 290, lipDeg: 20, radius: 50, width: 10, landingStart: 37, landingDeg: 21 },
-    { name: 'Stort', z: 430, lipDeg: 24, radius: 55, width: 12, landingStart: 40, landingDeg: 21 },
+    // myk rampe og utkjøring (maks 2,1 g), landing under 10° (også 5 % saktere og 3 % raskere),
+    // og under 11° med perfekt pop
+    { name: 'Lite', z: 160, lipDeg: 12, radius: 50, width: 9, landingStart: 19, landingDeg: 9 },
+    { name: 'Medium', z: 290, lipDeg: 21, radius: 65, width: 10, landingStart: 37, landingDeg: 15 },
+    { name: 'Stort', z: 430, lipDeg: 25, radius: 75, width: 12, landingStart: 40, landingDeg: 18 },
   ] as Kicker[],
 };
 

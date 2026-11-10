@@ -24,7 +24,16 @@ Dette er målene vi bygger mot. Tallene ligger i `src/core/config.ts`. Daniel ka
 | Stort (20 m) | 2,3–2,8 s | 5–7 m |
 
 Rampene skal dytte mykt: maks 2,1 g (1 g = å stå stille). Landingene skal treffe under 10° mot bakken.
-Justert 10. november etter Daniels test («brå oppover, brå landing»): uten pop gir det store hoppet 2,8 s og 4,2 m. Å nå 5 m uten pop krever en rampe som sparker hardere. Pop (neste steg) skal gi resten.
+Justert 10. november etter Daniels test («brå oppover, brå landing»): uten pop gir det store hoppet 2,5 s og 4,3 m. Å nå 5 m uten pop krever en rampe som sparker hardere. Med perfekt pop gir det 3,1 s og 5,3 m.
+
+## Pop
+| Mål | Verdi |
+|---|---|
+| Lading | hold mellomrom, fullt etter 0,5 s |
+| Pop på flat bakke (ollie) | ca. 5 cm |
+| Perfekt pop | slipp innen 0,12 s før kanten, 25 % ekstra kraft |
+| Ekstra høyde med perfekt pop | ca. +0,5 m (lite), +0,9 m (medium), +1,0 m (stort) |
+| Landing med perfekt pop | fortsatt under 11° |
 
 ## Triks (fase 2)
 | Mål | Verdi |
