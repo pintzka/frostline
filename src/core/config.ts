@@ -44,6 +44,10 @@ export const CONFIG = {
   camMinClearance: 0.6,
   /** Hopper skiløperen lenger enn dette på ett bilde (restart), flytter kameraet seg rett dit. */
   camSnapDistance: 20,
+  /** Skispor: avstand mellom punktene (m), hvor mange punkter som huskes, og avstand mellom skiene (m). */
+  trailSpacing: 0.25,
+  trailMaxPoints: 600,
+  skiGap: 0.3,
 } as const;
 
 export type Config = typeof CONFIG;
