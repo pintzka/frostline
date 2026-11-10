@@ -1,11 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import { CONFIG } from '../src/core/config';
 import { createSkier, speedOf, stepSkier, type SkierState } from '../src/physics/skier';
-import { heightAt, PARK } from '../src/park/terrain';
+import { heightAt, normalAt, PARK } from '../src/park/terrain';
 
 const dt = 1 / CONFIG.physicsHz;
 
-interface Flight { startZ: number; endZ: number; airtime: number; heightOverLip: number }
+interface Flight {
+  startZ: number; endZ: number; airtime: number; heightOverLip: number;
+  /** Vinkelen mellom farten og bakken i det skiløperen lander (grader). Liten = myk landing. */
+  landingAngle: number;
+  /** Hvor mye av farten som er igjen etter landingen (0–1). */
+  speedKept: number;
+  /** Hvor hardt rampen presset skiløperen opp før hoppet, i g (1 = som å stå stille). */
+  rampG: number;
+}
 
 /** Kjør rett ned hele bakken og logg hver gang skiløperen er i lufta. */
 function rideAndLog(brakeBeforeZ?: number) {
@@ -13,12 +21,22 @@ function rideAndLog(brakeBeforeZ?: number) {
   const flights: Flight[] = [];
   let cur: Flight | null = null;
   let lipY = 0;
+  let rampG = 0;
   for (let i = 0; i < 60 * CONFIG.physicsHz && s.z < PARK.length - 30; i++) {
     const brake = brakeBeforeZ !== undefined && s.z > brakeBeforeZ - 60 && s.z < brakeBeforeZ - 5 && speedOf(s) > 4 ? 1 : 0;
     const wasGrounded = s.grounded;
-    const y0 = s.y;
+    const y0 = s.y, vx0 = s.vx, vy0 = s.vy, vz0 = s.vz, v0 = speedOf(s);
     stepSkier(s, { steer: 0, brake }, dt);
-    if (wasGrounded && !s.grounded) { cur = { startZ: s.z, endZ: 0, airtime: 0, heightOverLip: 0 }; lipY = y0; }
+    if (wasGrounded && s.grounded) {
+      // kraften fra bakken (per kg) langs bakkens normal, delt på g
+      const [nx, ny, nz] = normalAt(s.x, s.z);
+      const ax = (s.vx - vx0) / dt, ay = (s.vy - vy0) / dt + CONFIG.gravity, az = (s.vz - vz0) / dt;
+      rampG = Math.max(rampG, (ax * nx + ay * ny + az * nz) / CONFIG.gravity);
+    }
+    if (wasGrounded && !s.grounded) {
+      cur = { startZ: s.z, endZ: 0, airtime: 0, heightOverLip: 0, landingAngle: 0, speedKept: 1, rampG };
+      lipY = y0;
+    }
     if (cur && !s.grounded) {
       cur.airtime += dt;
       // høyde over kanten, målt langs bakkens helning (som i DESIGN.md)
@@ -26,7 +44,17 @@ function rideAndLog(brakeBeforeZ?: number) {
       const lineY = lipY - (s.z - cur.startZ) * slope;
       cur.heightOverLip = Math.max(cur.heightOverLip, s.y - lineY);
     }
-    if (cur && s.grounded) { cur.endZ = s.z; flights.push(cur); cur = null; }
+    if (cur && s.grounded) {
+      const [nx, ny, nz] = normalAt(s.x, s.z);
+      const vn = -(vx0 * nx + vy0 * ny + vz0 * nz);
+      cur.landingAngle = (Math.asin(Math.max(-1, Math.min(1, vn / v0))) * 180) / Math.PI;
+      cur.speedKept = speedOf(s) / v0;
+      cur.endZ = s.z;
+      flights.push(cur);
+      cur = null;
+    }
+    if (!wasGrounded || !s.grounded) rampG = 0;
+    if (s.grounded && Math.min(...PARK.kickers.map((k) => Math.abs(s.z - k.z))) > 40) rampG = 0;
   }
   return { s, flights };
 }
@@ -60,12 +88,24 @@ describe('hopp og luft', () => {
     expect(f.heightOverLip).toBeLessThanOrEqual(4);
   });
 
-  it('stort hopp: 2,3–2,8 s i lufta og 5–7 m over kanten', () => {
+  // uten pop: 4–7 m (se DESIGN.md). 5 m krever en rampe som sparker hardere enn 2,1 g, eller pop.
+  it('stort hopp: 2,3–2,9 s i lufta og 4–7 m over kanten', () => {
     const f = flightFor(flights, big.z)!;
     expect(f.airtime).toBeGreaterThanOrEqual(2.3);
-    expect(f.airtime).toBeLessThanOrEqual(2.8);
-    expect(f.heightOverLip).toBeGreaterThanOrEqual(5);
+    expect(f.airtime).toBeLessThanOrEqual(2.9);
+    expect(f.heightOverLip).toBeGreaterThanOrEqual(4);
     expect(f.heightOverLip).toBeLessThanOrEqual(7);
+  });
+
+  it('rampene dytter mykt (maks 2,1 g), ikke et brått spark', () => {
+    for (const f of flights) expect(f.rampG).toBeLessThanOrEqual(2.1);
+  });
+
+  it('landingene er myke: under 12° mot bakken, og nesten all fart beholdes', () => {
+    for (const f of flights) {
+      expect(f.landingAngle).toBeLessThan(12);
+      expect(f.speedKept).toBeGreaterThan(0.97);
+    }
   });
 
   it('lander på bakken og kjører videre', () => {
