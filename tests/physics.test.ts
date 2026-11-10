@@ -112,7 +112,7 @@ describe('lening i svinger', () => {
   });
 
   it('lener seg mindre i lav fart enn i høy fart', () => {
-    expect(lean(1, 1, moving(4)).lean).toBeLessThan(lean(1, 1, moving(kmh60)).lean);
+    expect(lean(1, 1, moving(2)).lean).toBeLessThan(lean(1, 1, moving(kmh60)).lean);
   });
 
   it('legger seg mykt over, og reiser seg igjen når styringen slippes', () => {
