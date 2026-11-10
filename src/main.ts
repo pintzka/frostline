@@ -27,7 +27,8 @@ let prev = { ...skier };
 const startZ = skier.z;
 
 const target = new THREE.Vector3();
-const up = new THREE.Vector3();
+const up = new THREE.Vector3(0, 1, 0);
+const wantUp = new THREE.Vector3();
 const q = new THREE.Quaternion();
 const qYaw = new THREE.Quaternion();
 const Y = new THREE.Vector3(0, 1, 0);
@@ -47,20 +48,22 @@ const loop = createLoop({
       prev.z + (skier.z - prev.z) * alpha,
     );
     mesh.position.copy(target);
-    const [nx, ny, nz] = normalAt(target.x, target.z);
-    up.set(nx, ny, nz);
+    // på bakken står skiløperen vinkelrett på snøen; i lufta glir den mykt over til å stå rett opp
+    const [nx, ny, nz] = skier.grounded ? normalAt(target.x, target.z) : [0, 1, 0];
+    wantUp.set(nx, ny, nz);
+    up.lerp(wantUp, 1 - Math.exp(-12 * frameDt)).normalize();
     q.setFromUnitVectors(Y, up);
     qYaw.setFromAxisAngle(Y, skier.heading);
     mesh.quaternion.copy(q).multiply(qYaw);
     skierModel.setLean(prev.lean + (skier.lean - prev.lean) * alpha);
-    trails.update(target.x, target.y, target.z, skier.heading);
+    trails.update(target.x, target.y, target.z, skier.heading, skier.grounded);
 
     sun.position.set(target.x + 30, target.y + 60, target.z - 20);
     sun.target.position.copy(target);
 
     const v = speedOf(skier);
     chase.update({ x: target.x, y: target.y, z: target.z, vx: skier.vx, vz: skier.vz, heading: skier.heading, speed: v }, frameDt);
-    hud.update(v, skier.z - startZ);
+    hud.update(v, skier.z - startZ, skier.airTime, !skier.grounded);
     renderer.render(scene, chase.camera);
   },
 });

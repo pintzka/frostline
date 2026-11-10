@@ -47,7 +47,10 @@ describe('skiløper-fysikk', () => {
 /** Skiløper som allerede kjører rett ned med gitt fart. */
 function moving(speed: number) {
   const s = createSkier();
-  s.vz = speed;
+  // farten går langs bakken (ned 18°), ikke vannrett, ellers letter skiløperen med en gang
+  const a = (CONFIG.slopeDeg * Math.PI) / 180;
+  s.vz = speed * Math.cos(a);
+  s.vy = -speed * Math.sin(a);
   return s;
 }
 
