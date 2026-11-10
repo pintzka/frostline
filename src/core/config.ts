@@ -7,9 +7,13 @@ export const CONFIG = {
   slopeDeg: 18,
   /** Toppfart i m/s (≈ 90 km/t). */
   maxSpeed: 25,
-  /** Luftmotstand og snøfriksjon. */
-  dragCoef: 0.0045,
+  /** Forsterker farten ned bakken, så 0–60 km/t tar 3–4 s. */
+  slopeAccel: 1.75,
+  /** Luftmotstand og snøfriksjon. dragCoef er satt så farten flater ut like under toppfarten. */
+  dragCoef: 0.0085,
   snowFriction: 0.03,
+  /** Hvor hardt bremsen tar i (m/s²) ved full brems. */
+  brakeDecel: 11,
   /** Hvor fort skiene svinger (rad/s) ved full styring i lav fart. */
   turnRate: 1.6,
   /** Hvor hardt kanten kan presse i en sving (m/s²). Gir ca. 15 m radius i 60 km/t, større radius i høyere fart. */

@@ -42,11 +42,11 @@ export function stepSkier(s: SkierState, inp: SkierInput, dt: number): void {
 
   if (s.grounded) {
     const [nx, ny, nz] = normalAt(s.x, s.z);
-    // tyngdekraftens komponent langs bakken
+    // tyngdekraftens komponent langs bakken, forsterket så det føles raskt
     const gDotN = -g * ny;
-    let ax = -gDotN * nx;
-    let ay = -g - gDotN * ny;
-    let az = -gDotN * nz;
+    const ax = -gDotN * nx * CONFIG.slopeAccel;
+    const ay = (-g - gDotN * ny) * CONFIG.slopeAccel;
+    const az = -gDotN * nz * CONFIG.slopeAccel;
 
     // skienes retning projisert på bakken
     let fx = Math.sin(s.heading), fz = Math.cos(s.heading);
@@ -65,14 +65,15 @@ export function stepSkier(s: SkierState, inp: SkierInput, dt: number): void {
     s.vy = newAlong * fy + sy * keep;
     s.vz = newAlong * fz + sz * keep;
 
-    // friksjon + luftmotstand + skrens + brems
-    const v = speedOf(s);
-    if (v > 1e-6) {
-      const drag = CONFIG.dragCoef * v * v + CONFIG.snowFriction * g + CONFIG.skidFriction * side + inp.brake * 6;
-      ax -= (s.vx / v) * drag; ay -= (s.vy / v) * drag; az -= (s.vz / v) * drag;
-    }
-
     s.vx += ax * dt; s.vy += ay * dt; s.vz += az * dt;
+
+    // friksjon + luftmotstand + skrens + brems kan bare stoppe deg, aldri dytte deg bakover
+    const v = speedOf(s);
+    if (v > 0) {
+      const drag = CONFIG.dragCoef * v * v + CONFIG.snowFriction * g + CONFIG.skidFriction * side + inp.brake * CONFIG.brakeDecel;
+      const k = Math.max(0, v - drag * dt) / v;
+      s.vx *= k; s.vy *= k; s.vz *= k;
+    }
 
     // hold farten langs bakken
     const vn = s.vx * nx + s.vy * ny + s.vz * nz;
