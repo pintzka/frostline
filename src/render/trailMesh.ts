@@ -20,17 +20,19 @@ export function createSkiTrails(scene: THREE.Scene) {
     polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
   });
 
+  // lagrede punkter + én spiss som følger bakenden av skiene hvert bilde
+  const cap = max + 1;
   const index: number[] = [];
-  for (let i = 0; i < max - 1; i++) {
+  for (let i = 0; i < cap - 1; i++) {
     const a = i * 2;
     index.push(a, a + 2, a + 1, a + 1, a + 2, a + 3);
   }
 
   const ribbons = [-1, 1].map((side) => {
     const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(max * 2 * 3), 3));
-    geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(max * 2 * 3), 3));
-    geo.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(max * 2 * 3), 3));
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(cap * 2 * 3), 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(cap * 2 * 3), 3));
+    geo.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(cap * 2 * 3), 3));
     geo.setIndex(index);
     geo.setDrawRange(0, 0);
     const mesh = new THREE.Mesh(geo, mat);
@@ -42,9 +44,13 @@ export function createSkiTrails(scene: THREE.Scene) {
 
   const c = new THREE.Color();
   return {
+    /** x, y, z er midt under skiløperen; sporet starter ved bakenden av skiene. */
     update(x: number, y: number, z: number, heading: number) {
-      if (!trail.update(x, y, z, heading)) return;
+      trail.update(x, y, z, heading);
       const pts = trail.points();
+      const tip = trail.tip();
+      const newest = pts[pts.length - 1];
+      if (!newest || Math.hypot(tip.x - newest.x, tip.z - newest.z) > 1e-3) pts.push(tip);
       const n = pts.length;
       for (const { side, geo } of ribbons) {
         const pos = geo.attributes.position as THREE.BufferAttribute;

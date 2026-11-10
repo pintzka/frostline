@@ -17,7 +17,7 @@ describe('skispor', () => {
     for (let i = 0; i < n; i++) t.update(0, 0, i * CONFIG.trailSpacing * 1.01, 0);
     const pts = t.points();
     expect(pts.length).toBe(CONFIG.trailMaxPoints);
-    expect(pts[pts.length - 1].z).toBeCloseTo((n - 1) * CONFIG.trailSpacing * 1.01, 6);
+    expect(pts[pts.length - 1].z).toBeCloseTo((n - 1) * CONFIG.trailSpacing * 1.01 - CONFIG.skiLength / 2, 6);
     for (let i = 1; i < pts.length; i++) expect(pts[i].z).toBeGreaterThan(pts[i - 1].z);
   });
 
@@ -28,6 +28,20 @@ describe('skispor', () => {
       const p = t.points()[t.points().length - 1];
       expect(Math.hypot(p.rx, p.rz)).toBeCloseTo(1, 6);
       expect(p.rx * Math.sin(heading) + p.rz * Math.cos(heading)).toBeCloseTo(0, 6);
+    }
+  });
+
+  it('legger sporet ved bakenden av skiene, ikke midt under skiløperen', () => {
+    for (const heading of [0, 0.6, -1.1]) {
+      const t = createTrail();
+      t.update(3, 0, 10, heading);
+      const back = CONFIG.skiLength / 2;
+      const p = t.points()[0];
+      expect(p.x).toBeCloseTo(3 - Math.sin(heading) * back, 6);
+      expect(p.z).toBeCloseTo(10 - Math.cos(heading) * back, 6);
+      // spissen følger bakenden hvert bilde, også mellom de lagrede punktene
+      t.update(3, 0, 10.1, heading);
+      expect(t.tip().z).toBeCloseTo(10.1 - Math.cos(heading) * back, 6);
     }
   });
 

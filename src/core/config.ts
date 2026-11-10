@@ -44,6 +44,8 @@ export const CONFIG = {
   camMinClearance: 0.6,
   /** Hopper skiløperen lenger enn dette på ett bilde (restart), flytter kameraet seg rett dit. */
   camSnapDistance: 20,
+  /** Skienes lengde (m). Sporet starter ved bakenden, halve lengden bak midten. */
+  skiLength: 1.7,
   /** Skispor: avstand mellom punktene (m), hvor mange punkter som huskes, og avstand mellom skiene (m). */
   trailSpacing: 0.25,
   trailMaxPoints: 600,
