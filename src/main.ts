@@ -53,7 +53,7 @@ const loop = createLoop({
     sun.target.position.copy(target);
 
     const v = speedOf(skier);
-    chase.update(target, skier.heading, v, frameDt);
+    chase.update({ x: target.x, y: target.y, z: target.z, vx: skier.vx, vz: skier.vz, heading: skier.heading, speed: v }, frameDt);
     hud.update(v, skier.z - startZ);
     renderer.render(scene, chase.camera);
   },

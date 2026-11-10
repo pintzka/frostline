@@ -24,11 +24,26 @@ export const CONFIG = {
   edgeGrip: 6,
   /** Hvor mye skrens bremser (m/s² per m/s sidelengs fart). */
   skidFriction: 0.25,
-  /** Kamera */
+  /** Kamera: fast avstand bak (m) og høyde over snøen (m). */
   camDistance: 5.5,
   camHeight: 2.0,
   camFovBase: 62,
   camFovMax: 78,
+  /** Hvor fort kameraet svinger etter skiløperen (per sekund). Lavere = mykere, men henger mer etter. */
+  camYawFollow: 4,
+  /** Hvor fort kamerahøyden følger kuler i bakken (per sekund). */
+  camHeightFollow: 6,
+  /** Hvor fort synsfeltet følger farten (per sekund). */
+  camFovFollow: 3,
+  /** Kameraet ser på et punkt så langt foran (m) og så høyt over skiene (m). */
+  camLookAhead: 3,
+  camLookHeight: 0.8,
+  /** Under denne farten (m/s) følger kameraet skiene i stedet for fartsretningen. */
+  camDirMinSpeed: 2,
+  /** Kameraet holder alltid minst så mye avstand til snøen (m). */
+  camMinClearance: 0.6,
+  /** Hopper skiløperen lenger enn dette på ett bilde (restart), flytter kameraet seg rett dit. */
+  camSnapDistance: 20,
 } as const;
 
 export type Config = typeof CONFIG;
