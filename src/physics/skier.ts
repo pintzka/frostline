@@ -162,10 +162,12 @@ export function stepSkier(s: SkierState, inp: SkierInput, dt: number): void {
     const vn = s.vx * nx + s.vy * ny + s.vz * nz;
     s.vx -= vn * nx; s.vy -= vn * ny; s.vz -= vn * nz;
 
-    // toppfart (bare på bakken; i lufta bestemmer tyngdekraften)
+    // toppfart (bare på bakken; i lufta bestemmer tyngdekraften). Er du over, f.eks. etter et hopp,
+    // tas farten mykt ned over et par sekunder i stedet for å kuttes med en gang
     const vt = speedOf(s);
     if (vt > CONFIG.maxSpeed) {
-      const k = CONFIG.maxSpeed / vt;
+      const want = CONFIG.maxSpeed + (vt - CONFIG.maxSpeed) * Math.exp(-dt / CONFIG.overspeedFade);
+      const k = want / vt;
       s.vx *= k; s.vy *= k; s.vz *= k;
     }
   } else {

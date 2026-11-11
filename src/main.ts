@@ -8,7 +8,7 @@ import { createScene } from './render/scene';
 import { createHud } from './ui/hud';
 import { createPlaceholderSkier } from './character/placeholder';
 import { heightAt, normalAt } from './park/terrain';
-import { poseFor } from './character/pose';
+import { poseFor, smoothPose } from './character/pose';
 import { createSkiTrails } from './render/trailMesh';
 
 const root = document.getElementById('app')!;
@@ -33,6 +33,7 @@ const wantUp = new THREE.Vector3();
 const q = new THREE.Quaternion();
 const qYaw = new THREE.Quaternion();
 const Y = new THREE.Vector3(0, 1, 0);
+let pose = smoothPose(poseFor({ grounded: true, popCharge: 0, airTime: 0, heightAboveSnow: 0, sinceLanding: 99 }), poseFor({ grounded: true, popCharge: 0, airTime: 0, heightAboveSnow: 0, sinceLanding: 99 }), 0);
 
 const loop = createLoop({
   hz: CONFIG.physicsHz,
@@ -54,20 +55,25 @@ const loop = createLoop({
     wantUp.set(nx, ny, nz);
     up.lerp(wantUp, 1 - Math.exp(-12 * frameDt)).normalize();
     q.setFromUnitVectors(Y, up);
-    qYaw.setFromAxisAngle(Y, skier.heading);
+    // retningen jevnes ut mellom fysikkstegene, som posisjonen, så svingene ikke rister
+    const heading = prev.heading + (skier.heading - prev.heading) * alpha;
+    qYaw.setFromAxisAngle(Y, heading);
     mesh.quaternion.copy(q).multiply(qYaw);
     skierModel.setLean(prev.lean + (skier.lean - prev.lean) * alpha);
-    skierModel.setPose(poseFor({
+    // kroppen glir mellom stillingene, så avspark og landing ikke rykker
+    pose = smoothPose(pose, poseFor({
       grounded: skier.grounded, popCharge: skier.popCharge, airTime: skier.airTime,
       heightAboveSnow: target.y - heightAt(target.x, target.z), sinceLanding: skier.sinceLanding,
-    }));
-    trails.update(target.x, target.y, target.z, skier.heading, skier.grounded);
+    }), frameDt);
+    skierModel.setPose(pose);
+    trails.update(target.x, target.y, target.z, heading, skier.grounded);
 
     sun.position.set(target.x + 30, target.y + 60, target.z - 20);
     sun.target.position.copy(target);
 
+    // den ekte farten: landingene følger flybanen, så den holder seg når du lander
     const v = speedOf(skier);
-    chase.update({ x: target.x, y: target.y, z: target.z, vx: skier.vx, vz: skier.vz, heading: skier.heading, speed: v }, frameDt);
+    chase.update({ x: target.x, y: target.y, z: target.z, vx: skier.vx, vz: skier.vz, heading, speed: v }, frameDt);
     hud.update({
       speed: v, distance: skier.z - startZ, airTime: skier.airTime, inAir: !skier.grounded,
       popCharge: skier.popCharge, lastPop: skier.lastPop, popAge: skier.popAge,

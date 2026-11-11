@@ -7,6 +7,8 @@ export const CONFIG = {
   slopeDeg: 18,
   /** Toppfart i m/s (≈ 90 km/t). */
   maxSpeed: 25,
+  /** Er du over toppfarten (f.eks. etter et hopp), tas farten mykt ned med denne tidskonstanten (s). */
+  overspeedFade: 0.8,
   /** Forsterker farten ned bakken, så 0–60 km/t tar 3–4 s. */
   slopeAccel: 1.75,
   /** Luftmotstand og snøfriksjon. dragCoef er satt så farten flater ut like under toppfarten. */

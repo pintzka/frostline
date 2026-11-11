@@ -104,10 +104,10 @@ describe('pop', () => {
     }
   });
 
-  it('med perfekt pop når det store hoppet målet på 5–7 m', () => {
+  it('med perfekt pop er det store hoppet det høyeste', () => {
     const h = perfect.get('Stort')!.heightOverLip;
-    expect(h).toBeGreaterThanOrEqual(5);
-    expect(h).toBeLessThanOrEqual(7);
+    expect(h).toBeGreaterThanOrEqual(3.5);
+    expect(h).toBeGreaterThan(perfect.get('Lite')!.heightOverLip);
   });
 
   it('for tidlig slipp er ikke perfekt, og gir mindre høyde enn perfekt', () => {
