@@ -7,7 +7,8 @@ import { createChaseCamera } from './camera/chase';
 import { createScene } from './render/scene';
 import { createHud } from './ui/hud';
 import { createPlaceholderSkier } from './character/placeholder';
-import { normalAt } from './park/terrain';
+import { heightAt, normalAt } from './park/terrain';
+import { poseFor } from './character/pose';
 import { createSkiTrails } from './render/trailMesh';
 
 const root = document.getElementById('app')!;
@@ -56,7 +57,10 @@ const loop = createLoop({
     qYaw.setFromAxisAngle(Y, skier.heading);
     mesh.quaternion.copy(q).multiply(qYaw);
     skierModel.setLean(prev.lean + (skier.lean - prev.lean) * alpha);
-    skierModel.setCrouch(skier.popCharge);
+    skierModel.setPose(poseFor({
+      grounded: skier.grounded, popCharge: skier.popCharge, airTime: skier.airTime,
+      heightAboveSnow: target.y - heightAt(target.x, target.z), sinceLanding: skier.sinceLanding,
+    }));
     trails.update(target.x, target.y, target.z, skier.heading, skier.grounded);
 
     sun.position.set(target.x + 30, target.y + 60, target.z - 20);

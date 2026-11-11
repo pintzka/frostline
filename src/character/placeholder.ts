@@ -33,12 +33,13 @@ export function createPlaceholderSkier() {
       for (const ski of skis) ski.rotation.z = lean * CONFIG.skiEdgeTilt;
     },
     /**
-     * Tar sats mens pop lades (0–1): kroppen går ned mot skiene og lener seg litt framover,
-     * som når du bøyer knærne. Formen på kroppen endres ikke.
+     * Hopp-bevegelsen fra pose.ts: kroppen går ned (sats/landing) eller strekker seg opp (avspark),
+     * og skiene trekkes opp under kroppen i lufta. Formen på kroppen endres ikke.
      */
-    setCrouch(amount: number) {
-      upper.position.y = -0.22 * amount;
-      upper.rotation.x = 0.3 * amount;
+    setPose(p: { drop: number; pitch: number; skiLift: number }) {
+      upper.position.y = -p.drop;
+      upper.rotation.x = p.pitch;
+      for (const ski of skis) ski.position.y = 0.02 + p.skiLift;
     },
   };
 }

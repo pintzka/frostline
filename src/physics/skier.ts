@@ -27,6 +27,8 @@ export interface SkierState {
   lastPop: '' | 'pop' | 'perfekt';
   /** Sekunder siden siste pop (for visning på skjermen). */
   popAge: number;
+  /** Sekunder siden siste landing (for fjæringen i kroppen). */
+  sinceLanding: number;
 }
 
 export interface SkierInput {
@@ -41,7 +43,7 @@ export interface SkierInput {
 export function createSkier(): SkierState {
   const z = 5;
   return { x: 0, y: heightAt(0, z), z, vx: 0, vy: 0, vz: 2, heading: 0, edge: 0, lean: 0, leanRate: 0, grounded: true, airTime: 0,
-    popCharge: 0, popHeld: false, lastPop: '', popAge: 99 };
+    popCharge: 0, popHeld: false, lastPop: '', popAge: 99, sinceLanding: 99 };
 }
 
 /** Er skiløperen akkurat foran kanten på et hopp (innenfor vinduet for perfekt pop)? */
@@ -103,6 +105,7 @@ export function stepSkier(s: SkierState, inp: SkierInput, dt: number): void {
 
   // pop: lad mens knappen holdes på bakken, sprett når den slippes (i lufta skjer ingenting)
   s.popAge += dt;
+  s.sinceLanding += dt;
   const holding = !!inp.pop;
   if (holding) {
     if (s.grounded) s.popCharge = Math.min(1, s.popCharge + dt / CONFIG.popChargeTime);
@@ -191,6 +194,7 @@ export function stepSkier(s: SkierState, inp: SkierInput, dt: number): void {
     // landing: farten rett inn i bakken tas opp av beina, farten langs bakken beholdes
     s.y = h;
     s.grounded = true;
+    s.sinceLanding = 0;
     const [nx, ny, nz] = normalAt(s.x, s.z);
     const vn = s.vx * nx + s.vy * ny + s.vz * nz;
     if (vn < 0) { s.vx -= vn * nx; s.vy -= vn * ny; s.vz -= vn * nz; }

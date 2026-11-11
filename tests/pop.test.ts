@@ -64,9 +64,9 @@ describe('pop', () => {
       stepSkier(s, { steer: 0, brake: 0, pop: false }, dt);
       maxH = Math.max(maxH, s.y - heightAt(s.x, s.z));
     }
-    // en ordentlig ollie: ca. 35 cm opp ved full lading
-    expect(maxH).toBeGreaterThan(0.25);
-    expect(maxH).toBeLessThan(0.5);
+    // et ordentlig hopp: ca. 60 cm opp ved full lading
+    expect(maxH).toBeGreaterThan(0.5);
+    expect(maxH).toBeLessThan(0.8);
     expect(s.grounded).toBe(true);
   });
 
