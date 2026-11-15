@@ -57,8 +57,10 @@ Justert 15. november: Daniel valgte et høyere stort hopp. Rampen på det store 
 | Fall | kroppen velter, du sklir og bremser opp i snøen, skjermen blekner, og du settes tilbake |
 
 - Settes tilbake 1,1 s etter landingen, skjermen er klar igjen etter 1,4 s (målet er under 1,5 s).
-- Du settes tilbake 70 m før rampen på hoppet du falt på, midt i hoppet, i 36 km/t. Da rekker du å få opp nesten vanlig fart før kanten.
-- Mens du faller virker ingen taster (heller ikke R). Pop holdt fra fallet teller ikke før du slipper.
+- Falt du på landingen til et hopp, settes du tilbake før rampen på det hoppet, midt i hoppet. Avstand og fart er valgt per hopp så farten på kanten blir som i en vanlig kjøring (innen 3 %): Lite 100 m før rampen i 50 km/t, Medium 75 m i 40 km/t, Stort 60 m i 36 km/t.
+- Andre fall (f.eks. pop på flat bakke): 35 m før fallstedet i 36 km/t. Havner du da på et hopp (rampe, platå eller kanten inn til landingen), settes du 10 m før rampen i stedet.
+- Mens du faller virker ingen taster. R virker først når skjermen er helt klar igjen. Pop holdt fra fallet teller ikke før du slipper.
+- R og slutten av bakken tømmer skisporet; respawn etter fall lar det gamle sporet ligge med et hull.
 - Tallene ligger i `src/core/config.ts` (`sloppy...` og `fall...`).
 
 ## Poeng
