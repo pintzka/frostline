@@ -10,4 +10,6 @@ export const CHALLENGE_CONFIG = {
   takeoffAfterLip: 3,
   /** Nøkkelen fremgangen lagres under i nettleseren (localStorage). */
   storageKey: 'frostline.utfordringer',
+  /** Lavere skjerm enn dette (px): lista på startskjermen er sammenfoldet (trykk på tittelen for å se den). */
+  foldBelowHeight: 820,
 } as const;

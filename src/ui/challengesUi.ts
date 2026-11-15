@@ -30,7 +30,7 @@ function row(done: boolean, label: string, extra = ''): HTMLDivElement[] {
   return [mark, t];
 }
 
-function box(): { el: HTMLDivElement; title: HTMLDivElement; grid: HTMLDivElement } {
+function box(): { el: HTMLElement; title: HTMLElement; grid: HTMLDivElement } {
   const el = document.createElement('div');
   el.style.cssText = `display:flex;flex-direction:column;align-items:center;gap:6px;font:600 15px/1.3 ${FONT};max-width:92vw;`;
   const title = document.createElement('div');
@@ -39,6 +39,27 @@ function box(): { el: HTMLDivElement; title: HTMLDivElement; grid: HTMLDivElemen
   grid.style.cssText = 'display:grid;grid-template-columns:auto auto;gap:3px 10px;';
   el.append(title, grid);
   return { el, title, grid };
+}
+
+/** Er skjermen lav (mobil, laptop)? Da er lista på startskjermen sammenfoldet, så menyen ikke blir for høy. */
+function lowScreen(): boolean {
+  try { return matchMedia(`(max-height: ${CHALLENGE_CONFIG.foldBelowHeight}px)`).matches; } catch { return false; }
+}
+
+/** Som box(), men tittelen kan trykkes for å folde lista ut og inn (sammenfoldet på lave skjermer). */
+function foldBox(): { el: HTMLElement; title: HTMLElement; grid: HTMLDivElement } {
+  const b = box();
+  const el = document.createElement('details');
+  el.open = !lowScreen();
+  el.style.cssText = b.el.style.cssText + 'cursor:default;';
+  const title = document.createElement('summary');
+  title.style.cssText = 'font-weight:800;font-size:17px;cursor:pointer;text-align:center;';
+  b.grid.style.marginTop = '6px';
+  el.append(title, b.grid);
+  // å folde ut skal ikke også starte runden
+  el.addEventListener('pointerdown', (e) => e.stopPropagation());
+  el.addEventListener('click', (e) => e.stopPropagation());
+  return { el, title, grid: b.grid };
 }
 
 export function createChallengesUi(
@@ -56,7 +77,7 @@ export function createChallengesUi(
   const doneCount = () => list.filter((c) => isCleared(progress, parkKey, c.id)).length;
 
   // startskjermen: alle utfordringene, med hake for de du har klart
-  const start = box();
+  const start = foldBox();
   const drawStart = () => {
     start.title.textContent = `Utfordringer · ${doneCount()} av ${list.length} klart`;
     start.grid.replaceChildren(...list.flatMap((c) => row(isCleared(progress, parkKey, c.id), c.text)));
@@ -87,7 +108,8 @@ export function createChallengesUi(
     /** Kalles etter hvert fysikksteg med det ui/flow.ts sin stepGame ga tilbake. */
     step(g: Game, ev: FlowEvent) {
       if (list.length === 0) return;
-      if (ev === 'ny-runde') firstThisRun.length = 0;
+      // ny runde: meldinger som ikke rakk å vises fra forrige runde kastes, så de ikke popper opp nå
+      if (ev === 'ny-runde') { firstThisRun.length = 0; queue.length = 0; toastAge = 99; }
       const now: string[] = [];
       for (const e of gameEvents(g, ev, park)) now.push(...applyEvent(run, list, e));
       if (now.length > 0) {
@@ -97,7 +119,8 @@ export function createChallengesUi(
           save(progress);
           drawStart();
           firstThisRun.push(...m.added);
-          queue.push(...m.added.map((id) => `Utfordring klart: ${textOf(id)}`));
+          // flere på én gang blir én melding (ellers står de i kø i flere sekunder)
+          queue.push(`Utfordring klart: ${m.added.map(textOf).join(' · ')}`);
         }
       }
       if (ev === 'mål') drawResult();

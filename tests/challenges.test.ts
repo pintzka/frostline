@@ -52,12 +52,16 @@ describe('utfordringsfila', () => {
 
 describe('sjekk av hver type', () => {
   it('triks: må være ren landing, nok rotasjon, riktig flip-retning og hopp', () => {
-    const c360 = byId('ren-360'), back = byId('backflip'), big = byId('stort-720');
-    expect(matchesTrick(c360, land(360, 0), null)).toBe(true);
-    expect(matchesTrick(c360, land(720, 0), null)).toBe(true);
-    expect(matchesTrick(c360, land(180, 0), null)).toBe(false);
-    // 360 med 40° for mye er slurvete, og teller ikke
-    expect(matchesTrick(c360, land(400, 0), null)).toBe(false);
+    // «Land et rent 360» ble «Land et rent 540»: et 360 gir ingen poeng (bare 540 og mer er ekte triks)
+    const c540 = byId('ren-540'), back = byId('backflip'), big = byId('stort-720');
+    expect(matchesTrick(c540, land(540, 0), null)).toBe(true);
+    expect(matchesTrick(c540, land(720, 0), null)).toBe(true);
+    expect(matchesTrick(c540, land(360, 0), null)).toBe(false);
+    // 540 med 40° for mye er slurvete, og teller ikke
+    expect(matchesTrick(c540, land(580, 0), null)).toBe(false);
+    const g540 = byId('540-grab');
+    expect(matchesTrick(g540, land(540, 0, { grab: 1, grabTime: 0.4 }), null)).toBe(true);
+    expect(matchesTrick(g540, land(540, 0), null)).toBe(false);
     expect(matchesTrick(back, land(0, -360), null)).toBe(true);
     expect(matchesTrick(back, land(0, 360), null)).toBe(false);
     expect(matchesTrick(big, land(720, 0), 'Stort')).toBe(true);
@@ -81,7 +85,12 @@ describe('sjekk av hver type', () => {
     expect(ev({ type: 'finish', time: 28.4, total: 3000 })).toEqual(['poeng-3000']);
     expect(ev({ type: 'start' })).toEqual([]);
     expect(run.cleared).toEqual([]);
-    expect(ev({ type: 'finish', time: 27.5, total: 0 })).toEqual(['tid-28']);
+    // tid-utfordringen er tatt ut av testbakken (rett ned tar 27,1 s og perfekte pops sparer bare 0,2 s),
+    // men typen finnes fortsatt
+    const timed: Challenge[] = [{ id: 'tid', text: 'tid', type: 'time', seconds: 28 }];
+    const r2 = createRunProgress();
+    expect(applyEvent(r2, timed, { type: 'finish', time: 28.4, total: 0 })).toEqual([]);
+    expect(applyEvent(r2, timed, { type: 'finish', time: 27.5, total: 0 })).toEqual(['tid']);
   });
 
   it('perfekt pop teller hvert hopp én gang, og ikke hvis du falt', () => {
@@ -106,8 +115,8 @@ describe('sjekk av hver type', () => {
 describe('fremgang lagret som rene data', () => {
   it('husker per park, gir bare nye id-er, og tåler ødelagt tekst', () => {
     let p = parseProgress(null);
-    const a = markCleared(p, 'testbakke', ['ren-360', 'backflip', 'ren-360']);
-    expect(a.added).toEqual(['ren-360', 'backflip']);
+    const a = markCleared(p, 'testbakke', ['ren-540', 'backflip', 'ren-540']);
+    expect(a.added).toEqual(['ren-540', 'backflip']);
     p = parseProgress(serializeProgress(a.progress));
     expect(isCleared(p, 'testbakke', 'backflip')).toBe(true);
     expect(isCleared(p, 'nybegynner', 'backflip')).toBe(false);
@@ -121,7 +130,8 @@ describe('fremgang lagret som rene data', () => {
 describe('utfordringer med ekte fysikk og triks', () => {
   it('360 på Lite, backflip på Medium og 720 på Stort klarer fem utfordringer', () => {
     const got = clearedIn([{ spin: 360 }, { flip: -360 }, { spin: 720 }]);
-    expect(got).toEqual(['ren-360', 'backflip', 'stort-720', 'kombo-1-5', 'tid-28']);
+    // et 360 klarer ikke lenger «rent 540»; det gjør 720 på Stort
+    expect(got).toEqual(['backflip', 'ren-540', 'stort-720', 'kombo-1-5']);
   });
 
   it('perfekt pop på alle tre hoppene og en lang grab', () => {
@@ -139,12 +149,16 @@ describe('utfordringer med ekte fysikk og triks', () => {
 
   it('720 på Medium er ikke det store hoppet', () => {
     const got = clearedIn([null, { spin: 720 }, null]);
-    expect(got).toContain('ren-360');
+    expect(got).toContain('ren-540');
     expect(got).not.toContain('stort-720');
   });
 
-  it('bare å kjøre rett ned klarer bare tiden', () => {
-    expect(clearedIn([null, null, null])).toEqual(['tid-28']);
+  it('bare å kjøre rett ned klarer ingenting', () => {
+    expect(clearedIn([null, null, null])).toEqual([]);
+  });
+
+  it('540 med grab på et hopp klarer «540 med grab»', () => {
+    expect(clearedIn([{ spin: 540, grab: 0.4 }, null, null])).toEqual(['ren-540', '540-grab']);
   });
 });
 
