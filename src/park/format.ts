@@ -80,8 +80,8 @@ export function lipHeight(k: Kicker): number {
 export function sideAngle(k: Kicker): number {
   return Math.atan((1.5 * lipHeight(k)) / k.sideWidth) / DEG;
 }
-/** Brattere sider enn dette gir kraftspark når du kjører på siden av hoppet. */
-const MAX_SIDE_DEG = 35;
+/** Brattere sider enn dette (grader) gir kraftspark når du kjører på siden av hoppet. */
+const MAX_SIDE_DEG = CONFIG.parkMaxSideDeg;
 
 // Trygge grenser. Utenfor disse blir hoppet umulig eller farlig å kjøre.
 const LIMITS = {
@@ -90,7 +90,7 @@ const LIMITS = {
   radius: [5, 300],
 };
 /** Rampen må starte så langt ned at skiløperen (som starter ved z = 5) får litt fart først (m). */
-const FIRST_RAMP_MIN_Z = 20;
+const FIRST_RAMP_MIN_Z = CONFIG.parkFirstRampMinZ;
 
 type Shape = Record<string, 'string' | 'number' | 'object' | 'array'>;
 const PARK_FIELDS: Shape = {

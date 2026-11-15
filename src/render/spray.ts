@@ -39,7 +39,7 @@ function smooth(a: number, b: number, v: number): number {
 
 /** Carving: partikler per sekund. Mer jo hardere kanten og jo høyere farten. */
 export function carveRate(edge: number, speed: number): number {
-  return CONFIG.sprayCarveRate * Math.abs(edge) ** 1.5 * smooth(CONFIG.sprayMinSpeed, CONFIG.sprayFullSpeed, speed);
+  return CONFIG.sprayCarveRate * Math.abs(edge) ** CONFIG.sprayCarveCurve * smooth(CONFIG.sprayMinSpeed, CONFIG.sprayFullSpeed, speed);
 }
 
 /** Brems: partikler per sekund. level er hvor mye bremsen er inne (0–1, glir mykt). */

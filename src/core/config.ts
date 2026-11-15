@@ -149,6 +149,8 @@ export const CONFIG = {
   hudSlidePx: 10,
   /** Hvor fort totalen teller seg opp (per sekund). */
   hudCountUp: 8,
+  /** Lufttiden vises i HUD-en først når du har vært i lufta lenger enn dette (s), så små kuler ikke blinker. */
+  hudAirTimeMin: 0.3,
 
   // --- Grabs (src/tricks/grabs.ts) ---
   /** En grab må holdes minst så lenge (s) i lufta for å telle. */
@@ -243,10 +245,22 @@ export const CONFIG = {
   fallBackSpeed: 10,
   /** Havner du da på et hopp (rampe, platå eller kant inn til landingen), settes du så mange meter før rampen i stedet. */
   fallRampMargin: 10,
+  /** Etter et fall settes du aldri nærmere kanten av bakken enn dette (m). */
+  fallEdgeMargin: 2,
+
+  // --- Regler for parker (src/park/format.ts, se docs/PARK.md) ---
+  /** Sidene på et hopp kan være høyst så bratte (grader), ellers gir de kraftspark. */
+  parkMaxSideDeg: 35,
+  /** Den første rampen må starte så langt ned (m), så skiløperen (som starter ved startZ) får litt fart først. */
+  parkFirstRampMinZ: 20,
+  /** Et hopp regnes som «der» (for å flytte respawn bort fra det) så langt utenfor den flate toppen (m). */
+  fallKickerMargin: 4,
   /** Fartsmåleren følger den ekte farten mykt (per sekund), så tallet aldri hopper. */
   hudSpeedFollow: 6,
   /** Sekunder «PERFEKT POP!» vises. */
   popFlashTime: 1.2,
+  /** «PERFEKT POP!» blekner bort de siste så mange sekundene. */
+  popFlashFade: 0.5,
 
   // --- Kroppens stillinger rundt et hopp (src/character/pose.ts). Lengder i m, vinkler i rad, tider i s ---
   pose: {
@@ -284,6 +298,8 @@ export const CONFIG = {
   sprayMax: 800,
   /** Carving: partikler/s ved full kant i full fart. Fra sprayMinSpeed til sprayFullSpeed (m/s) øker sprut mykt. */
   sprayCarveRate: 240,
+  /** Hvor mye mer det spruter når kanten tas hardere: kanten opphøyd i dette (1 = rett linje, 1,5 = mest ved hard kant). */
+  sprayCarveCurve: 1.5,
   sprayMinSpeed: 3,
   sprayFullSpeed: 20,
   /** Brems: partikler/s ved full brems i full fart (mest av alt), og hvor fort bremsesprut kommer og går (per sekund). */

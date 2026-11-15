@@ -70,14 +70,14 @@ export function respawnSpot(fallX: number, fallZ: number, takeoffZ: number): { x
     const back = respawnOf(k);
     return { x: 0, z: Math.max(CONFIG.startZ, k.z - rampLength(k) - back.before), speed: back.speed };
   }
-  const half = PARK.width / 2 - 2;
+  const half = PARK.width / 2 - CONFIG.fallEdgeMargin;
   const x = Math.max(-half, Math.min(half, fallX));
   let z = Math.max(CONFIG.startZ, fallZ - CONFIG.fallBackDistance);
   // havner du på et hopp, flyttes du bakover til før rampen (de bakerste hoppene sjekkes sist)
   for (let n = PARK.kickers.length - 1; n >= 0; n--) {
     const k = PARK.kickers[n];
     const [from, to] = kickerZone(k);
-    if (Math.abs(x) < k.width / 2 + 4 && z > from && z < to) z = Math.max(CONFIG.startZ, from);
+    if (Math.abs(x) < k.width / 2 + CONFIG.fallKickerMargin && z > from && z < to) z = Math.max(CONFIG.startZ, from);
   }
   return { x, z, speed: CONFIG.fallBackSpeed };
 }

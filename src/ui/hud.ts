@@ -177,7 +177,7 @@ export function createHud(parent: HTMLElement) {
       fade.style.opacity = h.fade.toFixed(3);
       shown = smoothSpeed(shown, h.speed, dt);
       let text = `${Math.round(shown * 3.6)} km/t · ${Math.round(h.distance)} m`;
-      if (h.airTime > 0.3) text += ` · ${h.inAir ? 'I lufta' : 'Lufttid'} ${h.airTime.toFixed(1).replace('.', ',')} s`;
+      if (h.airTime > CONFIG.hudAirTimeMin) text += ` · ${h.inAir ? 'I lufta' : 'Lufttid'} ${h.airTime.toFixed(1).replace('.', ',')} s`;
       el.textContent = text;
 
       bar.style.opacity = h.popCharge > 0 ? '1' : '0';
@@ -186,7 +186,7 @@ export function createHud(parent: HTMLElement) {
 
       // vises i litt over et sekund og blekner bort
       const show = h.lastPop === 'perfekt' && h.popAge < CONFIG.popFlashTime;
-      flash.style.opacity = show ? String(Math.min(1, (CONFIG.popFlashTime - h.popAge) * 2)) : '0';
+      flash.style.opacity = show ? String(Math.min(1, (CONFIG.popFlashTime - h.popAge) / CONFIG.popFlashFade)) : '0';
 
       // triksnavn og poeng: glir inn ovenfra og blekner mykt bort (ingen blinking).
       // Forsvinner trikset plutselig (ny runde), blekner teksten som står der bort i stedet for å bli borte på ett bilde
