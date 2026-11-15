@@ -5,7 +5,7 @@ import { countFlips, countHalves, type Landing } from './rotation';
  * Poeng og kombo. Ren logikk uten three.js og DOM, og helt deterministisk.
  * Arbeidsstrøm 3 (Triks og poeng) eier denne fila. Tallene står i src/core/config.ts.
  *
- * Poeng for ett triks = (spinn + flip + grab) × grab-gangetall × perfekt pop × switch
+ * Poeng for ett triks = (spinn × off-axis + flip + grab) × grab-gangetall × perfekt pop × switch
  *   × landing (ren 1, slurvete 0,5, fall 0) × gjentakelse × kombo.
  * Bare ekte triks gir poeng: 540 eller mer, minst én flip, eller en grab som teller.
  * Småhopp (en pop på flaten) gir bare litt, og bygger ikke komboen.
@@ -43,7 +43,8 @@ export function grabMult(l: Landing): number {
 /** Hva trikset er verdt før landing, småhopp, gjentakelse og kombo. Gir 0 hvis det ikke er et ekte triks. */
 export function trickValue(l: Landing): number {
   if (!isRealTrick(l)) return 0;
-  const base = fromTable(CONFIG.spinPoints, spinHalves(l), CONFIG.spinPointsExtra)
+  // off-axis (cork, rodeo) gir bonus på spinnpoengene
+  const base = fromTable(CONFIG.spinPoints, spinHalves(l), CONFIG.spinPointsExtra) * (l.offAxis ? CONFIG.offAxisSpinMult : 1)
     + fromTable(CONFIG.flipPoints, flipCount(l), CONFIG.flipPointsExtra)
     + (l.grab ? CONFIG.grabPoints : 0);
   return base * grabMult(l) * (l.perfectPop ? CONFIG.popPerfectMult : 1) * (l.fromSwitch ? CONFIG.switchBonus : 1);
@@ -52,10 +53,11 @@ export function trickValue(l: Landing): number {
 /**
  * Hva som teller som «samme triks»: like mange halve runder, samme flip og samme grab.
  * Spinnretning og switch gjør det ikke til et nytt triks (switch gir i stedet en liten bonus).
+ * Off-axis gjør det: «Cork 720» og «720 + Frontflip» er to forskjellige triks.
  */
 export function trickKey(l: Landing): string {
   const flipDir = flipCount(l) === 0 ? 0 : Math.sign(l.flipDeg);
-  return `${spinHalves(l)}|${flipCount(l)}:${flipDir}|${l.grab}`;
+  return `${spinHalves(l)}|${flipCount(l)}:${flipDir}|${l.grab}${l.offAxis ? '|off' : ''}`;
 }
 
 /** Det som vises på skjermen etter et triks. */

@@ -49,6 +49,18 @@ Justert 15. november: Daniel valgte et høyere stort hopp. Rampen på det store 
 | Landing | ren hvis vinkelen mot bakken er under 25° og spinnet er innenfor ±30° av en hel eller halv runde (switch) |
 | Poeng og boost | bare for ekte triks: 540 eller mer, en flip eller en grab |
 
+## Off-axis: cork og rodeo
+Regelen: **trykk spinn (A/D) og flip (W/S) begge innen 0,25 s etter avsatsen**, så blir hoppet off-axis resten av hoppet.
+- **Spinn + W = Cork.** Kroppen snurrer rundt seg selv og tipper over på skrå, med hodet framover og ut mot den siden du spinner.
+- **Spinn + S = Rodeo.** Det samme, men hodet går bakover og ut mot spinnsiden.
+- Trykker du den andre tasten senere enn 0,25 s, er det vanlig spinn + flip som før (f.eks. «720 + Frontflip»).
+- Tastene, farten og glidet er de samme som vanlig. Bare stillingen og navnet endres: kroppen roterer rundt én skrå akse (sideaksen vridd 45° mot fartsretningen), ikke spinn og flip etter hverandre. Den glir mykt inn i off-axis (0,12 s) og ut igjen på bakken (0,4 s).
+- Tastene du holdt da du lettet (f.eks. styring over kanten), teller ikke, så du får aldri cork uten å mene det.
+- **Navn:** «Cork 720», «Cork 540», «Rodeo 900», «Dobbel cork 1080» (to flips), «Trippel rodeo 1440». Det må være minst 360 spinn og én hel flip, ellers heter trikset som vanlig.
+- **Landing:** vurderes ut fra hvor kroppen faktisk står: hvor langt fra stående, og hvor langt fra en hel eller halv runde skiene peker. Samme grenser som vanlig (ren ±25° / ±30°).
+- **Poeng:** spinnpoengene ganges med x1,3. Cork 720 = 800 × 1,3 + 700 = 1 740 (720 + Frontflip = 1 500).
+- Tallene står i `src/core/config.ts` (`offAxis...`), logikken i `src/tricks/offaxis.ts` og `rotation.ts`.
+
 ## Grabs
 Hold en tast i lufta. Grabben teller først etter 0,3 s, og den lengste grabben i hoppet er den som teller.
 Slipp grabben før du lander: holder du fortsatt en grab som teller når skiene treffer snøen, blir landingen slurvete (halve poeng).
@@ -75,7 +87,7 @@ Slipp grabben før du lander: holder du fortsatt en grab som teller når skiene 
 ## Poeng
 Tallene står i `src/core/config.ts` og regnes ut i `src/tricks/score.ts`.
 
-Poeng for ett triks = (spinn + flip + grab) × grab-gangetall × perfekt pop × switch × landing × gjentakelse × kombo.
+Poeng for ett triks = (spinn × off-axis + flip + grab) × grab-gangetall × perfekt pop × switch × landing × gjentakelse × kombo.
 
 | Spinn | 180 | 360 | 540 | 720 | 900 | 1080 | 1260 | 1440 | 1620 | mer |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -87,11 +99,12 @@ Poeng for ett triks = (spinn + flip + grab) × grab-gangetall × perfekt pop × 
 
 - **Bare ekte triks gir poeng:** 540 eller mer, minst én flip, eller en grab som teller. Et 180 eller 360 alene vises, men gir 0.
 - **Grab:** +300 poeng, og hele trikset ganges med x1,25 når grabben teller. Gangetallet vokser med 0,5 per sekund du holder etter 0,3 s, opp til x2.
+- **Off-axis** (cork, rodeo): spinnpoengene ganges med x1,3 (se Off-axis over).
 - **Perfekt pop:** x1,2.
 - **Switch** (hoppet starter baklengs): liten bonus, x1,1.
 - **Småhopp:** et hopp med under 0,9 s i lufta (en pop på flaten gir ca. 0,7 s, det lille hoppet 1,2 s) gir bare 5 % av poengene og påvirker ikke komboen. Da lønner det seg ikke å spamme pop og grabs på flaten.
 - **Landing:** ren full sum, slurvete halv sum, fall null.
-- **Gjentakelse:** de 4 siste triksene huskes. For hver gang trikset finnes der, gir det 60 % (så 36 %, 22 % ...), men aldri under 20 %. Også A-B-A-B gir mindre. Andre spinnretning eller switch gjør det ikke til et nytt triks; en annen rotasjon, flip eller grab gjør det.
+- **Gjentakelse:** de 4 siste triksene huskes. For hver gang trikset finnes der, gir det 60 % (så 36 %, 22 % ...), men aldri under 20 %. Også A-B-A-B gir mindre. Andre spinnretning eller switch gjør det ikke til et nytt triks; en annen rotasjon, flip, grab eller off-axis gjør det («Cork 720» og «720 + Frontflip» er to triks).
 - **Kombo:** hvert ekte triks med ren landing øker gangetallet med +0,25 (x1, x1,25, x1,5 ... opp til x4). Slurvete landing beholder komboen uten å øke den. Fall eller 9 sekunder på snøen uten nytt ekte triks nullstiller den. Poengene du har fått beholdes. Et fall vises alltid («Fall», og «Kombo tapt» hvis komboen var over x1).
 - Eksempler: 540 = 400, 720 = 800, 1080 = 2 200. 720 + Backflip + Isbit holdt 1 s med perfekt pop = (800 + 700 + 300) × 1,6 × 1,2 ≈ 3 460.
 - Når runden starter på nytt (R eller nederst i bakken), huskes beste runde i HUD-en.

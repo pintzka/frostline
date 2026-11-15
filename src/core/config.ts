@@ -152,6 +152,17 @@ export const CONFIG = {
   /** Lufttiden vises i HUD-en først når du har vært i lufta lenger enn dette (s), så små kuler ikke blinker. */
   hudAirTimeMin: 0.3,
 
+  // --- Off-axis: cork og rodeo (src/tricks/offaxis.ts og rotation.ts) ---
+  /** Trykker du spinn og flip (W/S) begge innen så mange sekunder etter avsatsen, blir hoppet off-axis. */
+  offAxisWindow: 0.25,
+  /** Spinn og flip må være minst så sterke (0–1) for å starte off-axis, så litt skjelving på stikka ikke gjør det. */
+  offAxisMinInput: 0.5,
+  /** Den skrå aksen kroppen tipper rundt: sideaksen vridd så mange grader mot fartsretningen. */
+  offAxisTiltDeg: 45,
+  /** Kroppen går mykt over til off-axis på så mange sekunder i lufta, og tilbake på bakken på offAxisBlendOut s. */
+  offAxisBlendIn: 0.12,
+  offAxisBlendOut: 0.4,
+
   // --- Grabs (src/tricks/grabs.ts) ---
   /** En grab må holdes minst så lenge (s) i lufta for å telle. */
   grabMinHold: 0.3,
@@ -166,6 +177,8 @@ export const CONFIG = {
   /** Ekstra poeng for flips: 0, 1, 2 og 3 hele flips. */
   flipPoints: [0, 700, 1800, 3200],
   flipPointsExtra: 1600,
+  /** Off-axis (cork, rodeo) ganger spinnpoengene med dette. */
+  offAxisSpinMult: 1.3,
   /** En grab som teller gir så mange poeng, og ganger hele trikset med grabStartMult. */
   grabPoints: 300,
   grabStartMult: 1.25,

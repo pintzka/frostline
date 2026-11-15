@@ -1,4 +1,5 @@
 import { CONFIG } from '../core/config';
+import { bodyQuat, bodyStance } from './offaxis';
 import { countedGrab, createGrabs, grabName, resetGrabJump, stepGrabs, type GrabKind, type GrabState } from './grabs';
 
 /**
@@ -8,6 +9,10 @@ import { countedGrab, createGrabs, grabName, resetGrabJump, stepGrabs, type Grab
  * Ingen automatisk fullføring: holder du tasten, bygger rotasjonen seg mykt opp. Slipper du,
  * glir den litt videre (ca. 25°) og bremses så. Du kan altså rotere for lite eller for mye.
  * Ved landing sjekkes hvor nær en hel eller halv runde du er, og kroppen retter seg mykt opp.
+ *
+ * Off-axis (cork og rodeo): trykker du spinn og flip begge innen offAxisWindow sekunder etter avsatsen,
+ * tipper kroppen over på skrå mens den snurrer (se offaxis.ts). W gir cork, S gir rodeo.
+ * Tastene og farten er de samme, bare stillingen og navnet endres. Landingen vurderes da ut fra hvor kroppen faktisk står.
  */
 
 export type LandingQuality = 'ren' | 'slurvete' | 'fall';
@@ -33,6 +38,8 @@ export interface Landing {
   airTime: number;
   /** Holdt du fortsatt grabben da du landet? Da blir landingen slurvete. */
   landedGrabbing: boolean;
+  /** Var det et off-axis-triks (cork eller rodeo) som teller? Gir bonus på spinnpoengene. */
+  offAxis?: boolean;
 }
 
 /** Det som skjedde i hoppet i tillegg til rotasjonen. */
@@ -44,6 +51,10 @@ export interface JumpExtras {
   airTime?: number;
   /** grabben holdes fortsatt idet skiene treffer snøen */
   stillGrabbing?: boolean;
+  /** hoppet var off-axis (cork eller rodeo) */
+  offAxis?: boolean;
+  /** hvor langt unna stående (flip) og en hel eller halv runde (spinn) kroppen faktisk står (grader). Regnes ellers fra vinklene. */
+  stance?: { spinErrDeg: number; flipErrDeg: number };
 }
 
 export interface TrickInput {
@@ -84,6 +95,12 @@ export interface TrickState {
   jumpFromSwitch: boolean;
   /** Sekunder i lufta i hoppet som pågår (eller det siste). */
   airTime: number;
+  /** Er hoppet som pågår (eller det siste) off-axis? Bestemmes innen offAxisWindow etter avsatsen. */
+  offAxis: boolean;
+  /** Spinnretning × flipretning da off-axis startet (±1). Gjør at hodet tipper ut mot spinnsiden. */
+  offAxisSide: number;
+  /** Hvor mye stillingen er off-axis (0 = vanlig, 1 = helt). Glir mykt, så kroppen aldri hopper. */
+  offAxisBlend: number;
 }
 
 const DEG = Math.PI / 180;
@@ -96,6 +113,7 @@ export function createTricks(): TrickState {
     spinStart: 0, flipStart: 0, spinTarget: 0, flipTarget: 0,
     lastLanding: null, landingAge: 99, justLanded: false,
     grabs: createGrabs(), jumpPerfectPop: false, jumpFromSwitch: false, airTime: 0,
+    offAxis: false, offAxisSide: 1, offAxisBlend: 0,
   };
 }
 
@@ -116,10 +134,23 @@ export function countFlips(flip: number): number {
   return Math.floor((Math.abs(flip) + (CONFIG.landFlipClean + CONFIG.landSloppyExtra) * DEG) / TURN);
 }
 
-/** Lager navnet på trikset ut fra hvor mye du roterte (rad). */
-export function trickName(spin: number, flip: number, grab: GrabKind = 0): string {
+/** Teller off-axis som et eget triks? Minst 360 spinn og én hel flip. */
+export function countsAsOffAxis(spin: number, flip: number): boolean {
+  return countHalves(spin) >= 2 && countFlips(flip) >= 1;
+}
+
+/** Lager navnet på trikset ut fra hvor mye du roterte (rad). Off-axis: «Cork 720», «Dobbel rodeo 1080». */
+export function trickName(spin: number, flip: number, grab: GrabKind = 0, offAxis = false): string {
   const parts: string[] = [];
   const halves = countHalves(spin);
+  if (offAxis && countsAsOffAxis(spin, flip)) {
+    const flips = countFlips(flip);
+    const word = flips < FLIP_WORDS.length ? FLIP_WORDS[flips] : `${flips}x `;
+    const full = `${word}${flip > 0 ? 'cork' : 'rodeo'} ${halves * 180}`;
+    parts.push(full.charAt(0).toUpperCase() + full.slice(1));
+    if (grab) parts.push(grabName(grab));
+    return parts.join(' + ');
+  }
   if (halves > 0) parts.push(String(halves * 180));
   const flips = countFlips(flip);
   if (flips > 0) {
@@ -134,8 +165,8 @@ export function trickName(spin: number, flip: number, grab: GrabKind = 0): strin
 
 /** Ren, slurvete eller fall, ut fra hvor mye du roterte i hoppet (rad). */
 export function judgeLanding(spin: number, flip: number, extras: JumpExtras = {}): Landing {
-  const spinErrDeg = offBy(spin, HALF);
-  const flipErrDeg = offBy(flip, TURN);
+  const spinErrDeg = extras.stance?.spinErrDeg ?? offBy(spin, HALF);
+  const flipErrDeg = extras.stance?.flipErrDeg ?? offBy(flip, TURN);
   const extra = CONFIG.landSloppyExtra;
   let quality: LandingQuality = 'fall';
   if (spinErrDeg <= CONFIG.landSpinClean && flipErrDeg <= CONFIG.landFlipClean) quality = 'ren';
@@ -145,9 +176,9 @@ export function judgeLanding(spin: number, flip: number, extras: JumpExtras = {}
   const landedGrabbing = !!extras.stillGrabbing && grab !== 0 && quality !== 'fall';
   if (landedGrabbing) quality = 'slurvete';
   return {
-    quality, name: trickName(spin, flip, grab), spinDeg: spin / DEG, flipDeg: flip / DEG, spinErrDeg, flipErrDeg,
+    quality, name: trickName(spin, flip, grab, !!extras.offAxis), spinDeg: spin / DEG, flipDeg: flip / DEG, spinErrDeg, flipErrDeg,
     grab, grabTime: extras.grabTime ?? 0, perfectPop: !!extras.perfectPop, fromSwitch: !!extras.fromSwitch,
-    airTime: extras.airTime ?? 0, landedGrabbing,
+    airTime: extras.airTime ?? 0, landedGrabbing, offAxis: !!extras.offAxis && countsAsOffAxis(spin, flip),
   };
 }
 
@@ -199,6 +230,7 @@ export function stepTricks(t: TrickState, inp: TrickInput, dt: number): void {
     t.jumpPerfectPop = !!inp.perfectPop;
     t.jumpFromSwitch = isSwitch(t);
     t.airTime = 0;
+    t.offAxis = false;
     resetGrabJump(t.grabs);
   }
 
@@ -208,19 +240,39 @@ export function stepTricks(t: TrickState, inp: TrickInput, dt: number): void {
     const ds = t.spin - t.spinStart;
     const df = t.flip - t.flipStart;
     const g = countedGrab(t.grabs);
+    // står kroppen (helt eller litt) off-axis, vurderes landingen ut fra hvor den faktisk står
+    let stance: JumpExtras['stance'];
+    let landedSpin = ds;
+    if (t.offAxisBlend > 0) {
+      const st = bodyStance(bodyQuat(t.spin, t.flip, t.offAxisBlend, t.offAxisSide));
+      stance = { spinErrDeg: offBy(st.heading, HALF), flipErrDeg: st.tiltDeg };
+      // retningen kroppen peker, nærmest spinnet du har gjort
+      const wrap = st.heading - t.spin - Math.round((st.heading - t.spin) / TURN) * TURN;
+      landedSpin = t.spin + wrap - t.spinStart;
+    }
     t.lastLanding = judgeLanding(ds, df, {
       grab: g, grabTime: g ? t.grabs.bestTime : 0, perfectPop: t.jumpPerfectPop, fromSwitch: t.jumpFromSwitch,
-      airTime: t.airTime, stillGrabbing: t.grabs.held !== 0,
+      airTime: t.airTime, stillGrabbing: t.grabs.held !== 0, offAxis: t.offAxis, stance,
     });
     t.landingAge = 0;
     t.justLanded = true;
     // spinn: nærmeste halve runde (en halv runde = du kjører baklengs, switch). Flip: nærmeste hele runde.
-    t.spinTarget = t.spinStart + Math.round(ds / HALF) * HALF;
+    t.spinTarget = t.spinStart + Math.round(landedSpin / HALF) * HALF;
     t.flipTarget = t.flipStart + Math.round(df / TURN) * TURN;
   }
 
   // grab: teller bare i lufta; på bakken slipper kroppen mykt
   stepGrabs(t.grabs, inp.grab ?? 0, t.inAir, dt);
+
+  // avsats-vinduet: spinn og flip begge trykket like etter avsatsen gir off-axis resten av hoppet
+  const min = CONFIG.offAxisMinInput;
+  if (t.inAir && !t.offAxis && t.airTime <= CONFIG.offAxisWindow && Math.abs(inp.spin) >= min && Math.abs(inp.flip) >= min) {
+    t.offAxis = true;
+    t.offAxisSide = Math.sign(inp.spin) * Math.sign(inp.flip);
+  }
+  // stillingen glir mykt inn i off-axis i lufta, og tilbake til vanlig når du ikke er det lenger
+  if (t.inAir && t.offAxis) t.offAxisBlend = Math.min(1, t.offAxisBlend + dt / CONFIG.offAxisBlendIn);
+  else t.offAxisBlend = Math.max(0, t.offAxisBlend - dt / CONFIG.offAxisBlendOut);
 
   if (t.inAir) {
     t.airTime += dt;

@@ -3,6 +3,7 @@ import type { Game, Move } from '../core/game';
 import type { SkierState } from '../physics/skier';
 import type { TrickState } from '../tricks/rotation';
 import { isSwitch } from '../tricks/rotation';
+import { bodyQuat } from '../tricks/offaxis';
 import { fallBody, landingWobble } from '../tricks/fall';
 import { heightAt, normalAt } from '../park/terrain';
 import { createPlaceholderSkier } from './placeholder';
@@ -58,9 +59,12 @@ export function createSkierView(scene: THREE.Scene) {
       model.root.quaternion.copy(q).multiply(qYaw);
       // spinn og flip jevnes ut mellom stegene; kameraet får dem ikke, så det snurrer ikke med
       const spin = prevTricks.spin + (tricks.spin - prevTricks.spin) * alpha;
+      const flip = prevTricks.flip + (tricks.flip - prevTricks.flip) * alpha;
+      // off-axis (cork, rodeo): kroppen glir mykt over til å rotere rundt den skrå aksen
+      const blend = prevTricks.offAxisBlend + (tricks.offAxisBlend - prevTricks.offAxisBlend) * alpha;
       // fall: kroppen velter og synker ned i snøen; slurvete landing: kroppen vakler litt
       const body = fallBody(fall), wobble = landingWobble(fall);
-      model.setTrick(spin, prevTricks.flip + (tricks.flip - prevTricks.flip) * alpha, body.roll);
+      model.setTrickQuat(bodyQuat(spin, flip, blend, tricks.offAxisSide), body.roll);
       model.setFallDrop(body.drop);
       // leningen er i kroppens retning: kjører du baklengs (switch), må den snus for å lene inn i svingen.
       // Bruker stillingen du sto i (ikke spinnet underveis), så leningen ikke svaier mens du spinner.

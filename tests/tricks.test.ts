@@ -335,7 +335,7 @@ describe('ingen triks eller sperrer du ikke mente (ekte fysikk, myk slalåm)', (
  * En hel tur ned til det medium hoppet med ekte fysikk. Spilleren holder tasten og slipper
  * når rotasjonen (med glidet etter slipp) akkurat vil nå målet, slik en flink spiller gjør.
  */
-function rideMedium(spinGoalDeg: number, flipGoalDeg: number, withCamera = false) {
+function rideMedium(spinGoalDeg: number, flipGoalDeg: number, withCamera = false, flipDelay = 0) {
   const s = createSkier();
   const t = createTricks();
   const latch = createLatch();
@@ -351,7 +351,7 @@ function rideMedium(spinGoalDeg: number, flipGoalDeg: number, withCamera = false
       const spinLeft = spinGoalDeg * DEG - (t.spin + spinCoast(t.spinRate));
       const flipLeft = flipGoalDeg * DEG - (t.flip + flipCoast(t.flipRate));
       steer = Math.abs(spinLeft) > 0.02 && spinGoalDeg !== 0 ? Math.sign(spinLeft) : 0;
-      flip = Math.abs(flipLeft) > 0.02 && flipGoalDeg !== 0 ? Math.sign(flipLeft) : 0;
+      flip = Math.abs(flipLeft) > 0.02 && flipGoalDeg !== 0 && t.airTime >= flipDelay ? Math.sign(flipLeft) : 0;
     }
     const c = splitControls({ steer, brake: 0, flip }, s.grounded, latch, dt);
     stepSkier(s, c.skier, dt);
@@ -378,8 +378,8 @@ describe('triks på det medium hoppet (ekte fysikk)', () => {
     expect(t.lastLanding?.quality).toBe('ren');
   });
 
-  it('540 + frontflip går an', () => {
-    const { t } = rideMedium(540, 360);
+  it('540 + frontflip går an (flipen startes etter off-axis-vinduet, ellers blir det en cork)', () => {
+    const { t } = rideMedium(540, 360, false, CONFIG.offAxisWindow + 0.05);
     expect(t.lastLanding?.name).toBe('540 + Frontflip');
     expect(t.lastLanding?.quality).not.toBe('fall');
   });

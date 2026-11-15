@@ -38,6 +38,8 @@ export function createPlaceholderSkier() {
   }
   // triks roterer hele kroppen (med ski) rundt midten av kroppen, ikke rundt føttene
   const pivot = new THREE.Group();
+  const qRoll = new THREE.Quaternion();
+  const Z = new THREE.Vector3(0, 0, 1);
   pivot.position.y = CONFIG.trickPivotHeight;
   const inner = new THREE.Group();
   inner.position.y = -CONFIG.trickPivotHeight;
@@ -77,6 +79,13 @@ export function createPlaceholderSkier() {
      */
     setTrick(spin: number, flip: number, roll = 0) {
       pivot.rotation.set(flip, -spin, roll, 'YXZ');
+    },
+    /**
+     * Kroppens stilling som kvaternion [x, y, z, w] fra tricks/offaxis.ts (brukes også for off-axis),
+     * med fallets velt (roll, rad) rundt kroppens egen akse til slutt.
+     */
+    setTrickQuat(q: readonly [number, number, number, number], roll = 0) {
+      pivot.quaternion.set(q[0], q[1], q[2], q[3]).multiply(qRoll.setFromAxisAngle(Z, roll));
     },
     /**
      * Fall fra tricks/fall.ts: kroppen velter til siden (roll, rad) og synker ned mot snøen (drop, m).
