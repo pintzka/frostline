@@ -11,7 +11,8 @@ import { speedOf, type SkierState } from '../physics/skier';
  */
 export interface GameAudio {
   /** Kalles etter hvert fysikksteg. Husker tilstanden og finner pop og landing. */
-  step(prev: SkierState, cur: SkierState, brake: number): void;
+  /** rail: skiene glir på en rail eller boks (skrape i stedet for snø-sus). */
+  step(prev: SkierState, cur: SkierState, brake: number, rail?: boolean): void;
   /** Kalles én gang per bilde. Sender de nye nivåene mykt til lyden. */
   frame(): void;
   /** Ny runde: lyden dukkes kort, så den ikke faller brått. */
@@ -55,6 +56,7 @@ export function createAudio(env: AudioEnv | null = browserEnv()): GameAudio {
   // siste tilstand fra fysikken, og hendelser som venter på neste bilde
   let cur: SkierState | null = null;
   let brake = 0;
+  let onRail = false;
   let popQueue = 0, landQueue = 0, newRunQueued = false;
   let woken = false;
 
@@ -63,9 +65,10 @@ export function createAudio(env: AudioEnv | null = browserEnv()): GameAudio {
 
   const api: GameAudio = {
     get muted() { return muted; },
-    step(prev, s, b) {
+    step(prev, s, b, rail = false) {
       cur = s;
       brake = b;
+      onRail = rail;
       const e = detectEvents(prev, s);
       // flere hendelser på ett bilde: behold den sterkeste
       if (e.pop !== null) popQueue = Math.max(popQueue, e.pop);
@@ -75,7 +78,7 @@ export function createAudio(env: AudioEnv | null = browserEnv()): GameAudio {
       if (engine && cur) {
         // regnes bare én gang per bilde, ikke for hvert fysikksteg
         engine.apply(soundLevels({
-          speed: speedOf(cur), grounded: cur.grounded, edge: cur.edge, brake, skid: cur.grounded ? skidAmount(cur) : 0,
+          speed: speedOf(cur), grounded: cur.grounded, edge: cur.edge, brake, skid: cur.grounded ? skidAmount(cur) : 0, rail: onRail,
         }));
         if (newRunQueued && !muted && !asleep()) engine.duck();
         if (popQueue > AUDIO.minEvent) engine.pop(popQueue);

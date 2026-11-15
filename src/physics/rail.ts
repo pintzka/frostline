@@ -21,8 +21,10 @@ export interface RailShape {
   dx: number; dz: number;
   /** Retningen som en vinkel, som heading (rad). */
   yaw: number;
-  /** Hvor langt fra midten skiene kan treffe (m). */
+  /** Hvor langt fra midten skiene kan treffe fra lufta (m). */
   catchHalf: number;
+  /** Hvor langt fra midten du låses på når du kjører opp fra snøen (m): smalere, så du ikke låses når du er ved siden av. */
+  groundHalf: number;
 }
 
 /** Lager formen på alle railene i parken. */
@@ -32,7 +34,8 @@ export function railShapes(park: ParkData): RailShape[] {
     // i verden er +x til venstre når du ser nedover, så parkfilas x og vinkel snus
     const dx = -Math.sin(a), dz = Math.cos(a);
     const catchHalf = r.kind === 'box' ? CONFIG.boxWidth / 2 + CONFIG.railCatch / 2 : CONFIG.railCatch;
-    return { rail: r, x0: -r.x, z0: r.z, dx, dz, yaw: Math.atan2(dx, dz), catchHalf };
+    const groundHalf = r.kind === 'box' ? CONFIG.boxWidth / 2 : CONFIG.railGroundCatch;
+    return { rail: r, x0: -r.x, z0: r.z, dx, dz, yaw: Math.atan2(dx, dz), catchHalf, groundHalf };
   });
 }
 
@@ -109,10 +112,14 @@ export interface RailRide {
   bail: boolean;
   /** Stilen du hadde da du falt av (for teksten på skjermen). */
   bailStyle: RailStyle;
+  /** Hvor langt du har glidd på railen (m). Poengene regnes per meter, så det ikke lønner seg å gli sakte. */
+  dist: number;
+  /** Kvarte runder du spant i hoppet opp på railen (0 hvis du kjørte opp fra snøen). */
+  spinIn: number;
 }
 
 export function createRailRide(): RailRide {
-  return { on: false, index: -1, u: 0, side: 0, sideVel: 0, speed: 0, style: '5050', balance: 0, time: 0, sloppy: false, bail: false, bailStyle: '5050' };
+  return { on: false, index: -1, u: 0, side: 0, sideVel: 0, speed: 0, style: '5050', balance: 0, time: 0, sloppy: false, bail: false, bailStyle: '5050', dist: 0, spinIn: 0 };
 }
 
 /** Der skiene treffer en rail. */
@@ -148,6 +155,7 @@ export function findRailHit(rails: RailShape[], prev: { x: number; y: number; z:
     } else {
       const hs = Math.hypot(s.vx, s.vz);
       const cos = (s.vx * r.dx + s.vz * r.dz) / Math.max(1e-6, hs);
+      if (Math.abs(side) > r.groundHalf) continue;
       if (top - s.y <= CONFIG.railStepUp && cos >= Math.cos(CONFIG.railGroundMaxDeg * DEG)) return { index: i, u, side, fromAir: false };
     }
   }
@@ -182,7 +190,7 @@ export function startGrind(rr: RailRide, rails: RailShape[], s: SkierState, hit:
   const d = railDir(r, hit.u, h);
   const speed = s.vx * d[0] + s.vy * d[1] + s.vz * d[2];
   s.heading += angleDiff(s.heading, r.yaw);
-  Object.assign(rr, { on: true, index: hit.index, u: hit.u, side: hit.side, sideVel: 0, speed, style, balance, time: 0, sloppy, bail: false });
+  Object.assign(rr, { on: true, index: hit.index, u: hit.u, side: hit.side, sideVel: 0, speed, style, balance, time: 0, sloppy, bail: false, dist: 0, spinIn: 0 });
   place(rr, r, s, h);
   s.vx = speed * d[0]; s.vy = speed * d[1]; s.vz = speed * d[2];
   s.grounded = true;
@@ -234,13 +242,15 @@ export function stepGrind(rr: RailRide, rails: RailShape[], s: SkierState, inp: 
   const d = railDir(r, rr.u, h);
   const mu = rr.style === '5050' ? CONFIG.railFriction5050 : CONFIG.railFrictionBoard;
   const cos = Math.hypot(d[0], d[2]);
-  rr.speed += -g * d[1] * dt;
+  // tyngden langs railen får samme forsterkning som på snøen (slopeAccel), så farten holder seg omtrent som i bakken
+  rr.speed += -g * d[1] * CONFIG.slopeAccel * dt;
   rr.speed = Math.max(0, rr.speed - (mu * g * cos + CONFIG.dragCoef * rr.speed * rr.speed) * dt);
   if (rr.speed < CONFIG.railMinSpeed) { bailOff(rr, rails, s, rr.index, rr.style, rr.balance); return 'fall'; }
 
   // flytt langs railen, og gli mykt inn mot midten
   const ox = s.x, oy = s.y, oz = s.z;
   rr.u += rr.speed * cos * dt;
+  rr.dist += rr.speed * dt;
   const e = Math.exp(-CONFIG.railCenter * dt);
   const x0 = rr.side, v0 = rr.sideVel, k = CONFIG.railCenter;
   rr.side = (x0 + (v0 + k * x0) * dt) * e;

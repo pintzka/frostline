@@ -297,12 +297,14 @@ export const CONFIG = {
   boxWidth: 0.7,
   /** Kjører du på snøen, låses du på hvis toppen er høyst så mye over skiene (m), og du kjører omtrent langs railen. */
   railStepUp: 0.06,
+  /** Kjører du opp fra snøen, låses du på en rail bare så nær midten (m). En boks: innenfor bredden (boxWidth / 2). */
+  railGroundCatch: 0.2,
   railGroundMaxDeg: 20,
   /** Lavere fart enn dette (m/s) langs railen: du låses ikke på, og glir du så sakte på railen, faller du av. */
   railMinSpeed: 2,
   /** Friksjon på railen (som andel av tyngden): 50-50 og boardslide. Tyngdekraften langs railen drar deg fortsatt nedover. */
-  railFriction5050: 0.2,
-  railFrictionBoard: 0.28,
+  railFriction5050: 0.08,
+  railFrictionBoard: 0.15,
   /**
    * Landing på railen: kroppen må stå langs railen (50-50) eller på tvers (boardslide).
    * Innenfor railLandClean grader er det rent, opp til railLandFall er det skjevt (halve poeng og ustø),
@@ -326,9 +328,16 @@ export const CONFIG = {
   railBailUp: 1,
   /** Fra boardslide: snur du ikke selv når du hopper av, vris kroppen tilbake langs fallinja (rad/s i en myk fjær). */
   railTurnOut: 14,
-  /** Poeng per sekund på railen (før kombo): 50-50 og boardslide. Kortere tid enn railMinTime (s) gir ingen poeng. */
-  railPoints5050: 300,
-  railPointsBoard: 450,
+  /**
+   * Poeng for en rail (før kombo): en startbonus pluss poeng per meter du glir, 50-50 og boardslide.
+   * Per meter (ikke per sekund), så det ikke lønner seg å gli sakte. Kortere tid enn railMinTime (s) gir ingen poeng.
+   * railSpinPoints: ekstra per kvarte runde du spinner opp på railen, utover det stilen trenger (f.eks. 270 Boardslide).
+   */
+  railStart5050: 150,
+  railStartBoard: 250,
+  railMeter5050: 15,
+  railMeterBoard: 22,
+  railSpinPoints: 80,
   railMinTime: 0.3,
   /** Settes du tilbake etter et fall og havner på en rail, flyttes du så mange meter før starten på den. */
   railRespawnBefore: 20,

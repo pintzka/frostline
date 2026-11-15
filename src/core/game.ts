@@ -129,7 +129,10 @@ function stepRailOrSnow(g: Game, inp: SkierInput, dt: number): void {
     const style = g.rail.style;
     const end = stepGrind(g.rail, RAILS, s, inp, dt);
     if (end === 'slutt' || end === 'pop') {
-      scoreRail(g.score, { name: railStyleName(style), across: style === 'boardslide', time: g.rail.time, sloppy: g.rail.sloppy });
+      scoreRail(g.score, {
+        name: railStyleName(style), across: style === 'boardslide', time: g.rail.time, sloppy: g.rail.sloppy,
+        meters: g.rail.dist, rail: g.rail.index, spinIn: g.rail.spinIn,
+      });
       // ut av en boardslide: kroppen vris av seg selv tilbake langs fallinja, til du spinner selv
       g.tricks.turnOut = style === 'boardslide';
     }
@@ -142,6 +145,8 @@ function stepRailOrSnow(g: Game, inp: SkierInput, dt: number): void {
   if (!hit) return;
   // skiene vris langs railen; spinnet vris motsatt, så kroppen ikke snur seg brått
   const shift = railHeadingShift(RAILS, s, hit);
+  // kvarte runder spunnet i hoppet opp (bare fra lufta)
+  const spinIn = hit.fromAir ? Math.round(Math.abs(g.tricks.spin - g.tricks.spinStart) / (Math.PI / 2)) : 0;
   shiftSpin(g.tricks, shift);
   const land = landOnRail(g.tricks);
   const style = land.across ? 'boardslide' : '5050';
@@ -152,5 +157,8 @@ function stepRailOrSnow(g: Game, inp: SkierInput, dt: number): void {
     return;
   }
   // skjev landing: du starter ustø, til den siden du var skjev mot
-  startGrind(g.rail, RAILS, s, hit, style, land.errDeg / CONFIG.railLandFall, land.quality === 'slurvete');
+  // fra snøen (rampen): ingen startbalanse og ikke skjevt; kroppen retter seg mykt inn langs railen
+  const fromAir = hit.fromAir;
+  startGrind(g.rail, RAILS, s, hit, style, fromAir ? land.errDeg / CONFIG.railLandFall : 0, fromAir && land.quality === 'slurvete');
+  g.rail.spinIn = spinIn;
 }

@@ -150,26 +150,58 @@ describe('å komme på en rail', () => {
   });
 });
 
-describe('på railen', () => {
-  it('farten bremses litt: mer i boardslide enn i 50-50', () => {
-    const loss = (spinDeg: number) => {
+describe('å kjøre opp fra snøen (kvalitetskontroll)', () => {
+  it('ved siden av boksen eller railen låses du ikke på', () => {
+    for (const [r, off] of [[box, CONFIG.boxWidth / 2 + 0.1], [rail, CONFIG.railGroundCatch + 0.1]] as const) {
       const g = createGame();
-      aboveRail(g, rail, 15, { spinDeg, speed: 20 });
+      placeSkier(g.skier, r.x0 + off * r.dz, r.z0 - 15, 12);
+      g.skier.heading = r.yaw;
+      expect(run(g, (g) => g.rail.on, () => none, 3), r.rail.name).toBe(-1);
+    }
+  });
+
+  it('litt skrå innkjøring fra rampen gir ingen startbalanse og er ikke skjev', () => {
+    const g = createGame();
+    placeSkier(g.skier, box.x0 + 0.25 * box.dz, box.z0 - 15, 12);
+    g.skier.heading = box.yaw + 12 * DEG;
+    // styr tilbake mot boksen, så du kommer opp på den litt på skrå
+    expect(run(g, (g) => g.rail.on, (g) => ({ ...none, steer: g.skier.x > box.x0 ? 0.3 : -0.3 }), 3)).toBeGreaterThan(0);
+    expect(g.rail.balance).toBe(0);
+    expect(g.rail.sloppy).toBe(false);
+  });
+});
+
+describe('på railen', () => {
+  // Tilpasset ved kvalitetskontrollen: railen manglet slopeAccel og bremset 5–6 m/s mer enn snøen.
+  // Nå skal farten holde seg omtrent som i bakken ved siden av: litt saktere, og boardslide mer enn 50-50.
+  it('farten holder seg omtrent som på snøen ved siden av: litt saktere, mer brems i boardslide enn i 50-50', () => {
+    const gain = (spinDeg: number) => {
+      const g = createGame();
+      aboveRail(g, rail, 10, { spinDeg, speed: 18 });
       run(g, (g) => g.rail.on, () => none, 0.1);
       const v0 = g.rail.speed;
-      run(g, (g) => !g.rail.on || g.rail.time >= 0.5);
-      return v0 - g.rail.speed;
+      const t0 = g.rail.time;
+      run(g, (g) => !g.rail.on || g.rail.time - t0 >= 0.5);
+      const t = g.rail.time - t0;
+      // snø rett ved siden av, samme fart og like lenge
+      const h = createGame();
+      placeSkier(h.skier, rail.x0 + 4 * rail.dz, rail.z0 + 10 * rail.dz, v0);
+      h.skier.heading = rail.yaw;
+      run(h, () => false, () => none, t);
+      return { rail: g.rail.speed - v0, snow: speedOf(h.skier) - v0 };
     };
-    const l5050 = loss(0), lBoard = loss(90);
-    expect(l5050).toBeGreaterThan(0.2);
-    expect(l5050).toBeLessThan(2.5);
-    expect(lBoard).toBeGreaterThan(l5050);
+    const a = gain(0), b = gain(90);
+    expect(a.rail).toBeLessThanOrEqual(a.snow);
+    expect(a.snow - a.rail).toBeLessThan(1);
+    expect(b.snow - b.rail).toBeLessThan(1.5);
+    expect(b.rail).toBeLessThan(a.rail);
   });
 
   it('holder du styring til én side, faller du av etter ca. 0,7 s, og det er et vanlig fall', () => {
     const g = createGame();
     g.score.comboCount = 2;
-    aboveRail(g, longBox, 15, { speed: 22 });
+    // starter nærmere starten av boksen enn før (u 5, ikke 15): railen er raskere nå, så du kom til enden før 0,7 s
+    aboveRail(g, longBox, 5, { speed: 22 });
     run(g, (g) => g.rail.on, () => none, 0.1);
     const t0 = g.rail.time;
     run(g, (g) => !g.rail.on, () => ({ ...none, steer: 1 }));
@@ -294,25 +326,65 @@ describe('ingen rykk på og av railen', () => {
   });
 });
 
+// Tilpasset ved kvalitetskontrollen: poengene er nå startbonus + per meter (ikke per sekund, som ga mest for å gli sakte),
+// og RailRun har fått meter, rail (indeks) og spinIn. Reglene som ble testet før (boardslide mer, kombo, skjev = halve,
+// for kort = ingen, gjentatt = mindre) testes fortsatt.
+const run1 = (over: Partial<Parameters<typeof scoreRail>[1]> = {}) =>
+  ({ name: '50-50', across: false, time: 1, sloppy: false, meters: 20, rail: 0, spinIn: 0, ...over });
+
 describe('poeng for rails', () => {
-  it('poeng per sekund, boardslide mer enn 50-50, og railen bygger komboen', () => {
+  it('startbonus + poeng per meter, boardslide mer enn 50-50, og railen bygger komboen', () => {
     const s = createScore();
-    const a = scoreRail(s, { name: '50-50', across: false, time: 1, sloppy: false });
-    expect(a.points).toBe(CONFIG.railPoints5050);
+    const a = scoreRail(s, run1());
+    expect(a.points).toBe(Math.round((CONFIG.railStart5050 + 20 * CONFIG.railMeter5050) / 10) * 10);
     expect(s.comboCount).toBe(1);
-    const b = scoreRail(s, { name: 'Boardslide', across: true, time: 1, sloppy: false });
-    expect(b.points).toBe(Math.round((CONFIG.railPointsBoard * 1.25) / 10) * 10);
+    const b = scoreRail(s, run1({ name: 'Boardslide', across: true, rail: 1 }));
+    expect(b.points).toBe(Math.round(((CONFIG.railStartBoard + 20 * CONFIG.railMeterBoard) * 1.25) / 10) * 10);
     expect(b.name).toBe('Boardslide 1,0 s');
   });
+
   it('skjev: halve poeng og ingen ekstra kombo; for kort: ingen poeng; gjentatt: mindre', () => {
     const s = createScore();
-    expect(scoreRail(s, { name: '50-50', across: false, time: 1, sloppy: true }).points).toBe(CONFIG.railPoints5050 / 2);
+    const full = Math.round((CONFIG.railStart5050 + 20 * CONFIG.railMeter5050) / 10) * 10;
+    expect(scoreRail(s, run1({ sloppy: true })).points).toBe(Math.round(full / 2 / 10) * 10);
     expect(s.comboCount).toBe(0);
-    const short = scoreRail(s, { name: '50-50', across: false, time: 0.1, sloppy: false });
+    const short = scoreRail(s, run1({ time: 0.1 }));
     expect(short.points).toBe(0);
     expect(short.tooSmall).toBe(true);
-    const again = scoreRail(s, { name: '50-50', across: false, time: 1, sloppy: false });
+    const again = scoreRail(s, run1());
     expect(again.repeat).toBeLessThan(1);
+  });
+
+  it('sakte lønner seg ikke: samme rail i 2,5 m/s gir ikke mer enn i 18 m/s', () => {
+    const slow = scoreRail(createScore(), run1({ time: 20 / 2.5, meters: 20 }));
+    const fast = scoreRail(createScore(), run1({ time: 20 / 18, meters: 20 }));
+    expect(slow.points).toBeLessThanOrEqual(fast.points);
+  });
+
+  it('av og på samme rail bygger komboen bare én gang; en annen rail eller snø imellom gjør det igjen', () => {
+    const s = createScore();
+    scoreRail(s, run1({ rail: 2 }));
+    scoreRail(s, run1({ rail: 2 }));
+    scoreRail(s, run1({ rail: 2 }));
+    expect(s.comboCount).toBe(1);
+    scoreRail(s, run1({ rail: 1 }));
+    expect(s.comboCount).toBe(2);
+  });
+
+  it('gjentakelse regnes per rail: en annen rail med samme stil er ikke en gjentakelse', () => {
+    const s = createScore();
+    scoreRail(s, run1({ rail: 0 }));
+    expect(scoreRail(s, run1({ rail: 1 })).repeat).toBe(1);
+    expect(scoreRail(s, run1({ rail: 0 })).repeat).toBeLessThan(1);
+  });
+
+  it('spinn opp på railen står i navnet og gir mer: «270 Boardslide»', () => {
+    const plain = scoreRail(createScore(), run1({ name: 'Boardslide', across: true, spinIn: 1 }));
+    const spun = scoreRail(createScore(), run1({ name: 'Boardslide', across: true, spinIn: 3 }));
+    expect(plain.name).toBe('Boardslide 1,0 s');
+    expect(spun.name).toBe('270 Boardslide 1,0 s');
+    expect(spun.points).toBeGreaterThan(plain.points);
+    expect(scoreRail(createScore(), run1({ spinIn: 2 })).name).toBe('180 50-50 1,0 s');
   });
 });
 

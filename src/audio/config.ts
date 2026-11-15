@@ -29,6 +29,9 @@ export const AUDIO = {
   scrapeFullSpeed: 15,
   scrapeCurve: 0.7,
   scrapeSkidShare: 0.6,
+  /** På en rail: skrape-lyden så sterk (0–1 ved full fart), og så lys som minst (0–1), så den høres annerledes ut enn brems. */
+  railScrape: 0.7,
+  railScrapeTone: 0.6,
 
   /**
    * Landing: styrken bygger mest på lufttid (stort hopp = tungt dump, selv om landingen er myk),

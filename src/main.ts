@@ -71,7 +71,7 @@ function onMoved(m: Move, g: Game) {
 /** Lyden: prev er satt på nytt etter en flytting, så det ikke høres ut som en landing. */
 function hear(g: Game) {
   const heard = soundSkier(g);
-  audio.step(heard === g.skier ? prev : heard, heard, heard.brake);
+  audio.step(heard === g.skier ? prev : heard, heard, heard.brake, g.rail.on);
 }
 
 /** Tilbake til resultatet: mellomrom som holdes starter ikke ny runde, og kameraet hopper rett tilbake. */

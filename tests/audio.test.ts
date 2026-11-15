@@ -203,3 +203,18 @@ describe('lydmotoren uten Web Audio', () => {
     }).not.toThrow();
   });
 });
+
+describe('lyd på rails', () => {
+  it('på railen: ingen snø-sus eller carve, men skrape, og vind som på bakken (ikke luft)', () => {
+    const base = { speed: 15, grounded: true, edge: 0.8, brake: 0, skid: 0 };
+    const snow = soundLevels(base);
+    const rail = soundLevels({ ...base, rail: true });
+    const air = soundLevels({ ...base, grounded: false });
+    expect(rail.snow).toBe(0);
+    expect(rail.carve).toBe(0);
+    expect(rail.scrape).toBeGreaterThan(0.3);
+    expect(rail.scrapeTone).toBeGreaterThan(snow.scrapeTone - 1e-9);
+    expect(rail.wind).toBe(snow.wind);
+    expect(rail.wind).toBeLessThan(air.wind);
+  });
+});

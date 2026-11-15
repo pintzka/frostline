@@ -90,10 +90,12 @@ export interface ScoreState {
   /** Siste triks som skal vises, og hvor mange sekunder siden. */
   last: TrickResult | null;
   lastAge: number;
+  /** Railen som sist bygde komboen (-1 = ingen siden sist du landet i snøen). Av og på samme rail bygger ikke komboen igjen. */
+  railChain: number;
 }
 
 export function createScore(): ScoreState {
-  return { total: 0, comboCount: 0, comboIdle: 0, recent: [], last: null, lastAge: 99 };
+  return { total: 0, comboCount: 0, comboIdle: 0, recent: [], last: null, lastAge: 99, railChain: -1 };
 }
 
 /** Kombo-gangetallet neste triks får: 1, 1,25, 1,5 ... opp til maks. */
@@ -122,6 +124,8 @@ function show(s: ScoreState, l: Landing, r: Partial<TrickResult>): TrickResult {
 /** Kalles én gang når skiløperen lander. Gir poeng og oppdaterer komboen. */
 export function scoreLanding(s: ScoreState, l: Landing): TrickResult | null {
   const real = isRealTrick(l);
+  // landet i snøen: neste rail bygger komboen igjen, også om det er den samme
+  s.railChain = -1;
 
   if (l.quality === 'fall') {
     // fall: null poeng og komboen er borte. Vises alltid, så du ser hvorfor komboen forsvant.
@@ -175,6 +179,12 @@ export interface RailRun {
   time: number;
   /** Landet du skjevt på railen? Da gir den halve poeng og bygger ikke komboen. */
   sloppy: boolean;
+  /** Meter du gled. Poengene regnes per meter. */
+  meters: number;
+  /** Hvilken rail (indeks). Gjentakelse regnes per rail og stil, og samme rail bygger komboen bare én gang. */
+  rail: number;
+  /** Kvarte runder du spant opp på railen (0 = kjørte opp fra snøen). */
+  spinIn: number;
 }
 
 /** 1.25 → «1,3 s» */
@@ -187,7 +197,9 @@ export function railTimeText(time: number): string {
  * poeng per sekund × landing × gjentakelse × kombo. Faller du av railen, er det et vanlig fall i stedet.
  */
 export function scoreRail(s: ScoreState, r: RailRun): TrickResult {
-  const name = `${r.name} ${railTimeText(r.time)}`;
+  // spinn opp på railen utover det stilen trenger (boardslide trenger en kvart runde): med i navnet og poengene
+  const extra = Math.max(0, r.spinIn - (r.across ? 1 : 0));
+  const name = `${extra > 0 ? `${r.spinIn * 90} ` : ''}${r.name} ${railTimeText(r.time)}`;
   const quality = r.sloppy ? 'slurvete' : 'ren';
   const base = { name, quality, points: 0, combo: 1, repeat: 1, perfectPop: false, tooSmall: false, smallJump: false, comboLost: false, landedGrabbing: false } as const;
   if (r.time < CONFIG.railMinTime) {
@@ -195,16 +207,19 @@ export function scoreRail(s: ScoreState, r: RailRun): TrickResult {
     s.lastAge = 0;
     return s.last;
   }
-  const key = `rail|${r.across ? 'board' : '5050'}`;
+  const key = `rail|${r.rail}|${r.across ? 'board' : '5050'}|${extra}`;
   const repeat = repeatShare(s, key);
   s.recent.push(key);
   if (s.recent.length > CONFIG.repeatMemory) s.recent.shift();
   const combo = comboMult(s);
-  const perSec = r.across ? CONFIG.railPointsBoard : CONFIG.railPoints5050;
-  const points = round10(perSec * r.time * (r.sloppy ? CONFIG.sloppyShare : 1) * repeat * combo);
+  const raw = (r.across ? CONFIG.railStartBoard : CONFIG.railStart5050)
+    + (r.across ? CONFIG.railMeterBoard : CONFIG.railMeter5050) * r.meters + CONFIG.railSpinPoints * extra;
+  const points = round10(raw * (r.sloppy ? CONFIG.sloppyShare : 1) * repeat * combo);
   s.total += points;
   s.comboIdle = 0;
-  if (!r.sloppy) s.comboCount++;
+  // av og på samme rail (uten å lande i snøen imellom) bygger ikke komboen én gang til
+  if (!r.sloppy && s.railChain !== r.rail) s.comboCount++;
+  s.railChain = r.rail;
   s.last = { ...base, points, combo, repeat };
   s.lastAge = 0;
   return s.last;

@@ -17,6 +17,8 @@ export interface SoundInput {
   brake: number;
   /** hvor mye skiene glir sidelengs, 0–1 */
   skid: number;
+  /** skiene glir på en rail eller boks: ingen snø-sus eller carve, men en lys skrape-lyd (og vind som på bakken) */
+  rail?: boolean;
 }
 
 export interface SoundLevels {
@@ -67,6 +69,11 @@ export function soundLevels(i: SoundInput): SoundLevels {
   const scrape = clamp01(rough * Math.pow(ramp(speed, 0, AUDIO.scrapeFullSpeed), AUDIO.scrapeCurve) * fadeIn * ground);
   const scrapeTone = clamp01(ramp(speed, 0, AUDIO.scrapeFullSpeed));
 
+  if (i.rail) {
+    // på railen: ikke snø under skiene, men metall/plast som skraper, lysere jo fortere
+    const r = clamp01(AUDIO.railScrape * Math.pow(ramp(speed, 0, AUDIO.scrapeFullSpeed), AUDIO.scrapeCurve) * fadeIn);
+    return { wind, windTone, snow: 0, snowTone, carve: 0, carveTone, scrape: r, scrapeTone: clamp01(AUDIO.railScrapeTone + (1 - AUDIO.railScrapeTone) * scrapeTone) };
+  }
   return { wind, windTone, snow, snowTone, carve, carveTone, scrape, scrapeTone };
 }
 
