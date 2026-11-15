@@ -6,7 +6,7 @@ import { isSwitch } from '../tricks/rotation';
 import { fallBody, landingWobble } from '../tricks/fall';
 import { heightAt, normalAt } from '../park/terrain';
 import { createPlaceholderSkier } from './placeholder';
-import { poseFor, smoothPose } from './pose';
+import { followLeanSign, poseFor, smoothPose } from './pose';
 import { createTilt, stepTilt } from './tilt';
 
 /**
@@ -28,13 +28,14 @@ export function createSkierView(scene: THREE.Scene) {
     return smoothPose(p, p, 0);
   };
   let pose = standingPose();
+  let leanSign = 1;
 
   return {
     /** Skiløperen ble flyttet: kroppen står rett på snøen med en gang, og ny runde starter i stående stilling. */
     moved(m: Move) {
       if (m === 'none') return;
       Object.assign(tilt, createTilt());
-      if (m === 'restart') pose = standingPose();
+      if (m === 'restart') { pose = standingPose(); leanSign = 1; }
     },
 
     /** Kalles hvert bilde. Gir hvor skiløperen tegnes og hvilken vei den peker. */
@@ -62,8 +63,10 @@ export function createSkierView(scene: THREE.Scene) {
       model.setTrick(spin, prevTricks.flip + (tricks.flip - prevTricks.flip) * alpha, body.roll);
       model.setFallDrop(body.drop);
       // leningen er i kroppens retning: kjører du baklengs (switch), må den snus for å lene inn i svingen.
-      // Bruker stillingen du sto i (ikke spinnet underveis), så leningen ikke svaier mens du spinner
-      model.setLean((prev.lean + (skier.lean - prev.lean) * alpha) * (isSwitch(tricks) ? -1 : 1) + wobble.roll);
+      // Bruker stillingen du sto i (ikke spinnet underveis), så leningen ikke svaier mens du spinner.
+      // Fortegnet glir mykt, så leningen ikke rykker når du lander switch
+      leanSign = followLeanSign(leanSign, isSwitch(tricks), frameDt);
+      model.setLean((prev.lean + (skier.lean - prev.lean) * alpha) * leanSign + wobble.roll);
       // kroppen glir mellom stillingene, så avspark og landing ikke rykker
       pose = smoothPose(pose, poseFor({
         grounded: skier.grounded, popCharge: skier.popCharge, airTime: skier.airTime,

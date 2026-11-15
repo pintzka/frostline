@@ -242,6 +242,8 @@ export const CONFIG = {
   pose: {
     /** Hvor raskt kroppen glir mellom stillingene (rad/s i en myk fjær). 22 ≈ 0,15 s. */
     speed: 22,
+    /** Hvor fort leningens fortegn snus når du lander switch (per sekund). 10 ≈ 0,3 s. */
+    leanSignSpeed: 10,
     /** Sats mens pop lades: så langt ned og så mye framover ved full lading. */
     crouchDrop: 0.22,
     crouchPitch: 0.3,

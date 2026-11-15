@@ -74,3 +74,12 @@ export function poseFor(s: PoseInput): Pose {
   const skiLift = P.tuckLift * tuckIn * tuckOut;
   return { drop, pitch: P.tuckPitch * tuckIn * tuckOut, skiLift };
 }
+
+/**
+ * Leningen vises i kroppens retning: kjører du baklengs (switch), snus den. Fortegnet (1 = forlengs,
+ * -1 = switch) glir mykt over i stedet for å bytte på ett bilde når du lander switch.
+ */
+export function followLeanSign(current: number, wantSwitch: boolean, dt: number): number {
+  const target = wantSwitch ? -1 : 1;
+  return target + (current - target) * Math.exp(-CONFIG.pose.leanSignSpeed * dt);
+}

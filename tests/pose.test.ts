@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { poseFor, smoothPose, type Pose, type PoseInput } from '../src/character/pose';
+import { followLeanSign, poseFor, smoothPose, type Pose, type PoseInput } from '../src/character/pose';
+import { CONFIG } from '../src/core/config';
+import { createGame, stepGame } from '../src/core/game';
+import { PARK } from '../src/park/terrain';
+import { isSwitch, spinCoast } from '../src/tricks/rotation';
 
 const standing: PoseInput = { grounded: true, popCharge: 0, airTime: 0, heightAboveSnow: 0, sinceLanding: 10 };
 
@@ -57,5 +61,47 @@ describe('hopp-bevegelse', () => {
   it('fjærer ned rett etter landing, og er tilbake etter et halvt sekund', () => {
     expect(poseFor({ ...standing, sinceLanding: 0.05 }).drop).toBeGreaterThan(0.1);
     expect(poseFor({ ...standing, sinceLanding: 0.5 }).drop).toBeCloseTo(0, 6);
+  });
+});
+
+describe('leningen ved switch-landing', () => {
+  /** Carver hardt, popper på flaten mens du lener, spinner 180 og lander baklengs. Gir største endring i vist lening per steg. */
+  function biggestLeanStep(follow: (sign: number, sw: boolean, dt: number) => number) {
+    const dt = 1 / CONFIG.physicsHz;
+    const g = createGame();
+    let sign = 1, last = 0, biggest = 0, time = 0, landedSwitch = false, leanAtLanding = 0, popped = false;
+    for (let i = 0; i < 12 * CONFIG.physicsHz; i++) {
+      const s = g.skier, t = g.tricks;
+      let steer = 0.8, pop = false;
+      // pop: hold 0,4 s etter 3 s carving, og slipp
+      if (time > 3 && time < 3.4 && !popped) pop = true;
+      if (time >= 3.4) popped = true;
+      if (!s.grounded) {
+        const left = Math.PI - (t.spin + spinCoast(t.spinRate));
+        // slipper stikka et øyeblikk etter avsatsen, så sperren slippes, og spinner så
+        steer = s.airTime < 0.03 ? 0 : Math.abs(left) > 0.02 ? Math.sign(left) : 0;
+      }
+      const wasAir = !s.grounded;
+      stepGame(g, { steer, brake: 0, flip: 0, pop }, false, dt);
+      time += dt;
+      if (wasAir && g.skier.grounded && isSwitch(g.tricks)) { landedSwitch = true; leanAtLanding = g.skier.lean; }
+      sign = follow(sign, isSwitch(g.tricks), dt);
+      const shown = g.skier.lean * sign;
+      if (i > 0) biggest = Math.max(biggest, Math.abs(shown - last));
+      last = shown;
+      if (landedSwitch && time > 7) break;
+    }
+    return { landedSwitch, leanAtLanding, biggestDeg: biggest / (Math.PI / 180) };
+  }
+
+  it('rykker ikke når du lander baklengs mens du fortsatt lener (fortegnet glir mykt)', () => {
+    const hard = biggestLeanStep((_, sw) => (sw ? -1 : 1));
+    const soft = biggestLeanStep(followLeanSign);
+    expect(soft.landedSwitch).toBe(true);
+    expect(Math.abs(soft.leanAtLanding)).toBeGreaterThan(0.02);
+    // uten myk overgang hopper leningen flere grader på ett steg
+    expect(hard.biggestDeg).toBeGreaterThan(3);
+    // med myk overgang: under 1° per fysikksteg (ca. 4° per bilde i 60 fps)
+    expect(soft.biggestDeg).toBeLessThan(1);
   });
 });
