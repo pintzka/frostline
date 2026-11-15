@@ -2,6 +2,7 @@ import { CONFIG } from './core/config';
 import { createLoop } from './core/loop';
 import { skisOnSnow, type Move } from './core/game';
 import { speedOf } from './physics/skier';
+import { railStyleName } from './physics/rail';
 import { createInput } from './input/input';
 import { createChaseCamera } from './camera/chase';
 import { createScene } from './render/scene';
@@ -37,6 +38,9 @@ let prevTricks = { ...game.tricks };
 let moved: Move = 'restart';
 const startZ = game.skier.z;
 
+/** Skiløperen slik lyd og snøsprut ser den: på en rail er skiene ikke i snøen. */
+const onSnowView = () => (game.rail.on ? { ...game.skier, grounded: false } : game.skier);
+
 const loop = createLoop({
   hz: CONFIG.physicsHz,
   step(dt) {
@@ -56,13 +60,14 @@ const loop = createLoop({
       audio.newRun();
     }
     // prev er satt på nytt etter en flytting, så det ikke høres ut som en landing
-    audio.step(prev, game.skier, { steer: 0, brake: game.skier.brake, pop: false });
+    // på en rail er det ikke snø under skiene (ingen snølyd eller snøsprut)
+    audio.step(prev, onSnowView(), { steer: 0, brake: game.skier.brake, pop: false });
   },
   render(alpha, frameDt) {
     const { skier, tricks } = game;
     const { at, heading, normal } = view.update(game, prev, prevTricks, alpha, frameDt);
     trails.update(at.x, at.y, at.z, heading, skisOnSnow(game), moved);
-    spray.update(skier, at, heading, skier.brake, normal, frameDt, chase.camera, renderer);
+    spray.update(onSnowView(), at, heading, skier.brake, normal, frameDt, chase.camera, renderer);
     sunFollow(at);
 
     // den ekte farten: landingene følger flybanen, så den holder seg når du lander
@@ -73,6 +78,7 @@ const loop = createLoop({
       popCharge: skier.popCharge, lastPop: skier.lastPop, popAge: skier.popAge,
       landing: tricks.lastLanding, landingAge: tricks.landingAge, fade: fadeAmount(game.fall),
       score: game.score, best: game.best, controls: input.device(), grab: tricks.grabs.held, grabTime: tricks.grabs.holdTime,
+      rail: game.rail.on ? { name: railStyleName(game.rail.style), time: game.rail.time, balance: game.rail.balance } : null,
     }, frameDt);
     hud.setOpacity(menu.update(game.flow, frameDt));
     moved = 'none';

@@ -87,6 +87,37 @@ Testene `offcenter.test.ts` (kjøre på sidene av hoppene) og `wall.test.ts` (kj
 
 **Test alltid med `npm run check` etter en endring.** Testene sjekker også at du får riktig høyde og myk landing. Hvis du endrer dagens hopp, vil noen av de testene (for eksempel `air.test.ts` og `pop.test.ts`) kanskje feile, fordi de passer på at hoppene føles som du valgte. Da kan du spille og se om det nye er bedre, og så oppdatere testene.
 
+## Rails og bokser
+
+Rails og bokser står i lista `rails` (den kan sløyfes). Eksempel:
+
+```json
+"rails": [
+  { "name": "Boks", "kind": "box", "z": 40, "x": 7, "length": 26, "height": 0.35 },
+  { "name": "Langboks", "kind": "box", "z": 222, "x": 12, "length": 30, "height": 0.35, "angleDeg": 5 }
+]
+```
+
+| Felt | Betyr |
+|---|---|
+| `name` | Navnet. Må være unikt. |
+| `kind` | `"rail"` (smalt metallrør) eller `"box"` (bred boks med glatt topp). |
+| `z` | Hvor starten står, i meter nedover bakken. |
+| `x` | Hvor langt fra midten (m). Positivt = til høyre når du kjører ned, negativt = til venstre. |
+| `length` | Hvor lang den er (m), med rampen i starten. |
+| `height` | Hvor høyt over snøen toppen er (m). |
+| `angleDeg` | (kan sløyfes) Hvor mye den skrår, i grader. 0 = rett ned bakken, positivt = mot høyre. |
+
+Starten er alltid en myk rampe opp fra snøen (14 m, `railRampLength` i `src/core/config.ts`), så du kan kjøre rett opp. Railen følger bakken, med samme høyde over snøen hele veien.
+
+**Trygge tall:** `height` 0,3–0,45 (en full pop gir ca. 0,6 m, så da kan du også poppe opp på den fra siden av starten), `length` 24–35.
+
+**Valideringen sjekker:**
+- `kind` er `"rail"` eller `"box"`, `height` 0,2–1,2 m, `length` minst 18 m (rampen + 4 m) og høyst 80 m, `angleDeg` høyst ±30°.
+- Den står innenfor bollen mot kanten (23 m fra midten), starter etter 20 m og slutter 50 m før bakken tar slutt.
+- Den står ikke på et hopp (rampe, platå eller landing, med de myke sidene og 2 m ekstra), og krysser ikke kanten inn til en landing (der bøyer bakken seg, over hele bredden).
+- Det er minst 3 m til neste rail, og ingen har samme navn.
+
 ## Ny park
 
 Lag en ny fil i `src/park/parks/`, for eksempel `minpark.json`, og legg den til i `src/park/parks.ts`.

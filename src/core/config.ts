@@ -236,6 +236,53 @@ export const CONFIG = {
   /** Sekunder «PERFEKT POP!» vises. */
   popFlashTime: 1.2,
 
+  // --- Rails og bokser (src/physics/rail.ts). Se docs/DESIGN.md (Rails og bokser) ---
+  /**
+   * Starten på hver rail og boks er en myk rampe opp fra snøen, så du kan kjøre rett opp på den.
+   * Så mange meter lang (m). Lengre = mykere dytt opp. Selve railen/boksen er resten av lengden.
+   */
+  railRampLength: 14,
+  /** Hvor langt fra midten av railen (m) skiene kan treffe og fortsatt låses på. En boks er boxWidth bred, pluss railCatch / 2. */
+  railCatch: 0.45,
+  boxWidth: 0.7,
+  /** Kjører du på snøen, låses du på hvis toppen er høyst så mye over skiene (m), og du kjører omtrent langs railen. */
+  railStepUp: 0.06,
+  railGroundMaxDeg: 20,
+  /** Lavere fart enn dette (m/s) langs railen: du låses ikke på, og glir du så sakte på railen, faller du av. */
+  railMinSpeed: 2,
+  /** Friksjon på railen (som andel av tyngden): 50-50 og boardslide. Tyngdekraften langs railen drar deg fortsatt nedover. */
+  railFriction5050: 0.2,
+  railFrictionBoard: 0.28,
+  /**
+   * Landing på railen: kroppen må stå langs railen (50-50) eller på tvers (boardslide).
+   * Innenfor railLandClean grader er det rent, opp til railLandFall er det skjevt (halve poeng og ustø),
+   * mer enn det = du faller av med en gang.
+   */
+  railLandClean: 20,
+  railLandFall: 40,
+  /**
+   * Balanse (−1 til 1, faller av ved ±1). Styring dytter balansen railSteerRate per sekund ved full styring,
+   * og den går mykt tilbake mot midten med railRecover per sekund. Full styring til én side: av etter ca. 0,7 s.
+   */
+  railSteerRate: 2,
+  railRecover: 1,
+  /** Hvor mye kroppen lener seg til siden ved full ubalanse (rad), og hvor fort den følger (rad/s i en myk fjær). */
+  railLeanMax: 0.5,
+  railLeanSpeed: 10,
+  /** Landet du litt ved siden av midten, glir du mykt inn på midten (rad/s i en myk fjær). */
+  railCenter: 8,
+  /** Faller du av: dyttes så fort ut til siden og opp (m/s), og lander i snøen som et fall. */
+  railBailPush: 2.5,
+  railBailUp: 1,
+  /** Fra boardslide: snur du ikke selv når du hopper av, vris kroppen tilbake langs fallinja (rad/s i en myk fjær). */
+  railTurnOut: 14,
+  /** Poeng per sekund på railen (før kombo): 50-50 og boardslide. Kortere tid enn railMinTime (s) gir ingen poeng. */
+  railPoints5050: 300,
+  railPointsBoard: 450,
+  railMinTime: 0.3,
+  /** Settes du tilbake etter et fall og havner på en rail, flyttes du så mange meter før starten på den. */
+  railRespawnBefore: 20,
+
   // --- Kroppens stillinger rundt et hopp (src/character/pose.ts). Lengder i m, vinkler i rad, tider i s ---
   pose: {
     /** Hvor raskt kroppen glir mellom stillingene (rad/s i en myk fjær). 22 ≈ 0,15 s. */

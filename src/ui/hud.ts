@@ -33,6 +33,8 @@ export interface HudInfo {
   controls?: 'keyboard' | 'gamepad' | 'touch';
   /** Hvor mye skjermen er bleket etter et fall (0–1). */
   fade: number;
+  /** Railen du glir på nå: navn («50-50»), sekunder, og balansen (−1 til 1, faller av ved ±1). */
+  rail?: { name: string; time: number; balance: number } | null;
 }
 
 /** Fartsmåleren følger den ekte farten mykt, så tallet aldri hopper (f.eks. når du settes tilbake etter et fall). */
@@ -95,7 +97,7 @@ export function countUp(shown: number, total: number, dt: number): number {
 }
 
 const HELP = {
-  keyboard: 'Styr: ← → / A D · Brems: ↓ / S · Pop: hold og slipp mellomrom · I lufta: ← → spinn, ↑ / W frontflip, ↓ / S backflip, hold J / K / L grab · Start på nytt: R · Pause: P / Esc · Lyd: M',
+  keyboard: 'Styr: ← → / A D · Brems: ↓ / S · Pop: hold og slipp mellomrom (også av railen) · I lufta: ← → spinn, ↑ / W frontflip, ↓ / S backflip, hold J / K / L grab · Start på nytt: R · Pause: P / Esc · Lyd: M',
   gamepad: 'Styr: venstre stikke · Brems: LT / B · Pop: hold og slipp A · I lufta: stikke sidelengs spinn, opp/ned flip, hold X / RB / LB grab · Start på nytt: Y · Pause: Start',
   touch: 'Styr: dra tommelen sidelengs på venstre side · POP: hold og slipp · BREMS: hold · I lufta: dra sidelengs for å spinne',
 } as const;
@@ -165,6 +167,14 @@ export function createHud(parent: HTMLElement) {
   grab.style.cssText = 'position:fixed;left:0;right:0;bottom:84px;text-align:center;color:#fff;font:700 24px system-ui,sans-serif;text-shadow:0 0 3px #000c,0 2px 8px #000a;pointer-events:none;opacity:0;transition:opacity .15s;';
   root.appendChild(grab);
 
+  // balansen på railen: en strek som viser hvor langt du lener; rød nær kanten
+  const balance = document.createElement('div');
+  balance.style.cssText = 'position:fixed;left:50%;bottom:72px;width:160px;height:8px;margin-left:-80px;border-radius:4px;background:#0006;pointer-events:none;opacity:0;transition:opacity .15s;';
+  const balanceDot = document.createElement('div');
+  balanceDot.style.cssText = 'position:absolute;top:-3px;left:50%;width:14px;height:14px;margin-left:-7px;border-radius:7px;background:#fff;';
+  balance.appendChild(balanceDot);
+  root.appendChild(balance);
+
   const help = document.createElement('div');
   help.style.cssText = 'position:fixed;left:16px;bottom:16px;color:#fffc;font:14px system-ui,sans-serif;pointer-events:none;';
   root.appendChild(help);
@@ -223,8 +233,15 @@ export function createHud(parent: HTMLElement) {
         comboFill.style.width = `${Math.max(0, 1 - h.score.comboIdle / CONFIG.comboTimeout) * 100}%`;
       }
 
-      // grabben du holder: svak før den teller (0,3 s), tydelig når den teller
-      if (h.grab) {
+      // railen: navn og tid der grabben vises, og balansen under
+      balance.style.opacity = h.rail ? '1' : '0';
+      if (h.rail) {
+        grab.textContent = `${h.rail.name} ${h.rail.time.toFixed(1).replace('.', ',')} s`;
+        grab.style.opacity = h.rail.time >= CONFIG.railMinTime ? '1' : '0.45';
+        const b = Math.max(-1, Math.min(1, h.rail.balance));
+        balanceDot.style.left = `${(50 + 50 * b).toFixed(1)}%`;
+        balanceDot.style.background = Math.abs(b) > 0.7 ? '#ff6b6b' : Math.abs(b) > 0.4 ? '#ffd166' : '#fff';
+      } else if (h.grab) {
         grab.textContent = `${grabName(h.grab)} ${h.grabTime.toFixed(1).replace('.', ',')} s`;
         grab.style.opacity = h.grabTime >= CONFIG.grabMinHold ? '1' : '0.45';
       } else grab.style.opacity = '0';
