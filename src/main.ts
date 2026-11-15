@@ -15,6 +15,7 @@ import { createGame, skisOnSnow, stepGame, type Move } from './core/game';
 import { fadeAmount, fallBody, landingWobble } from './tricks/fall';
 import { isSwitch } from './tricks/rotation';
 import { createSnowSpray } from './render/sprayMesh';
+import { createAudio } from './audio/engine';
 
 const root = document.getElementById('app')!;
 const { renderer, scene, env, sunFollow } = createScene(root);
@@ -22,6 +23,7 @@ const chase = createChaseCamera(innerWidth / innerHeight);
 addEventListener('resize', () => chase.resize(innerWidth / innerHeight));
 const input = createInput(renderer.domElement);
 const hud = createHud(root);
+const audio = createAudio();
 
 const skierModel = createPlaceholderSkier();
 const mesh = skierModel.root;
@@ -64,6 +66,10 @@ const loop = createLoop({
     // flyttet (ny runde eller respawn): kroppen står rett på snøen med en gang, uten å tippe dit
     if (m !== 'none') Object.assign(tilt, createTilt());
     if (m === 'restart') pose = standingPose();
+    // lyden dukkes kort når du flyttes, så den ikke hopper (ny runde eller satt tilbake etter fall)
+    if (m !== 'none') audio.newRun();
+    // prev er satt på nytt etter en flytting, så det ikke høres ut som en landing
+    audio.step(prev, game.skier, { steer: 0, brake: game.skier.brake, pop: false });
   },
   render(alpha, frameDt) {
     const { skier, tricks, fall } = game;
@@ -114,6 +120,7 @@ const loop = createLoop({
     }, frameDt);
     moved = 'none';
     env.follow(chase.camera.position, performance.now() / 1000);
+    audio.frame();
     renderer.render(scene, chase.camera);
   },
 });
