@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { PARK } from '../park/terrain';
+import { FINE } from './groundGrid';
 import { GROUND_HALF, groundAt, planMarkers, planTrees, ridgeProfile, WORLD, type Tree } from './sceneryLayout';
 
 /**
@@ -180,7 +180,8 @@ function createMountains() {
  */
 function createOuterGround() {
   // tett mellom punktene nær løypa, glissent langt ute
-  const half: number[] = [0, 20, 40, 50, 56, GROUND_HALF];
+  const half: number[] = [];
+  for (let x = 0; x <= GROUND_HALF; x += 4) half.push(x);
   for (let x = GROUND_HALF + 4; x <= 120; x += 4) half.push(x);
   for (let x = 130; x <= 200; x += 10) half.push(x);
   for (let x = 215; x <= WORLD.halfWidth; x += 15) half.push(x);
@@ -188,7 +189,7 @@ function createOuterGround() {
   const zs: number[] = [];
   for (let z = WORLD.zMin; z <= WORLD.zMax; z += 4) zs.push(z);
 
-  const fineZ0 = -20, fineZ1 = PARK.length - 20; // der den preparerte bakken går (se scene.ts)
+  const fineZ0 = FINE.zMin, fineZ1 = FINE.zMax; // der den preparerte bakken går (se groundGrid.ts)
   const pos = new Float32Array(xs.length * zs.length * 3);
   let n = 0;
   for (const z of zs) for (const x of xs) {

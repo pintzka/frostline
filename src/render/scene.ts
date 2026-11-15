@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { heightAt, PARK } from '../park/terrain';
+import { heightAt } from '../park/terrain';
+import { gridIndex, groundColumns, groundRows } from './groundGrid';
 import { createEnvironment, HAZE } from './environment';
 
 /**
@@ -26,17 +27,23 @@ export function createScene(root: HTMLElement) {
   sc.left = -30; sc.right = 30; sc.top = 30; sc.bottom = -30; sc.near = 1; sc.far = 200;
   scene.add(sun, sun.target);
 
-  // preparert bakke: riller langs fallinja og korn som suser forbi, så farten synes
-  // 0,5 m mellom punktene langs bakken, så kantene på hoppene blir skarpe
-  const segX = 80, segZ = PARK.length * 2;
-  const geo = new THREE.PlaneGeometry(PARK.width + 40, PARK.length, segX, segZ);
-  geo.rotateX(-Math.PI / 2);
-  geo.translate(0, 0, PARK.length / 2 - 20);
-  const p = geo.attributes.position as THREE.BufferAttribute;
-  for (let i = 0; i < p.count; i++) p.setY(i, heightAt(p.getX(i), p.getZ(i)));
+  // preparert bakke: riller langs fallinja og korn som suser forbi, så farten synes.
+  // Punktene står tett der hoppene krummer (groundGrid.ts), så snøen ligger der fysikken er.
+  const xs = groundColumns(), zs = groundRows();
+  const pos = new Float32Array(xs.length * zs.length * 3);
+  const uv = new Float32Array(xs.length * zs.length * 2);
+  let n = 0, m = 0;
+  for (const z of zs) for (const x of xs) {
+    pos[n++] = x; pos[n++] = heightAt(x, z); pos[n++] = z;
+    // teksturen gjentas hver TILE_M meter; rillene går langs bakken
+    uv[m++] = x / TILE_M; uv[m++] = -z / TILE_M;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  geo.setIndex(new THREE.BufferAttribute(gridIndex(xs.length, zs.length), 1));
   geo.computeVertexNormals();
   const tex = snowTexture(renderer);
-  tex.repeat.set((PARK.width + 40) / TILE_M, PARK.length / TILE_M);
   const ground = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0xdde3ea, map: tex, roughness: 0.9 }));
   ground.receiveShadow = true;
   scene.add(ground);
