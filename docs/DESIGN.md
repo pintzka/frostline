@@ -26,7 +26,9 @@ Dette er målene vi bygger mot. Tallene ligger i `src/core/config.ts`. Daniel ka
 Rampene skal dytte mykt: maks 2,1 g (1 g = å stå stille). Landingene skal treffe under 10° mot bakken.
 Justert 10. november etter Daniels test («brå oppover, brå landing»): rampene ble myke og landingene bratte.
 
-Justert 11. november etter Daniels test («farten går rett ned til 90 når jeg lander»): toppfarten er ikke lenger en vegg, farten tas mykt ned (`overspeedFade`). Da kommer du inn mot det store hoppet i ca. 100 km/t, og i den farten gir en myk rampe (maks 2,1 g) bare ca. 3,0 m (3,8 m med perfekt pop). Det store hoppet er derfor lavere enn målet på 5–7 m, men har lengst lufttid (2,4 s, 2,9 s med pop). Vil Daniel ha det høyere, må rampen på det store hoppet få sparke litt hardere (ca. 2,3 g).
+Justert 11. november etter Daniels test («farten går rett ned til 90 når jeg lander»): toppfarten er ikke lenger en vegg, farten tas mykt ned (`overspeedFade`). Da kommer du inn mot det store hoppet i ca. 100 km/t, og i den farten gir en myk rampe (maks 2,1 g) bare ca. 3 m.
+
+Justert 15. november: Daniel valgte et høyere stort hopp. Rampen på det store hoppet får sparke opp til 2,3 g (de andre maks 2,1 g). Det gir 2,5 s og 5,0 m uten pop, og 3,0 s og 6,0 m med perfekt pop, med landing under 8°.
 
 ## Pop
 | Mål | Verdi |
@@ -34,7 +36,7 @@ Justert 11. november etter Daniels test («farten går rett ned til 90 når jeg 
 | Lading | hold mellomrom, fullt etter 0,5 s |
 | Pop på flat bakke (ollie) | ca. 5 cm |
 | Perfekt pop | slipp innen 0,12 s før kanten, 25 % ekstra kraft |
-| Ekstra høyde med perfekt pop | ca. +0,5 m (lite), +0,9 m (medium), +0,8 m (stort) |
+| Ekstra høyde med perfekt pop | ca. +0,5 m (lite), +0,9 m (medium), +1,0 m (stort) |
 | Landing med perfekt pop | fortsatt under 11° |
 
 ## Triks (fase 2)

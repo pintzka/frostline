@@ -88,18 +88,19 @@ describe('hopp og luft', () => {
     expect(f.heightOverLip).toBeLessThanOrEqual(4);
   });
 
-  // Høyden er lavere enn målet i DESIGN.md (5–7 m): du kommer inn i ca. 100 km/t, og da gir en
-  // myk rampe (maks 2,1 g) ca. 3 m. Se DESIGN.md.
-  it('stort hopp: 2,3–2,9 s i lufta og minst 2,5 m over kanten', () => {
+  it('stort hopp: 2,3–2,9 s i lufta og 5–7 m over kanten', () => {
     const f = flightFor(flights, big.z)!;
     expect(f.airtime).toBeGreaterThanOrEqual(2.3);
     expect(f.airtime).toBeLessThanOrEqual(2.9);
-    expect(f.heightOverLip).toBeGreaterThanOrEqual(2.5);
+    expect(f.heightOverLip).toBeGreaterThanOrEqual(5);
     expect(f.heightOverLip).toBeLessThanOrEqual(7);
   });
 
-  it('rampene dytter mykt (maks 2,1 g), ikke et brått spark', () => {
-    for (const f of flights) expect(f.rampG).toBeLessThanOrEqual(2.1);
+  // Daniel valgte et høyere stort hopp, og da får rampen på det sparke litt hardere (2,3 g). Se DESIGN.md.
+  it('rampene dytter mykt (maks 2,1 g, det store hoppet maks 2,3 g), ikke et brått spark', () => {
+    expect(flightFor(flights, small.z)!.rampG).toBeLessThanOrEqual(2.1);
+    expect(flightFor(flights, medium.z)!.rampG).toBeLessThanOrEqual(2.1);
+    expect(flightFor(flights, big.z)!.rampG).toBeLessThanOrEqual(2.3);
   });
 
   it('landingene er myke: under 12° mot bakken, og nesten all fart beholdes', () => {

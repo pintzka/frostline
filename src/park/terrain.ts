@@ -43,7 +43,8 @@ export const PARK = {
     // og under 11° med perfekt pop
     { name: 'Lite', z: 160, lipDeg: 12, radius: 50, width: 9, landingStart: 19, landingDeg: 9 },
     { name: 'Medium', z: 290, lipDeg: 21, radius: 75, width: 10, landingStart: 37, landingDeg: 15 },
-    { name: 'Stort', z: 430, lipDeg: 20, radius: 90, width: 12, landingStart: 37, landingDeg: 18 },
+    // det store hoppet får sparke litt hardere (maks 2,3 g) for å nå 5 m, valgt av Daniel 15. november
+    { name: 'Stort', z: 430, lipDeg: 26, radius: 65, width: 12, landingStart: 43, landingDeg: 15 },
   ] as Kicker[],
 };
 
