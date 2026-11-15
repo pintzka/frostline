@@ -36,6 +36,8 @@ let prevTricks = { ...game.tricks };
 // om skiløperen ble flyttet siden forrige bilde: 'restart' (ny runde) eller 'respawn' (satt tilbake etter fall)
 let moved: Move = 'restart';
 const startZ = game.skier.z;
+// spilltid for himmelen: står stille på pause (loopen gir frameDt = 0 da)
+let skyTime = 0;
 
 const loop = createLoop({
   hz: CONFIG.physicsHz,
@@ -77,7 +79,8 @@ const loop = createLoop({
     }, frameDt);
     hud.setOpacity(menu.update(game.flow, frameDt));
     moved = 'none';
-    env.follow(chase.camera.position, performance.now() / 1000);
+    skyTime += frameDt;
+    env.follow(chase.camera.position, skyTime);
     audio.frame();
     renderer.render(scene, chase.camera);
   },

@@ -40,6 +40,9 @@ export const LOOK = {
     ],
   },
 
+  /** Skystripene på himmelen glir sakte sidelengs: så mye per sekund spilltid (står stille på pause). */
+  clouds: { drift: 0.004 },
+
   /** Gløden rundt lyktene: størrelse (m), styrke, og at den blekner bort litt lenger ute enn tåka. */
   glow: { size: 2.6, opacity: 0.7, fadeEndFactor: 1.15 },
 } as const;

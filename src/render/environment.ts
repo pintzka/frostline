@@ -36,7 +36,7 @@ export function createEnvironment(scene: THREE.Scene, sunDir: THREE.Vector3) {
   const c: Vec3 = [0, 0, 0];
 
   return {
-    /** Himmel og fjell flytter seg med kameraet, så de alltid er langt unna og aldri kan nås. */
+    /** Himmel og fjell flytter seg med kameraet, så de alltid er langt unna og aldri kan nås. time = spilltid (s), står stille på pause. */
     follow(cam: THREE.Vector3, time: number) {
       c[0] = cam.x; c[1] = cam.y; c[2] = cam.z;
       sky.mesh.position.copy(cam);
@@ -59,6 +59,7 @@ function createSky(sunDir: THREE.Vector3) {
     uCloud: c(SKY.cloud), uCloudLit: c(SKY.cloudLit),
     uSun: { value: new THREE.Vector2(sunDir.x, sunDir.z).normalize() },
     uTime: { value: 0 },
+    uCloudDrift: { value: LOOK.clouds.drift },
   };
   const mat = new THREE.ShaderMaterial({
     uniforms,
@@ -76,6 +77,7 @@ function createSky(sunDir: THREE.Vector3) {
       uniform vec3 uZenith, uMid, uHaze, uWarm, uBelt, uCloud, uCloudLit;
       uniform vec2 uSun;
       uniform float uTime;
+      uniform float uCloudDrift;
       varying vec3 vDir;
 
       float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -105,7 +107,7 @@ function createSky(sunDir: THREE.Vector3) {
 
         // skystriper: støy på et "tak" over oss, strukket ut så de blir lange og malte
         vec2 p = d.xz / (h + 0.12);
-        p = vec2(p.x * 0.55 + uTime * 0.004, p.y * 1.6);
+        p = vec2(p.x * 0.55 + uTime * uCloudDrift, p.y * 1.6);
         float n = fbm(p * 1.3);
         float cloud = smoothstep(0.52, 0.72, n) * smoothstep(0.03, 0.14, h) * (1.0 - smoothstep(0.35, 0.7, h));
         vec3 cc = mix(uCloud, uCloudLit, clamp(0.35 + 0.65 * max(az, 0.0) + (n - 0.6) * 1.5, 0.0, 1.0));
