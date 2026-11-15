@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { CONFIG } from '../src/core/config';
-import { createTricks, judgeLanding, stepTricks, trickName, type TrickState } from '../src/tricks/rotation';
-import { createLatch, splitControls } from '../src/tricks/controls';
+import { createTricks, isSwitch, judgeLanding, stepTricks, trickName, type TrickState } from '../src/tricks/rotation';
+import { createLatch, resetLatch, splitControls } from '../src/tricks/controls';
 import { createSkier, speedOf, stepSkier, type SkierState } from '../src/physics/skier';
 import { createCameraRig } from '../src/camera/rig';
 import { PARK } from '../src/park/terrain';
@@ -125,6 +125,12 @@ describe('landing og triksnavn', () => {
     expect(trickName(540 * DEG, 360 * DEG)).toBe('540 + Frontflip');
     expect(trickName(0, -720 * DEG)).toBe('Dobbel backflip');
     expect(trickName(10 * DEG, 5 * DEG)).toBe('');
+    // halv backflip (fall) er ikke en backflip; bare nesten hele rotasjoner teller
+    expect(trickName(0, -200 * DEG)).toBe('');
+    expect(trickName(0, -330 * DEG)).toBe('Backflip');
+    expect(trickName(100 * DEG, 0)).toBe('');
+    expect(trickName(330 * DEG, 0)).toBe('360');
+    expect(trickName(395 * DEG, 0)).toBe('360');
   });
 
   it('ren landing: spinn innenfor ±30° av hel eller halv runde, flip innenfor ±25°', () => {
@@ -161,13 +167,30 @@ describe('landing og triksnavn', () => {
       }
       // vinkelen flytter seg aldri mye mer enn full spinnfart tillater på ett steg
       expect(biggestAngle).toBeLessThan(spinMax * dt * 1.2);
-      // farten bremses over flere steg, ikke på ett (maks 15 % av full spinnfart per steg)
-      expect(biggestRate).toBeLessThan(spinMax * 0.15);
+      // skiene biter hardt, men farten forsvinner ikke på ett steg (maks 50 % av full spinnfart per steg)
+      expect(biggestRate).toBeLessThan(spinMax * 0.5);
       // står rett etter 0,8 s
       expect(Math.abs(t.spin - t.spinTarget) / DEG).toBeLessThan(2);
       expect(Math.abs(t.flip - t.flipTarget) / DEG).toBeLessThan(2);
       expect(Math.abs(Math.sin(t.flipTarget))).toBeLessThan(1e-9);
       expect(Math.abs(Math.sin(t.spinTarget))).toBeLessThan(1e-9);
+    }
+  });
+
+  it('snurrer ikke forbi ved landing i full spinnfart (maks noen få grader)', () => {
+    for (const pastDeg of [0, 15, 30]) {
+      const t = createTricks();
+      fly(t, 1, () => ({ spin: 1, flip: 0 }));
+      // still inn så landingen skjer akkurat pastDeg forbi en hel runde, i full fart
+      t.spin = t.spinStart + (360 + pastDeg) * DEG;
+      const landedAt = t.spin;
+      let most = 0;
+      for (let i = 0; i < CONFIG.physicsHz; i++) {
+        stepTricks(t, { spin: 1, flip: 0, grounded: true }, dt);
+        most = Math.max(most, t.spin - landedAt);
+      }
+      expect(Math.abs(t.spinRate)).toBeLessThan(0.05);
+      expect(most / DEG).toBeLessThan(5);
     }
   });
 
@@ -187,33 +210,117 @@ describe('landing og triksnavn', () => {
 });
 
 describe('tastene i lufta og på bakken', () => {
-  it('S bremser på bakken, men er backflip i lufta', () => {
+  it('S bremser på bakken, men er backflip i lufta (på et nytt trykk)', () => {
     const latch = createLatch();
-    const ground = splitControls({ steer: 0, brake: 1, flip: -1 }, true, latch);
+    const ground = splitControls({ steer: 0, brake: 1, flip: -1 }, true, latch, dt);
     expect(ground.skier.brake).toBe(1);
     expect(ground.flip).toBe(0);
-    const air = splitControls({ steer: 1, brake: 1, flip: -1 }, false, latch);
+    // letter mens S holdes: ingen backflip før du slipper og trykker igjen
+    expect(splitControls({ steer: 0, brake: 1, flip: -1 }, false, latch, dt).flip).toBe(0);
+    splitControls({ steer: 0, brake: 0, flip: 0 }, false, latch, dt);
+    const air = splitControls({ steer: 1, brake: 1, flip: -1 }, false, latch, dt);
     expect(air.skier.brake).toBe(0);
     expect(air.skier.steer).toBe(0);
     expect(air.flip).toBe(-1);
     expect(air.spin).toBe(1);
   });
 
-  it('en tast som holdes fra lufta teller ikke på bakken før du slipper den', () => {
+  it('styring holdt over kanten gir ingen spinn; slipp eller bytt retning for å spinne', () => {
     const latch = createLatch();
-    splitControls({ steer: 1, brake: 1, flip: -1 }, false, latch);
-    const landed = splitControls({ steer: 1, brake: 1, flip: -1 }, true, latch);
-    expect(landed.skier.steer).toBe(0);
-    expect(landed.skier.brake).toBe(0);
-    splitControls({ steer: 0, brake: 0, flip: 0 }, true, latch);
-    const again = splitControls({ steer: 1, brake: 1, flip: -1 }, true, latch);
-    expect(again.skier.steer).toBe(1);
-    expect(again.skier.brake).toBe(1);
+    splitControls({ steer: 1, brake: 0, flip: 0 }, true, latch, dt);
+    for (let i = 0; i < 100; i++) expect(splitControls({ steer: 1, brake: 0, flip: 0 }, false, latch, dt).spin).toBe(0);
+    // bytter retning i lufta: det er et nytt trykk
+    expect(splitControls({ steer: -1, brake: 0, flip: 0 }, false, latch, dt).spin).toBe(-1);
+    // W holdt over kanten gir heller ingen frontflip
+    const l2 = createLatch();
+    splitControls({ steer: 0, brake: 0, flip: 1 }, true, l2, dt);
+    expect(splitControls({ steer: 0, brake: 0, flip: 1 }, false, l2, dt).flip).toBe(0);
+  });
+
+  it(`spinn-tasten holdt ved landing sperrer styringen maks ${CONFIG.landKeyLock} s`, () => {
+    const latch = createLatch();
+    splitControls({ steer: 0, brake: 0, flip: 0 }, false, latch, dt);
+    splitControls({ steer: 1, brake: 1, flip: -1 }, false, latch, dt);
+    let blockedSteer = 0, blockedBrake = 0;
+    for (let i = 0; i < CONFIG.physicsHz; i++) {
+      const c = splitControls({ steer: 1, brake: 1, flip: -1 }, true, latch, dt);
+      if (c.skier.steer === 0) blockedSteer++;
+      if (c.skier.brake === 0) blockedBrake++;
+    }
+    expect(blockedSteer * dt).toBeGreaterThan(CONFIG.landKeyLock - 2 * dt);
+    expect(blockedSteer * dt).toBeLessThanOrEqual(CONFIG.landKeyLock + dt);
+    expect(blockedBrake * dt).toBeLessThanOrEqual(CONFIG.landKeyLock + dt);
+    // bytter du retning, styrer du med en gang
+    const l2 = createLatch();
+    splitControls({ steer: 0, brake: 0, flip: 0 }, false, l2, dt);
+    splitControls({ steer: 1, brake: 0, flip: 0 }, false, l2, dt);
+    splitControls({ steer: 1, brake: 0, flip: 0 }, true, l2, dt);
+    expect(splitControls({ steer: -1, brake: 0, flip: 0 }, true, l2, dt).skier.steer).toBe(-1);
+  });
+
+  it('carving over kanten sperrer ikke styringen etter landing', () => {
+    const latch = createLatch();
+    splitControls({ steer: 1, brake: 0, flip: 0 }, true, latch, dt);
+    splitControls({ steer: 1, brake: 0, flip: 0 }, false, latch, dt);
+    expect(splitControls({ steer: 1, brake: 0, flip: 0 }, true, latch, dt).skier.steer).toBe(1);
+  });
+
+  it('nullstilles helt ved ny runde', () => {
+    const latch = createLatch();
+    splitControls({ steer: 1, brake: 0, flip: -1 }, false, latch, dt);
+    resetLatch(latch);
+    expect(latch).toEqual(createLatch());
   });
 
   it('pop virker som før', () => {
-    const out = splitControls({ steer: 0, brake: 0, flip: 0, pop: true }, true, createLatch());
+    const out = splitControls({ steer: 0, brake: 0, flip: 0, pop: true }, true, createLatch(), dt);
     expect(out.skier.pop).toBe(true);
+  });
+});
+
+/** Hele bakken i myk slalåm med ekte fysikk. spinInAir: trykker spinn på nytt i lufta og holder til etter landing. */
+function slalom(spinInAir: boolean) {
+  const s = createSkier();
+  const t = createTricks();
+  const latch = createLatch();
+  const names: string[] = [];
+  let landings = 0, blocked = 0, longestBlock = 0, run = 0, wasAir = false, airSteps = 0, lastGroundSteer = 0, heldOverLip = 0;
+  for (let i = 0; i < 60 * CONFIG.physicsHz && s.z < PARK.length - 30; i++) {
+    // myk slalåm: skiene skal peke litt til høyre og venstre om hverandre (tastatur: bare -1, 0 eller 1)
+    const err = s.heading - 0.25 * Math.sin((2 * Math.PI * i * dt) / 2.4);
+    let steer = err > 0.03 ? 1 : err < -0.03 ? -1 : 0;
+    // over kanten holdes tasten du hadde, helt til landing
+    if (!s.grounded) steer = lastGroundSteer; else lastGroundSteer = steer;
+    if (spinInAir && !s.grounded) { airSteps++; steer = airSteps < 20 ? 0 : 1; }
+    if (spinInAir && s.grounded && airSteps > 0) { steer = 1; airSteps = airSteps > 400 ? 0 : airSteps + 1; }
+    const onSnow = s.grounded;
+    const c = splitControls({ steer, brake: 0, flip: 0 }, onSnow, latch, dt);
+    stepSkier(s, c.skier, dt);
+    stepTricks(t, { spin: c.spin, flip: c.flip, grounded: s.grounded }, dt);
+    if (!wasAir && !s.grounded && steer !== 0) heldOverLip++;
+    if (wasAir && s.grounded) { landings++; names.push(t.lastLanding!.name); }
+    wasAir = !s.grounded;
+    // sperret = på bakken (før steget), tasten holdes, men skiene får ingen styring
+    if (onSnow && steer !== 0 && c.skier.steer === 0) { blocked++; run++; longestBlock = Math.max(longestBlock, run); } else run = 0;
+  }
+  return { names, landings, heldOverLip, blockedTime: blocked * dt, longestBlock: longestBlock * dt };
+}
+
+describe('ingen triks eller sperrer du ikke mente (ekte fysikk, myk slalåm)', () => {
+  it('styring holdt over kantene gir aldri spinn, og styringen sperres aldri', () => {
+    const r = slalom(false);
+    expect(r.landings).toBeGreaterThan(0);
+    expect(r.heldOverLip).toBeGreaterThan(0);
+    expect(r.names.filter((n) => n !== '')).toEqual([]);
+    expect(r.blockedTime).toBe(0);
+  });
+
+  it(`med spinn i lufta er styringen aldri sperret lenger enn ${CONFIG.landKeyLock} s etter landing`, () => {
+    const r = slalom(true);
+    expect(r.landings).toBeGreaterThan(0);
+    expect(r.blockedTime).toBeGreaterThan(0);
+    expect(r.longestBlock).toBeLessThanOrEqual(CONFIG.landKeyLock + dt);
+    expect(r.blockedTime).toBeLessThanOrEqual(r.landings * (CONFIG.landKeyLock + dt));
   });
 });
 
@@ -239,7 +346,7 @@ function rideMedium(spinGoalDeg: number, flipGoalDeg: number, withCamera = false
       steer = Math.abs(spinLeft) > 0.02 && spinGoalDeg !== 0 ? Math.sign(spinLeft) : 0;
       flip = Math.abs(flipLeft) > 0.02 && flipGoalDeg !== 0 ? Math.sign(flipLeft) : 0;
     }
-    const c = splitControls({ steer, brake: 0, flip }, s.grounded, latch);
+    const c = splitControls({ steer, brake: 0, flip }, s.grounded, latch, dt);
     stepSkier(s, c.skier, dt);
     stepTricks(t, { spin: c.spin, flip: c.flip, grounded: s.grounded }, dt);
     if (withCamera && i % 4 === 0) {
@@ -287,5 +394,17 @@ describe('visning i HUD', () => {
     expect(landingText(judgeLanding(540 * DEG, 360 * DEG))).toEqual({ title: '540 + Frontflip', sub: 'Ren landing' });
     expect(landingText(judgeLanding(395 * DEG, 0)).sub).toBe('Slurvete landing');
     expect(landingText(judgeLanding(90 * DEG, 0)).sub).toBe('Fall');
+  });
+});
+
+describe('switch (lening)', () => {
+  it('switch følger stillingen du landet i, ikke spinnet underveis', () => {
+    const t = createTricks();
+    stepTricks(t, { spin: 0, flip: 0, grounded: false }, dt);
+    t.spin = 90 * DEG; // midt i et spinn: fortsatt ikke switch
+    expect(isSwitch(t)).toBe(false);
+    t.spin = 185 * DEG;
+    stepTricks(t, { spin: 0, flip: 0, grounded: true }, dt);
+    expect(isSwitch(t)).toBe(true);
   });
 });

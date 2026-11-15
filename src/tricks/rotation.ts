@@ -73,9 +73,12 @@ const FLIP_WORDS = ['', '', 'Dobbel ', 'Trippel '];
 /** Lager navnet på trikset ut fra hvor mye du roterte (rad). */
 export function trickName(spin: number, flip: number): string {
   const parts: string[] = [];
-  const halves = Math.round(Math.abs(spin) / HALF);
+  // en rotasjon teller bare når den er nesten hel: innenfor det som fortsatt er en slurvete landing
+  const spinTol = (CONFIG.landSpinClean + CONFIG.landSloppyExtra) * DEG;
+  const flipTol = (CONFIG.landFlipClean + CONFIG.landSloppyExtra) * DEG;
+  const halves = Math.floor((Math.abs(spin) + spinTol) / HALF);
   if (halves > 0) parts.push(String(halves * 180));
-  const flips = Math.round(Math.abs(flip) / TURN);
+  const flips = Math.floor((Math.abs(flip) + flipTol) / TURN);
   if (flips > 0) {
     const kind = flip > 0 ? 'frontflip' : 'backflip';
     const word = flips < FLIP_WORDS.length ? FLIP_WORDS[flips] : `${flips}x `;
@@ -144,6 +147,11 @@ export function stepTricks(t: TrickState, inp: TrickInput, dt: number): void {
     t.spin += t.spinRate * dt;
     t.flip += t.flipRate * dt;
   } else {
+    // skiene biter i snøen: rotasjonsfarten tas hardt ned rett etter landing (mykt avtagende),
+    // så kroppen ikke snurrer forbi stillingen den landet i
+    const grip = CONFIG.landGrip * Math.max(0, 1 - t.landingAge / CONFIG.landGripTime);
+    const keep = Math.exp(-grip * dt);
+    t.spinRate *= keep; t.flipRate *= keep;
     // på bakken retter kroppen seg mykt opp (ingen snap), også etter et fall (selve fallet kommer senere)
     [t.spin, t.spinRate] = settle(t.spin, t.spinRate, t.spinTarget, CONFIG.landSettle, dt);
     [t.flip, t.flipRate] = settle(t.flip, t.flipRate, t.flipTarget, CONFIG.landSettle, dt);

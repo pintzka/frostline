@@ -93,6 +93,14 @@ export const CONFIG = {
   landSloppyExtra: 20,
   /** Hvor fort kroppen retter seg opp etter landing (rad/s i en myk fjær). 10 ≈ 0,4 s. */
   landSettle: 10,
+  /**
+   * Skiene biter i snøen ved landing: rotasjonsfarten bremses så hardt (per sekund) de første
+   * landGripTime sekundene, så et perfekt 360 ikke snurrer forbi. Kroppen retter seg likevel mykt opp.
+   */
+  landGrip: 120,
+  landGripTime: 0.1,
+  /** Holder du spinn- eller backflip-tasten når du lander, styrer/bremser den ikke før etter så mange sekunder (eller du slipper). */
+  landKeyLock: 0.25,
   /** Skiløperen roterer rundt dette punktet (m over føttene), ca. midt på kroppen. */
   trickPivotHeight: 1.0,
   /** Sekunder triksnavnet vises etter landing. */
