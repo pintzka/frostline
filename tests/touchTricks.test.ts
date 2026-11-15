@@ -204,3 +204,46 @@ describe('knappene på skjermen', () => {
     }
   });
 });
+
+describe('tommel-flip: skrå spinn-drag og landing (kvalitetskontroll)', () => {
+  it('sideveis spinn-drag med litt drift opp eller ned gir aldri flip (20°, 40°, fram og tilbake)', () => {
+    for (const deg of [20, 30, 40, -20, -40]) {
+      const t = thumb(100, 400);
+      const k = Math.tan((deg * Math.PI) / 180);
+      // dra 180 px sidelengs og tilbake, med skrå drift
+      for (let i = 0; i <= 180; i += 3) { t.move(1, 100 + i, 400 + i * k); expect(t.flip(), `${deg}° ut`).toBe(0); }
+      for (let i = 180; i >= 0; i -= 3) { t.move(1, 100 + i, 400 + 180 * k + (180 - i) * k); expect(t.flip(), `${deg}° tilbake`).toBe(0); }
+    }
+  });
+
+  it('et loddrett drag etter et spinn-drag gir flip', () => {
+    const t = thumb(100, 400);
+    for (let i = 0; i <= 150; i += 3) t.move(1, 100 + i, 400 + i * 0.3);
+    for (let y = 445; y >= 445 - T - 20; y -= 3) t.move(1, 250, y);
+    expect(t.flip()).toBe(1);
+  });
+
+  it('landing nullstiller midtpunktet: flippen henger ikke igjen, og tommelen stille gir ingen ny flip', () => {
+    const t = thumb();
+    t.move(1, 150, 400 - T - 10);
+    expect(t.flip()).toBe(1);
+    t.landed();
+    expect(t.flip()).toBe(0);
+    for (let i = 0; i < 60; i++) { t.tick(1 / 60); t.move(1, 150, 400 - T - 10); }
+    expect(t.flip()).toBe(0);
+    // et nytt drag virker
+    t.move(1, 150, 400 - 2 * T - 20);
+    expect(t.flip()).toBe(1);
+  });
+
+  it('backflip med tommelen sperrer ikke BREMS-knappen etter landing; backflip med S gjør det (S er også brems)', () => {
+    const dt = 1 / CONFIG.physicsHz;
+    for (const byThumb of [true, false]) {
+      const latch = createLatch();
+      splitControls({ steer: 0, brake: 0, flip: 0 }, true, latch, dt);
+      for (let i = 0; i < 20; i++) splitControls({ steer: 0, brake: byThumb ? 0 : 1, flip: -1, flipByThumb: byThumb }, false, latch, dt);
+      const landed = splitControls({ steer: 0, brake: 1, flip: 0 }, true, latch, dt);
+      expect(landed.skier.brake, byThumb ? 'tommel' : 'S').toBe(byThumb ? 1 : 0);
+    }
+  });
+});

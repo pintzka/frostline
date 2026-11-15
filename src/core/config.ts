@@ -171,7 +171,10 @@ export const CONFIG = {
   /** Hvor fort totalen teller seg opp (per sekund). */
   hudCountUp: 8,
   /** Lufttiden vises i HUD-en først når du har vært i lufta lenger enn dette (s), så små kuler ikke blinker. */
-  hudAirTimeMin: 0.3,
+/** Hjelpeteksten på mobil står i styresonen: vises så mange sekunder av hver runde, og blekner så bort over hudTouchHelpFade s. */
+  hudTouchHelpTime: 6,
+  hudTouchHelpFade: 1,
+    hudAirTimeMin: 0.3,
 
   // --- Grabs (src/tricks/grabs.ts) ---
   /** En grab må holdes minst så lenge (s) i lufta for å telle. */
@@ -468,6 +471,8 @@ export const CONFIG = {
   touchFlipRelease: 30,
   touchFlipLeash: 70,
   touchFlipRecenter: 30,
+  /** Et nytt flip krever et mest loddrett drag: |opp/ned| større enn dette ganger |sidelengs| (siden midtpunktet ble satt). 1,2 = brattere enn ca. 50°. */
+  touchFlipSteep: 1.2,
   /**
    * Brukes flere styringer samtidig (tastatur, gamepad, berøring), vinner den med størst utslag.
    * Den som styrer nå, beholder styringen til en annen er så mye større, så det ikke hopper fram og tilbake.

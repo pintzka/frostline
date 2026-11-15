@@ -145,7 +145,9 @@ export function createInput(target: HTMLElement, touch?: TouchSurface) {
       const down = has('ArrowDown') || has('KeyS');
       const forward = has('ArrowUp') || has('KeyW');
       state.brake = Math.max(down ? 1 : 0, pad.brake, brakeFingers.count() > 0 ? 1 : 0);
-      state.flip = (forward ? 1 : 0) - (down ? 1 : 0) || padTricks.flip || steer.flip();
+      const keyFlip = (forward ? 1 : 0) - (down ? 1 : 0) || padTricks.flip;
+      state.flip = keyFlip || steer.flip();
+      state.flipByThumb = keyFlip === 0 && state.flip !== 0;
       state.pop = has('Space') || pad.pop || popFingers.count() > 0;
       // holder du flere grab-taster, vinner den første i lista (J, så K, så L)
       const g = GRABS.findIndex((x) => has(x.key));
@@ -157,6 +159,8 @@ export function createInput(target: HTMLElement, touch?: TouchSurface) {
       for (const f of grabFingers) f.endRead();
       return state;
     },
+    /** Kalles når skiløperen lander: tommel-flippen stopper, og midtpunktet i høyden flyttes til tommelen. */
+    landed() { steer.landed(); },
     /** Slipper alle taster og fingre (f.eks. når spillet fortsetter etter pause), så ingenting henger igjen. */
     releaseAll() { releaseAll(); restartPending = false; },
     /** Ble R (eller Y/Back på gamepad) trykket siden sist? Gir true én gang per trykk. */

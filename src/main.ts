@@ -113,6 +113,7 @@ const loop = createLoop({
     recordStep(recorder, game, inp, ev);
     if (ev) { menu.onEvent(ev, game); saveBest(CURRENT_PARK_ID, Math.max(game.best, game.score.total)); }
     challenges.step(game, ev);
+    if (game.tricks.justLanded) input.landed();
     if (game.flow.move !== 'none') onMoved(game.flow.move, game);
     hear(game);
     // V eller knappen på resultatskjermen: se runden igjen

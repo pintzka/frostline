@@ -89,7 +89,8 @@ export function countUp(shown: number, total: number, dt: number): number {
 const HELP = {
   keyboard: 'Styr: ← → / A D · Brems: ↓ / S · Pop: hold og slipp mellomrom (også av railen) · I lufta: ← → spinn, ↑ / W frontflip, ↓ / S backflip, hold J / K / L grab · Start på nytt: R · Pause: P / Esc · Lyd: M · FPS: F',
   gamepad: 'Styr: venstre stikke · Brems: LT / B · Pop: hold og slipp A · I lufta: stikke sidelengs spinn, opp/ned flip, hold X / RB / LB grab · Start på nytt: Y · Pause: Start',
-  touch: 'Venstre tommel: dra sidelengs for å styre · POP: hold og slipp · BREMS: hold · I lufta: dra sidelengs = spinn, dra opp/ned = frontflip/backflip, hold NORDLYS / ISBIT / SNØUGLE = grab',
+  // kort på mobil: den står i styresonen, og vises bare de første sekundene av runden (hudTouchHelpTime)
+  touch: 'Tommel: styr · i lufta: sidelengs spinn, opp/ned flip · POP: hold og slipp · grab: hold knappen',
 } as const;
 
 export function createHud(parent: HTMLElement) {
@@ -169,6 +170,8 @@ export function createHud(parent: HTMLElement) {
   help.style.cssText = 'position:fixed;left:16px;bottom:16px;color:#fffc;font:14px system-ui,sans-serif;pointer-events:none;';
   root.appendChild(help);
   let shownHelp = '';
+  // sekunder av runden: hjelpeteksten på mobil blekner bort etter hudTouchHelpTime
+  let helpAge = 0;
 
   let shown = 0;
   return {
@@ -184,6 +187,9 @@ export function createHud(parent: HTMLElement) {
         help.style.maxWidth = h.controls === 'touch' ? 'calc(50vw - 28px)' : '';
       }
 
+      helpAge = h.distance < 1 ? 0 : helpAge + dt;
+      const helpFade = CONFIG.hudTouchHelpFade;
+      help.style.opacity = h.controls === 'touch' ? String(Math.max(0, Math.min(1, (CONFIG.hudTouchHelpTime + helpFade - helpAge) / helpFade))) : '1';
       fade.style.opacity = h.fade.toFixed(3);
       shown = smoothSpeed(shown, h.speed, dt);
       let text = `${Math.round(shown * 3.6)} km/t · ${Math.round(h.distance)} m`;

@@ -77,7 +77,7 @@ export function createTouchControls(root: HTMLElement) {
   const grabs = GRABS.map((g) => {
     const el = document.createElement('div');
     el.textContent = g.name.toUpperCase();
-    el.style.cssText = BTN + 'font-size:9px;letter-spacing:0;';
+    el.style.cssText = BTN + 'font-size:11px;letter-spacing:0;white-space:nowrap;';
     return el;
   });
   wrap.append(pop, brake, ...grabs);

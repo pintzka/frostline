@@ -23,6 +23,8 @@ export interface RawControls {
   pop?: boolean;
   /** Grab-tasten som holdes: 0 = ingen, 1 = J, 2 = K, 3 = L. */
   grab?: GrabKind;
+  /** Flippen kom fra tommelen på mobil (ikke fra S/pil ned, som også er brems). Da sperres ikke bremsen etter landing. */
+  flipByThumb?: boolean;
 }
 
 export interface ControlLatch {
@@ -36,6 +38,8 @@ export interface ControlLatch {
   /** Spinn og flip som ble brukt i lufta forrige steg. */
   lastSpin: number;
   lastFlip: number;
+  /** Flippen i lufta forrige steg kom fra tommelen på mobil. */
+  lastFlipByThumb: boolean;
   /** Retningen som er sperret for styring rett etter landing (0 = ingen), og om bremsen er sperret. */
   steerBlock: number;
   brakeBlock: boolean;
@@ -44,7 +48,7 @@ export interface ControlLatch {
 }
 
 export function createLatch(): ControlLatch {
-  return { wasGrounded: true, groundSteer: 0, groundFlip: 0, spinBlock: 0, flipBlock: 0, lastSpin: 0, lastFlip: 0, steerBlock: 0, brakeBlock: false, sinceLanding: 99 };
+  return { wasGrounded: true, groundSteer: 0, groundFlip: 0, spinBlock: 0, flipBlock: 0, lastSpin: 0, lastFlip: 0, lastFlipByThumb: false, steerBlock: 0, brakeBlock: false, sinceLanding: 99 };
 }
 
 /** Nullstiller sperrene, f.eks. når runden starter på nytt. */
@@ -69,14 +73,15 @@ export function splitControls(raw: RawControls, grounded: boolean, latch: Contro
     if (movedFrom(raw.flip, latch.flipBlock)) latch.flipBlock = 0;
     const spin = latch.spinBlock !== 0 ? 0 : raw.steer;
     const flip = latch.flipBlock !== 0 ? 0 : raw.flip;
-    latch.lastSpin = spin; latch.lastFlip = flip;
+    latch.lastSpin = spin; latch.lastFlip = flip; latch.lastFlipByThumb = flip !== 0 && !!raw.flipByThumb;
     return { skier: { steer: 0, brake: 0, pop: raw.pop }, spin, flip, grab: raw.grab ?? 0 };
   }
 
   if (!latch.wasGrounded) {
     // akkurat landet: sperr bare tastene du brukte til triks
     latch.steerBlock = latch.lastSpin;
-    latch.brakeBlock = latch.lastFlip < 0;
+    // backflip med S/pil ned: samme tast er brems, så den sperres. BREMS-knappen på mobil er en egen knapp.
+    latch.brakeBlock = latch.lastFlip < 0 && !latch.lastFlipByThumb;
     latch.sinceLanding = 0;
   }
   latch.wasGrounded = true;

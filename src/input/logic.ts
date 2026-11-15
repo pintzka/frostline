@@ -198,12 +198,14 @@ export function padInUse(p: PadInput): boolean {
  */
 export function createSteerTouches(radius = CONFIG.touchSteerRadius) {
   const fingers = new Map<number, { x: number; y: number }>(); // alle fingre som startet på venstre side
-  let id = -1, anchor = 0, anchorY = 0, value = 0, flip = 0;
+  // anchorY: midtpunktet i høyden for flip. side: hvor langt tommelen har gått sidelengs (fram og tilbake) siden det ble satt.
+  let id = -1, anchor = 0, anchorY = 0, side = 0, lastX = 0, lastY = 0, value = 0, flip = 0;
   const take = (newId: number) => {
     const f = fingers.get(newId)!;
     id = newId;
     anchor = f.x;
     anchorY = f.y;
+    side = 0; lastX = f.x; lastY = f.y;
     value = 0;
     flip = 0;
   };
@@ -227,7 +229,27 @@ export function createSteerTouches(radius = CONFIG.touchSteerRadius) {
       const leash = CONFIG.touchFlipLeash;
       if (y - anchorY > leash) anchorY = y - leash;
       else if (anchorY - y > leash) anchorY = y + leash;
-      flip = touchFlip(flip, y - anchorY);
+      // sidelengs vei teller opp; et mest loddrett drag teller den ned igjen
+      const ddx = Math.abs(x - lastX), ddy = Math.abs(y - lastY);
+      side = ddy > CONFIG.touchFlipSteep * ddx ? Math.max(0, side - ddy) : side + ddx;
+      lastX = x; lastY = y;
+      if (flip === 0 && side > CONFIG.touchFlipThreshold) {
+        // langt sidelengs drag (spinn): midtpunktet i høyden flyttes med, så skrå spinn-drag aldri blir flip
+        anchorY = y; side = 0;
+      }
+      const dy = y - anchorY;
+      let next = touchFlip(flip, dy);
+      // et nytt flip må være et mest loddrett drag siden midtpunktet ble satt
+      if (flip === 0 && next !== 0 && Math.abs(dy) <= CONFIG.touchFlipSteep * side) next = 0;
+      if (next !== flip) side = 0;
+      flip = next;
+    },
+    /** Du landet: flippen stopper, og midtpunktet i høyden flyttes til tommelen (ingen flip som henger igjen). */
+    landed() {
+      flip = 0;
+      if (id < 0) return;
+      const f = fingers.get(id)!;
+      anchorY = f.y; side = 0; lastX = f.x; lastY = f.y;
     },
     /** Hvert bilde: uten flip glir midtpunktet i høyden sakte etter tommelen, så langsom drift aldri blir flip. */
     tick(dt: number) {

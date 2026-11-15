@@ -45,7 +45,7 @@ function copyInput(i: GameInput): GameInput {
 function sameInput(a: GameInput, b: GameInput): boolean {
   const x = a.raw, y = b.raw;
   return x.steer === y.steer && x.brake === y.brake && x.flip === y.flip && !!x.pop === !!y.pop
-    && (x.grab ?? 0) === (y.grab ?? 0) && a.click === b.click && a.restart === b.restart;
+    && (x.grab ?? 0) === (y.grab ?? 0) && !!x.flipByThumb === !!y.flipByThumb && a.click === b.click && a.restart === b.restart;
 }
 
 export function createRecorder(): Recorder {
