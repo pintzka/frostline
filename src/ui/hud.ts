@@ -1,3 +1,6 @@
+import { CONFIG } from '../core/config';
+import type { Landing } from '../tricks/rotation';
+
 /**
  * Enkel HUD. Arbeidsstrøm 8 (UI og flyt) eier denne fila.
  */
@@ -14,6 +17,18 @@ export interface HudInfo {
   /** siste pop, og hvor mange sekunder siden */
   lastPop: '' | 'pop' | 'perfekt';
   popAge: number;
+  /** siste landing (triksnavn og ren/slurvete/fall), og hvor mange sekunder siden */
+  landing: Landing | null;
+  landingAge: number;
+}
+
+const LANDING_TEXT = { ren: 'Ren landing', slurvete: 'Slurvete landing', fall: 'Fall' } as const;
+const LANDING_COLOR = { ren: '#7fe3ff', slurvete: '#ffd166', fall: '#ff6b6b' } as const;
+
+/** Teksten som vises etter en landing. Tom når det ikke var noe å vise (et vanlig hopp uten triks). */
+export function landingText(l: Landing | null): { title: string; sub: string } {
+  if (!l || (l.name === '' && l.quality === 'ren')) return { title: '', sub: '' };
+  return { title: l.name, sub: LANDING_TEXT[l.quality] };
 }
 
 export function createHud(root: HTMLElement) {
@@ -35,9 +50,18 @@ export function createHud(root: HTMLElement) {
   flash.textContent = 'PERFEKT POP!';
   root.appendChild(flash);
 
+  // triksnavn og landing, litt under pop-teksten
+  const trick = document.createElement('div');
+  trick.style.cssText = 'position:fixed;left:0;right:0;top:38%;text-align:center;color:#fff;font:800 44px system-ui,sans-serif;text-shadow:0 2px 8px #0009;pointer-events:none;opacity:0;';
+  const trickName = document.createElement('div');
+  const trickSub = document.createElement('div');
+  trickSub.style.cssText = 'font:700 22px system-ui,sans-serif;';
+  trick.append(trickName, trickSub);
+  root.appendChild(trick);
+
   const help = document.createElement('div');
   help.style.cssText = 'position:fixed;left:16px;bottom:16px;color:#fffc;font:14px system-ui,sans-serif;pointer-events:none;';
-  help.textContent = 'Styr: ← → / A D · Brems: ↓ / S · Pop: hold og slipp mellomrom · Start på nytt: R · Mobil: trykk venstre/høyre';
+  help.textContent = 'Styr: ← → / A D · Brems: ↓ / S · Pop: hold og slipp mellomrom · I lufta: ← → spinn, ↑ / W frontflip, ↓ / S backflip · Start på nytt: R · Mobil: trykk venstre/høyre';
   root.appendChild(help);
 
   return {
@@ -53,6 +77,15 @@ export function createHud(root: HTMLElement) {
       // vises i litt over et sekund og blekner bort
       const show = h.lastPop === 'perfekt' && h.popAge < 1.2;
       flash.style.opacity = show ? String(Math.min(1, (1.2 - h.popAge) * 2)) : '0';
+
+      const t = landingText(h.landing);
+      const left = CONFIG.trickShowTime - h.landingAge;
+      if (t.sub && left > 0) {
+        trickName.textContent = t.title;
+        trickSub.textContent = t.sub;
+        trickSub.style.color = LANDING_COLOR[h.landing!.quality];
+        trick.style.opacity = String(Math.min(1, left * 2));
+      } else trick.style.opacity = '0';
     },
   };
 }

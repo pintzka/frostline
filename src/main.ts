@@ -10,6 +10,8 @@ import { createPlaceholderSkier } from './character/placeholder';
 import { heightAt, normalAt } from './park/terrain';
 import { poseFor, smoothPose } from './character/pose';
 import { createSkiTrails } from './render/trailMesh';
+import { createTricks, stepTricks } from './tricks/rotation';
+import { createLatch, splitControls } from './tricks/controls';
 
 const root = document.getElementById('app')!;
 const { renderer, scene, sun } = createScene(root);
@@ -25,6 +27,9 @@ const trails = createSkiTrails(scene);
 
 let skier = createSkier();
 let prev = { ...skier };
+let tricks = createTricks();
+let prevTricks = { ...tricks };
+const latch = createLatch();
 const startZ = skier.z;
 
 const target = new THREE.Vector3();
@@ -39,9 +44,13 @@ const loop = createLoop({
   hz: CONFIG.physicsHz,
   step(dt) {
     // R, eller slutten av bakken: ny runde med en gang
-    if (input.pressed('KeyR') || reachedEnd(skier)) { skier = createSkier(); }
+    if (input.pressed('KeyR') || reachedEnd(skier)) { skier = createSkier(); tricks = createTricks(); }
     prev = { ...skier };
-    stepSkier(skier, input.read(), dt);
+    prevTricks = { ...tricks };
+    // på bakken styrer tastene skiene, i lufta spinner og flipper de
+    const c = splitControls(input.read(), skier.grounded, latch);
+    stepSkier(skier, c.skier, dt);
+    stepTricks(tricks, { spin: c.spin, flip: c.flip, grounded: skier.grounded }, dt);
   },
   render(alpha, frameDt) {
     target.set(
@@ -59,7 +68,11 @@ const loop = createLoop({
     const heading = prev.heading + (skier.heading - prev.heading) * alpha;
     qYaw.setFromAxisAngle(Y, heading);
     mesh.quaternion.copy(q).multiply(qYaw);
-    skierModel.setLean(prev.lean + (skier.lean - prev.lean) * alpha);
+    // spinn og flip jevnes ut mellom stegene; kameraet får dem ikke, så det snurrer ikke med
+    const spin = prevTricks.spin + (tricks.spin - prevTricks.spin) * alpha;
+    skierModel.setTrick(spin, prevTricks.flip + (tricks.flip - prevTricks.flip) * alpha);
+    // leningen er i kroppens retning: kjører du baklengs (switch), må den snus for å lene inn i svingen
+    skierModel.setLean((prev.lean + (skier.lean - prev.lean) * alpha) * Math.cos(spin));
     // kroppen glir mellom stillingene, så avspark og landing ikke rykker
     pose = smoothPose(pose, poseFor({
       grounded: skier.grounded, popCharge: skier.popCharge, airTime: skier.airTime,
@@ -77,6 +90,7 @@ const loop = createLoop({
     hud.update({
       speed: v, distance: skier.z - startZ, airTime: skier.airTime, inAir: !skier.grounded,
       popCharge: skier.popCharge, lastPop: skier.lastPop, popAge: skier.popAge,
+      landing: tricks.lastLanding, landingAge: tricks.landingAge,
     });
     renderer.render(scene, chase.camera);
   },

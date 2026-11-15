@@ -22,7 +22,14 @@ export function createPlaceholderSkier() {
     ski.position.set(sx, 0.02, 0);
     skis.push(ski);
   }
-  root.add(upper, ...skis);
+  // triks roterer hele kroppen (med ski) rundt midten av kroppen, ikke rundt føttene
+  const pivot = new THREE.Group();
+  pivot.position.y = CONFIG.trickPivotHeight;
+  const inner = new THREE.Group();
+  inner.position.y = -CONFIG.trickPivotHeight;
+  inner.add(upper, ...skis);
+  pivot.add(inner);
+  root.add(pivot);
   root.traverse((o) => { if (o instanceof THREE.Mesh) o.castShadow = true; });
 
   return {
@@ -31,6 +38,13 @@ export function createPlaceholderSkier() {
     setLean(lean: number) {
       upper.rotation.z = lean;
       for (const ski of skis) ski.rotation.z = lean * CONFIG.skiEdgeTilt;
+    },
+    /**
+     * Spinn og flip fra tricks/rotation.ts (rad). Spinn positiv = mot høyre, flip positiv = framover.
+     * Spinnet er rundt den loddrette aksen, flipen rundt kroppens egen sideakse.
+     */
+    setTrick(spin: number, flip: number) {
+      pivot.rotation.set(flip, -spin, 0, 'YXZ');
     },
     /**
      * Hopp-bevegelsen fra pose.ts: kroppen går ned (sats/landing) eller strekker seg opp (avspark),
