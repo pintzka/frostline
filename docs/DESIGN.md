@@ -34,7 +34,7 @@ Justert 15. november: Daniel valgte et høyere stort hopp. Rampen på det store 
 | Mål | Verdi |
 |---|---|
 | Lading | hold mellomrom, fullt etter 0,5 s |
-| Pop på flat bakke (ollie) | ca. 5 cm |
+| Pop på flat bakke (ollie) | ca. 60 cm (popSpeed 3,4 m/s) |
 | Perfekt pop | slipp innen 0,12 s før kanten, 25 % ekstra kraft |
 | Ekstra høyde med perfekt pop | ca. +0,5 m (lite), +0,9 m (medium), +1,0 m (stort) |
 | Landing med perfekt pop | fortsatt under 11° |
