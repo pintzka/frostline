@@ -50,6 +50,12 @@ export const CONFIG = {
   /** Slipper du pop så kort tid (s) før kanten, er det en perfekt pop, som gir så mye ekstra. */
   popPerfectWindow: 0.12,
   popPerfectBoost: 1.25,
+  /**
+   * Kanten av parken: de siste wallZone meterne før kanten bremses farten utover mykt, opp til wallDecel (m/s²)
+   * helt ytterst. Bollen i terrenget (edge i parkfila) gjør mesteparten av jobben. Helt ytterst er en nødstopp.
+   */
+  wallZone: 10,
+  wallDecel: 60,
   /** Runden starter på nytt så mange meter før bakken tar slutt. */
   runEndMargin: 40,
   /** Kamera: fast avstand bak (m) og høyde over snøen (m). */
