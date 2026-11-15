@@ -74,6 +74,28 @@ export const CONFIG = {
   trailSpacing: 0.25,
   trailMaxPoints: 600,
   skiGap: 0.3,
+  /**
+   * Gamepad: stikka gjør ingenting innenfor dødsonen (så den ikke "kryper"), og gir fullt utslag
+   * allerede ved padOuterEdge (stikker når sjelden helt ut). padCurve > 1 gjør små utslag ekstra
+   * fine, så du kan legge inn en slak sving uten å vri hardt.
+   */
+  padDeadzone: 0.15,
+  padOuterEdge: 0.95,
+  padCurve: 1.5,
+  /** Venstre trigger (brems) gjør ingenting under dette, så en hvilende finger ikke bremser. */
+  triggerDeadzone: 0.06,
+  /**
+   * Mobil: dra tommelen så mange CSS-piksler sidelengs fra der du satte den ned for full sving.
+   * Drar du lenger, følger midtpunktet etter, så du kan snu retning med en gang.
+   */
+  touchSteerRadius: 60,
+  touchDeadzone: 0.06,
+  touchCurve: 1.3,
+  /**
+   * Brukes flere styringer samtidig (tastatur, gamepad, berøring), vinner den med størst utslag.
+   * Den som styrer nå, beholder styringen til en annen er så mye større, så det ikke hopper fram og tilbake.
+   */
+  inputMergeMargin: 0.1,
 } as const;
 
 export type Config = typeof CONFIG;

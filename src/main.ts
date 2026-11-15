@@ -6,6 +6,7 @@ import { createInput } from './input/input';
 import { createChaseCamera } from './camera/chase';
 import { createScene } from './render/scene';
 import { createHud } from './ui/hud';
+import { createTouchControls } from './ui/touchControls';
 import { createPlaceholderSkier } from './character/placeholder';
 import { heightAt, normalAt } from './park/terrain';
 import { poseFor, smoothPose } from './character/pose';
@@ -15,8 +16,8 @@ const root = document.getElementById('app')!;
 const { renderer, scene, sun } = createScene(root);
 const chase = createChaseCamera(innerWidth / innerHeight);
 addEventListener('resize', () => chase.resize(innerWidth / innerHeight));
-const input = createInput(renderer.domElement);
 const hud = createHud(root);
+const input = createInput(renderer.domElement, createTouchControls(root));
 
 const skierModel = createPlaceholderSkier();
 const mesh = skierModel.root;
@@ -38,8 +39,8 @@ let pose = smoothPose(poseFor({ grounded: true, popCharge: 0, airTime: 0, height
 const loop = createLoop({
   hz: CONFIG.physicsHz,
   step(dt) {
-    // R, eller slutten av bakken: ny runde med en gang
-    if (input.pressed('KeyR') || reachedEnd(skier)) { skier = createSkier(); }
+    // R (eller Y på gamepad), eller slutten av bakken: ny runde med en gang
+    if (input.restart() || reachedEnd(skier)) { skier = createSkier(); }
     prev = { ...skier };
     stepSkier(skier, input.read(), dt);
   },
@@ -76,7 +77,7 @@ const loop = createLoop({
     chase.update({ x: target.x, y: target.y, z: target.z, vx: skier.vx, vz: skier.vz, heading, speed: v }, frameDt);
     hud.update({
       speed: v, distance: skier.z - startZ, airTime: skier.airTime, inAir: !skier.grounded,
-      popCharge: skier.popCharge, lastPop: skier.lastPop, popAge: skier.popAge,
+      popCharge: skier.popCharge, lastPop: skier.lastPop, popAge: skier.popAge, controls: input.device(),
     });
     renderer.render(scene, chase.camera);
   },

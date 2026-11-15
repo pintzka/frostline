@@ -14,7 +14,15 @@ export interface HudInfo {
   /** siste pop, og hvor mange sekunder siden */
   lastPop: '' | 'pop' | 'perfekt';
   popAge: number;
+  /** hva spilleren styrer med nå, så hjelpeteksten viser riktige knapper */
+  controls?: 'keyboard' | 'gamepad' | 'touch';
 }
+
+const HELP = {
+  keyboard: 'Styr: ← → / A D · Brems: ↓ / S · Pop: hold og slipp mellomrom · Start på nytt: R',
+  gamepad: 'Styr: venstre stikke · Brems: LT / B · Pop: hold og slipp A · Start på nytt: Y',
+  touch: 'Styr: dra tommelen sidelengs på venstre side · POP: hold og slipp · BREMS: hold',
+} as const;
 
 export function createHud(root: HTMLElement) {
   const el = document.createElement('div');
@@ -37,11 +45,19 @@ export function createHud(root: HTMLElement) {
 
   const help = document.createElement('div');
   help.style.cssText = 'position:fixed;left:16px;bottom:16px;color:#fffc;font:14px system-ui,sans-serif;pointer-events:none;';
-  help.textContent = 'Styr: ← → / A D · Brems: ↓ / S · Pop: hold og slipp mellomrom · Start på nytt: R · Mobil: trykk venstre/høyre';
   root.appendChild(help);
+  let shownHelp = '';
 
   return {
     update(h: HudInfo) {
+      // bytter bare tekst når du bytter kontroller, ikke hvert bilde
+      const helpText = HELP[h.controls ?? 'keyboard'];
+      if (helpText !== shownHelp) {
+        help.textContent = shownHelp = helpText;
+        // på mobil skal teksten ikke gå inn under knappene nede til høyre
+        help.style.maxWidth = h.controls === 'touch' ? 'calc(100vw - 260px)' : '';
+      }
+
       let text = `${Math.round(h.speed * 3.6)} km/t · ${Math.round(h.distance)} m`;
       if (h.airTime > 0.3) text += ` · ${h.inAir ? 'I lufta' : 'Lufttid'} ${h.airTime.toFixed(1).replace('.', ',')} s`;
       el.textContent = text;
