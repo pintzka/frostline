@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CONFIG } from '../src/core/config';
-import { createGame, createStats, scoreLines, stepGame, type Game, type GameInput } from '../src/ui/flow';
+import { createGame, createStats, resumeGame, scoreLines, stepGame, type Game, type GameInput } from '../src/ui/flow';
 import { createScore } from '../src/tricks/score';
 import { heightAt, PARK } from '../src/park/terrain';
 import { isFalling } from '../src/tricks/fall';
@@ -155,5 +155,33 @@ describe('poeng på resultatskjermen', () => {
       ['Flest poeng', '720 + Backflip · 1 500'],
     ]);
     expect(scoreLines(score, 5000, st)[0]).toEqual(['Poeng', '4 200']);
+  });
+});
+
+describe('fortsett etter pause', () => {
+  const pop = (on: boolean) => idle({ raw: { steer: 0, brake: 0, flip: 0, pop: on } });
+
+  it('pop som ble ladet før pausen, gir ikke pop når du fortsetter', () => {
+    const g = createGame();
+    stepGame(g, idle({ click: true }), dt);
+    for (let i = 0; i < 0.5 / dt; i++) stepGame(g, idle(), dt);
+    // lader pop, så kommer pausen (tastene slippes)
+    for (let i = 0; i < 0.3 / dt; i++) stepGame(g, pop(true), dt);
+    expect(g.skier.popCharge).toBeGreaterThan(0);
+    resumeGame(g);
+    for (let i = 0; i < 0.5 / dt; i++) stepGame(g, pop(false), dt);
+    expect(g.skier.lastPop).toBe('');
+    // neste ekte trykk er en vanlig pop
+    for (let i = 0; i < 0.3 / dt; i++) stepGame(g, pop(true), dt);
+    stepGame(g, pop(false), dt);
+    expect(g.skier.lastPop).not.toBe('');
+  });
+
+  it('mellomrom holdt over pausen på startskjermen starter ikke runden', () => {
+    const g = createGame();
+    resumeGame(g);
+    for (let i = 0; i < 0.3 / dt; i++) expect(stepGame(g, pop(true), dt)).toBeNull();
+    stepGame(g, pop(false), dt);
+    expect(stepGame(g, pop(true), dt)).toBe('ny-runde');
   });
 });

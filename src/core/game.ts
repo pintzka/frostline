@@ -72,6 +72,8 @@ export function stepGame(g: Game, raw: RawControls, restart: boolean, dt: number
   // blekingen inn igjen etter fallet fortsetter, men nå kjører du som vanlig
   stepFall(g.fall, g.skier, dt);
 
+  // sperret pop: ladingen kastes først, så det ikke blir en pop når tasten slippes (f.eks. etter pause)
+  if (g.popLock) { g.skier.popHeld = false; g.skier.popCharge = 0; }
   if (g.popLock && !raw.pop) g.popLock = false;
   const c = splitControls(raw, g.skier.grounded, g.latch, dt);
   if (g.popLock) c.skier.pop = false;

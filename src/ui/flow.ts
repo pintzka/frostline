@@ -116,6 +116,15 @@ function newRun(g: Game, bySpace: boolean): void {
   g.flow.move = 'restart';
 }
 
+/**
+ * Fortsetter etter pause (eller fanebytte): pop som ble holdt eller ladet før pausen kastes,
+ * og mellomrom som fortsatt holdes, må slippes før det starter en runde eller gir pop.
+ */
+export function resumeGame(g: Game): void {
+  g.popLock = true;
+  g.flow.spaceWas = true;
+}
+
 /** Etter målet: bremser mykt men bestemt inn, så skiløperen stopper før bakken tar slutt. Bare på snøen, ikke i lufta. */
 function stopAtFinish(s: SkierState, dt: number): void {
   const v = speedOf(s);

@@ -143,6 +143,8 @@ export function createInput(target: HTMLElement, touch?: TouchSurface) {
       brakeFingers.endRead();
       return state;
     },
+    /** Slipper alle taster og fingre (f.eks. når spillet fortsetter etter pause), så ingenting henger igjen. */
+    releaseAll() { releaseAll(); restartPending = false; },
     /** Ble R (eller Y/Back på gamepad) trykket siden sist? Gir true én gang per trykk. */
     takeRestart(): boolean {
       const r = restartPending;

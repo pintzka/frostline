@@ -13,7 +13,7 @@ import { createHud } from './ui/hud';
 import { createTouchControls } from './ui/touchControls';
 import { createPauseUi } from './ui/pause';
 import { createMenu } from './ui/menu';
-import { createGame, stepGame } from './ui/flow';
+import { createGame, resumeGame, stepGame } from './ui/flow';
 import { createAudio } from './audio/engine';
 
 const root = document.getElementById('app')!;
@@ -83,10 +83,10 @@ const loop = createLoop({
 });
 loop.start();
 
-// pause: fysikken står, lyden tones ned, og R trykket på pause gir ikke ny runde når du fortsetter
+// pause: fysikken står og lyden tones ned. Taster trykket eller holdt på pause (R, mellomrom) gir ingenting når du fortsetter
 const pausable = {
   pause() { loop.pause(); audio.suspend(); },
-  resume() { input.takeRestart(); loop.resume(); audio.resume(); },
+  resume() { input.releaseAll(); resumeGame(game); loop.resume(); audio.resume(); },
   toggle() { if (loop.isPaused()) pausable.resume(); else pausable.pause(); return loop.isPaused(); },
   isPaused: () => loop.isPaused(),
 };
