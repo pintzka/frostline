@@ -66,7 +66,10 @@ export function respawnSpot(fallX: number, fallZ: number, takeoffZ: number): { x
   const i = PARK.kickers.findIndex((k) => Math.abs(takeoffZ - k.z) <= CONFIG.fallTakeoffWindow && fallZ > k.z);
   if (i >= 0) {
     const k = PARK.kickers[i];
-    return { x: 0, z: Math.max(CONFIG.startZ, k.z - rampLength(k) - CONFIG.fallRespawnBeforeRamp[i]), speed: CONFIG.fallRespawnSpeed[i] };
+    // tallene står i parkfila hvis parken har egne (nybegynnerparken), ellers i config.ts (testbakken)
+    const before = k.respawnBeforeRamp ?? CONFIG.fallRespawnBeforeRamp[i] ?? CONFIG.fallBackDistance;
+    const speed = k.respawnSpeed ?? CONFIG.fallRespawnSpeed[i] ?? CONFIG.fallBackSpeed;
+    return { x: 0, z: Math.max(CONFIG.startZ, k.z - rampLength(k) - before), speed };
   }
   const half = PARK.width / 2 - 2;
   const x = Math.max(-half, Math.min(half, fallX));

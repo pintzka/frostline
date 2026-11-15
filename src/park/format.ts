@@ -27,6 +27,12 @@ export interface Kicker {
   landingStart: number;
   /** Hvor mye brattere enn bakken den bratte delen av landingen er (grader). */
   landingDeg: number;
+  /**
+   * Valgfritt: faller du på landingen, settes du så mange meter før rampen (m), med farten respawnSpeed (m/s).
+   * Mangler de, brukes fallRespawnBeforeRamp / fallRespawnSpeed i config.ts (som er laget for testbakken).
+   */
+  respawnBeforeRamp?: number;
+  respawnSpeed?: number;
 }
 
 /** Hele parken slik den står i JSON-fila. */
@@ -94,6 +100,8 @@ const GROUP_FIELDS: Record<string, Shape> = {
 const KICKER_FIELDS: Shape = {
   name: 'string', z: 'number', lipDeg: 'number', radius: 'number', width: 'number', sideWidth: 'number', landingStart: 'number', landingDeg: 'number',
 };
+/** Felt et hopp kan ha, men ikke må ha. */
+const KICKER_OPTIONAL: Shape = { respawnBeforeRamp: 'number', respawnSpeed: 'number' };
 const TYPE_NAMES = { string: 'tekst', number: 'et tall', object: 'en gruppe { }', array: 'en liste [ ]' };
 
 function isObject(v: unknown): v is Record<string, unknown> {
@@ -108,8 +116,14 @@ function typeOk(v: unknown, t: Shape[string]): boolean {
 }
 
 /** Sjekker at alle felt finnes og har riktig type, og at det ikke er ukjente (feilstavede) felt. */
-function checkShape(obj: Record<string, unknown>, shape: Shape, where: string, errors: string[]): boolean {
+function checkShape(obj: Record<string, unknown>, shape: Shape, where: string, errors: string[], optional: Shape = {}): boolean {
   let ok = true;
+  for (const [key, t] of Object.entries(optional)) {
+    if (key in obj && !typeOk(obj[key], t)) {
+      errors.push(`${where}: "${key}" må være ${TYPE_NAMES[t]}.`);
+      ok = false;
+    }
+  }
   for (const [key, t] of Object.entries(shape)) {
     if (!(key in obj)) {
       errors.push(`${where}: mangler feltet "${key}".`);
@@ -120,7 +134,7 @@ function checkShape(obj: Record<string, unknown>, shape: Shape, where: string, e
     }
   }
   for (const key of Object.keys(obj)) {
-    if (!(key in shape)) errors.push(`${where}: ukjent felt "${key}". Er det feilstavet?`);
+    if (!(key in shape) && !(key in optional)) errors.push(`${where}: ukjent felt "${key}". Er det feilstavet?`);
   }
   return ok;
 }
@@ -144,7 +158,7 @@ export function validatePark(data: unknown): string[] {
   const list = data.kickers as unknown[];
   list.forEach((k, i) => {
     if (!isObject(k)) errors.push(`Hopp nr. ${i + 1}: må være en gruppe { }.`);
-    else checkShape(k, KICKER_FIELDS, `Hopp nr. ${i + 1}${typeof k.name === 'string' ? ` («${k.name}»)` : ''}`, errors);
+    else checkShape(k, KICKER_FIELDS, `Hopp nr. ${i + 1}${typeof k.name === 'string' ? ` («${k.name}»)` : ''}`, errors, KICKER_OPTIONAL);
   });
   // Ingen vits i å regne på tallene før alle felt finnes.
   if (errors.length > 0) return errors;
@@ -193,6 +207,16 @@ export function validatePark(data: unknown): string[] {
     }
     if (k.landingStart <= p.deck.drop) {
       errors.push(`${who}: landingen starter ${k.landingStart} m etter kanten, men platået slutter først etter ${p.deck.drop} m. "landingStart" må være større.`);
+    }
+
+    if ((k.respawnBeforeRamp === undefined) !== (k.respawnSpeed === undefined)) {
+      errors.push(`${who}: skriv både "respawnBeforeRamp" og "respawnSpeed", eller ingen av dem.`);
+    }
+    if (k.respawnBeforeRamp !== undefined && k.respawnBeforeRamp < 10) {
+      errors.push(`${who}: "respawnBeforeRamp" er ${k.respawnBeforeRamp} m. Du må settes minst 10 m før rampen.`);
+    }
+    if (k.respawnSpeed !== undefined && (k.respawnSpeed < 0 || k.respawnSpeed > CONFIG.maxSpeed)) {
+      errors.push(`${who}: "respawnSpeed" er ${k.respawnSpeed} m/s. Den må være mellom 0 og ${CONFIG.maxSpeed} m/s.`);
     }
 
     const start = k.z - rampLength(k);
