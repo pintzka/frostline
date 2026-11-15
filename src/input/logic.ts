@@ -105,3 +105,23 @@ export function createEdge() {
     return pressed;
   };
 }
+
+/**
+ * Husker tastetrykk mellom to avlesninger. Trykker du og slipper før spillet rekker å lese
+ * input (et veldig raskt tapp), regnes tasten likevel som nede i én avlesning. Da gir et
+ * raskt tapp på mellomrom en kort pop i stedet for ingenting.
+ * Bruk: down/up fra hendelsene, isDown når input leses, endRead etter hver avlesning.
+ */
+export function createKeyLatch() {
+  const held = new Set<string>();
+  const tapped = new Set<string>();
+  return {
+    down(code: string) { held.add(code); tapped.add(code); },
+    up(code: string) { held.delete(code); },
+    isDown(code: string) { return held.has(code) || tapped.has(code); },
+    /** Antall taster/fingre som er nede nå (eller ble tappet siden sist). */
+    count() { return new Set([...held, ...tapped]).size; },
+    endRead() { tapped.clear(); },
+    clear() { held.clear(); tapped.clear(); },
+  };
+}

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { CONFIG } from '../src/core/config';
-import { createEdge, isSteerZone, mergeSteer, PAD, readPad, shapeAxis, shapeTrigger, touchSteer, type PadButton } from '../src/input/logic';
+import { createSkier, stepSkier } from '../src/physics/skier';
+import { createEdge, createKeyLatch, isSteerZone, mergeSteer, PAD, readPad, shapeAxis, shapeTrigger, touchSteer, type PadButton } from '../src/input/logic';
 
 const dz = CONFIG.padDeadzone, outer = CONFIG.padOuterEdge, curve = CONFIG.padCurve;
 
@@ -182,5 +183,55 @@ describe('restart og pause skjer én gang per trykk', () => {
     let restarts = 0;
     for (let i = 0; i < 120; i++) if (edge(readPad([0, 0], buttons({ [PAD.Y]: 1 })).restart)) restarts++;
     expect(restarts).toBe(1);
+  });
+});
+
+describe('raske tapp mellom to avlesninger', () => {
+  it('ned og opp før avlesning: tasten er nede i nøyaktig én avlesning', () => {
+    const keys = createKeyLatch();
+    keys.down('Space');
+    keys.up('Space');
+    expect(keys.isDown('Space')).toBe(true);
+    keys.endRead();
+    expect(keys.isDown('Space')).toBe(false);
+  });
+
+  it('en tast som holdes, er nede helt til den slippes', () => {
+    const keys = createKeyLatch();
+    keys.down('KeyA');
+    for (let i = 0; i < 10; i++) { expect(keys.isDown('KeyA')).toBe(true); keys.endRead(); }
+    keys.up('KeyA');
+    expect(keys.isDown('KeyA')).toBe(false);
+  });
+
+  it('raskt tapp på mellomrom gir en kort pop, ikke ingenting', () => {
+    const keys = createKeyLatch();
+    const s = createSkier();
+    const dt = 1 / CONFIG.physicsHz;
+    // kjør litt så skiløperen er i gang på bakken
+    for (let i = 0; i < 240; i++) stepSkier(s, { steer: 0, brake: 0, pop: false }, dt);
+    expect(s.grounded).toBe(true);
+    // tapp mellom to fysikksteg
+    keys.down('Space');
+    keys.up('Space');
+    let jumped = false;
+    for (let i = 0; i < 10; i++) {
+      stepSkier(s, { steer: 0, brake: 0, pop: keys.isDown('Space') }, dt);
+      keys.endRead();
+      if (!s.grounded) jumped = true;
+    }
+    expect(jumped).toBe(true);
+    expect(s.lastPop).not.toBe('');
+  });
+
+  it('flere fingre: én slipper, den andre holder fortsatt knappen nede', () => {
+    const fingers = createKeyLatch();
+    fingers.down('1');
+    fingers.down('2');
+    fingers.endRead();
+    fingers.up('1');
+    expect(fingers.count()).toBe(1);
+    fingers.up('2');
+    expect(fingers.count()).toBe(0);
   });
 });

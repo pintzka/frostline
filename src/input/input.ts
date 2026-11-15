@@ -1,6 +1,6 @@
 import type { SkierInput } from '../physics/skier';
 import { CONFIG } from '../core/config';
-import { createEdge, isSteerZone, mergeSteer, readPad, touchSteer, type PadInput } from './logic';
+import { createEdge, createKeyLatch, isSteerZone, mergeSteer, readPad, touchSteer, type PadInput } from './logic';
 
 /**
  * Tastatur, gamepad og berøring. Arbeidsstrøm 2 (Kamera og input) eier denne fila.
@@ -22,24 +22,26 @@ export type InputDevice = 'keyboard' | 'gamepad' | 'touch';
 const NO_PAD: PadInput = { steer: 0, brake: 0, pop: false, restart: false, pause: false };
 
 export function createInput(target: HTMLElement, touch?: TouchSurface) {
-  const keys = new Set<string>();
+  // tastene huskes til spillet har lest dem minst én gang, så raske tapp ikke forsvinner
+  const keys = createKeyLatch();
   let device: InputDevice = 'keyboard';
   // restart skjer én gang per trykk; settes her og hentes av spillet med takeRestart()
   let restartPending = false;
   addEventListener('keydown', (e) => {
-    keys.add(e.code);
+    keys.down(e.code);
     // tasten gjentar seg selv når den holdes; bare det første trykket teller
     if (e.code === 'KeyR' && !e.repeat) restartPending = true;
     device = 'keyboard';
     // mellomrom skal lade pop, ikke rulle siden
     if (e.code === 'Space') e.preventDefault();
   });
-  addEventListener('keyup', (e) => keys.delete(e.code));
+  addEventListener('keyup', (e) => keys.up(e.code));
 
   // --- berøring: én tommel styrer, knappene kan holdes med andre fingre samtidig ---
   let steerId = -1, anchorX = 0, steerY = 0, steerX = 0, touchValue = 0;
-  const popFingers = new Set<number>();
-  const brakeFingers = new Set<number>();
+  // fingrene på knappene huskes på samme måte som tastene, så et raskt tapp på POP teller
+  const popFingers = createKeyLatch();
+  const brakeFingers = createKeyLatch();
 
   const usedTouch = () => { device = 'touch'; touch?.show(); };
   const endSteer = (e: PointerEvent) => {
@@ -69,14 +71,14 @@ export function createInput(target: HTMLElement, touch?: TouchSurface) {
   target.addEventListener('lostpointercapture', endSteer);
 
   /** En knapp er nede så lenge minst én finger holder på den. */
-  function holdButton(el: HTMLElement, fingers: Set<number>) {
+  function holdButton(el: HTMLElement, fingers: ReturnType<typeof createKeyLatch>) {
     el.addEventListener('pointerdown', (e) => {
       e.preventDefault();
       usedTouch();
-      fingers.add(e.pointerId);
+      fingers.down(String(e.pointerId));
       el.setPointerCapture?.(e.pointerId);
     });
-    const up = (e: PointerEvent) => { fingers.delete(e.pointerId); };
+    const up = (e: PointerEvent) => { fingers.up(String(e.pointerId)); };
     el.addEventListener('pointerup', up);
     el.addEventListener('pointercancel', up);
     el.addEventListener('lostpointercapture', up);
@@ -118,7 +120,7 @@ export function createInput(target: HTMLElement, touch?: TouchSurface) {
     pad = next;
 
     const stick = steerId >= 0 ? { anchorX, y: steerY, x: steerX, radius: CONFIG.touchSteerRadius } : null;
-    touch?.update(stick, popFingers.size > 0, brakeFingers.size > 0);
+    touch?.update(stick, popFingers.count() > 0, brakeFingers.count() > 0);
     requestAnimationFrame(pollPads);
   }
   requestAnimationFrame(pollPads);
@@ -127,15 +129,20 @@ export function createInput(target: HTMLElement, touch?: TouchSurface) {
   const state: SkierInput = { steer: 0, brake: 0, pop: false };
   return {
     read(): SkierInput {
-      const left = keys.has('ArrowLeft') || keys.has('KeyA');
-      const right = keys.has('ArrowRight') || keys.has('KeyD');
+      const has = (c: string) => keys.isDown(c);
+      const left = has('ArrowLeft') || has('KeyA');
+      const right = has('ArrowRight') || has('KeyD');
       const keySteer = (right ? 1 : 0) - (left ? 1 : 0);
       const merged = mergeSteer([keySteer, pad.steer, touchValue], steerSource);
       steerSource = merged.source;
       state.steer = merged.value;
-      const keyBrake = keys.has('ArrowDown') || keys.has('KeyS') ? 1 : 0;
-      state.brake = Math.max(keyBrake, pad.brake, brakeFingers.size > 0 ? 1 : 0);
-      state.pop = keys.has('Space') || pad.pop || popFingers.size > 0;
+      const keyBrake = has('ArrowDown') || has('KeyS') ? 1 : 0;
+      state.brake = Math.max(keyBrake, pad.brake, brakeFingers.count() > 0 ? 1 : 0);
+      state.pop = has('Space') || pad.pop || popFingers.count() > 0;
+      // raske tapp er nå lest; neste avlesning ser bare det som fortsatt holdes
+      keys.endRead();
+      popFingers.endRead();
+      brakeFingers.endRead();
       return state;
     },
     /** Ble R (eller Y/Back på gamepad) trykket siden sist? Gir true én gang per trykk. */
@@ -148,6 +155,6 @@ export function createInput(target: HTMLElement, touch?: TouchSurface) {
     onPause(fn: () => void) { pauseListeners.push(fn); },
     /** Hva ble sist brukt, så hjelpeteksten kan vise riktige knapper. */
     device(): InputDevice { return device; },
-    pressed(code: string) { return keys.has(code); },
+    pressed(code: string) { return keys.isDown(code); },
   };
 }
