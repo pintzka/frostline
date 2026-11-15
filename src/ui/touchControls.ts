@@ -11,18 +11,36 @@ const BTN = 'position:fixed;display:flex;align-items:center;justify-content:cent
   + 'text-shadow:0 1px 3px #0008;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;'
   + '-webkit-tap-highlight-color:transparent;transition:background .06s,transform .06s;';
 
+/**
+ * Plassering av knappene (CSS-piksler fra høyre og nederste kant). BREMS står over POP i en
+ * smal kolonne helt til høyre, så knappene aldri dekker styresonen på venstre halvdel,
+ * heller ikke på en smal telefon på høykant.
+ */
+export const BUTTONS = {
+  pop: { size: 96, right: 20, bottom: 28 },
+  brake: { size: 72, right: 32, bottom: 140 },
+} as const;
+
+/** Venstre kant (px) til den knappen som står lengst til venstre, på en skjerm så bred. */
+export function buttonsLeftEdge(screenWidth: number): number {
+  return Math.min(...Object.values(BUTTONS).map((b) => screenWidth - b.right - b.size));
+}
+
+const place = (b: { size: number; right: number; bottom: number }) =>
+  `width:${b.size}px;height:${b.size}px;right:calc(${b.right}px + env(safe-area-inset-right));bottom:calc(${b.bottom}px + env(safe-area-inset-bottom));`;
+
 export function createTouchControls(root: HTMLElement) {
   const wrap = document.createElement('div');
   wrap.style.cssText = 'display:none;';
   root.appendChild(wrap);
 
-  // POP er størst og nærmest tommelen; BREMS sitter til venstre for den
+  // POP er størst og nederst; BREMS sitter rett over
   const pop = document.createElement('div');
   pop.textContent = 'POP';
-  pop.style.cssText = BTN + 'width:96px;height:96px;right:calc(20px + env(safe-area-inset-right));bottom:calc(28px + env(safe-area-inset-bottom));';
+  pop.style.cssText = BTN + place(BUTTONS.pop);
   const brake = document.createElement('div');
   brake.textContent = 'BREMS';
-  brake.style.cssText = BTN + 'width:72px;height:72px;font-size:12px;right:calc(130px + env(safe-area-inset-right));bottom:calc(20px + env(safe-area-inset-bottom));';
+  brake.style.cssText = BTN + place(BUTTONS.brake) + 'font-size:12px;';
   wrap.append(pop, brake);
 
   // ring der tommelen ble satt ned, og en prikk som viser hvor mye du svinger
@@ -36,7 +54,12 @@ export function createTouchControls(root: HTMLElement) {
   // iPhone zoomer med to fingre selv om siden sier nei; dette stopper det
   document.addEventListener('gesturestart', (e) => e.preventDefault());
 
+  // stilen skrives bare når noe faktisk endres, ikke hvert bilde
+  const isDown = new Map<HTMLElement, boolean>();
+  let lastStick = '';
   const setDown = (el: HTMLElement, down: boolean) => {
+    if (isDown.get(el) === down) return;
+    isDown.set(el, down);
     el.style.background = down ? '#ffffff66' : '#ffffff26';
     el.style.transform = down ? 'scale(0.94)' : '';
   };
@@ -49,6 +72,9 @@ export function createTouchControls(root: HTMLElement) {
     update(stick: TouchStickView | null, popDown: boolean, brakeDown: boolean) {
       setDown(pop, popDown);
       setDown(brake, brakeDown);
+      const key = stick ? `${stick.anchorX}|${stick.x}|${stick.y}|${stick.radius}` : '';
+      if (key === lastStick) return;
+      lastStick = key;
       if (!stick) { ring.style.display = knob.style.display = 'none'; return; }
       ring.style.display = knob.style.display = '';
       const r = stick.radius + 22;

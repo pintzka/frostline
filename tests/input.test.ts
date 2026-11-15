@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { CONFIG } from '../src/core/config';
 import { createSkier, stepSkier } from '../src/physics/skier';
-import { createEdge, createKeyLatch, isSteerZone, mergeSteer, PAD, readPad, shapeAxis, shapeTrigger, touchSteer, type PadButton } from '../src/input/logic';
+import { buttonsLeftEdge } from '../src/ui/touchControls';
+import { createEdge, createKeyLatch, createSteerTouches, padInUse, stickSteer, isSteerZone, mergeSteer, PAD, readPad, shapeAxis, shapeTrigger, touchSteer, type PadButton } from '../src/input/logic';
 
 const dz = CONFIG.padDeadzone, outer = CONFIG.padOuterEdge, curve = CONFIG.padCurve;
 
@@ -233,5 +234,67 @@ describe('raske tapp mellom to avlesninger', () => {
     expect(fingers.count()).toBe(1);
     fingers.up('2');
     expect(fingers.count()).toBe(0);
+  });
+});
+
+describe('kvalitetsrettinger', () => {
+  it('padder uten standard-oppsett: knapper ignoreres, stikka virker', () => {
+    // en knapp som "alltid står på" på brems-plassen skal ikke bremse
+    const p = readPad([0.9, 0], buttons({ [PAD.B]: 1, [PAD.LT]: 1, [PAD.A]: 1 }), false);
+    expect(p.brake).toBe(0);
+    expect(p.pop).toBe(false);
+    expect(p.steer).toBeGreaterThan(0.8);
+  });
+
+  it('skrå stikke (45°) svinger fullt, rett opp svinger ikke', () => {
+    const d = Math.SQRT1_2;
+    expect(stickSteer(d, -d)).toBeCloseTo(1, 2);
+    expect(stickSteer(-d, d)).toBeCloseTo(-1, 2);
+    expect(stickSteer(0, -1)).toBe(0);
+    // rett til siden er som før
+    expect(stickSteer(0.6, 0)).toBeCloseTo(shapeAxis(0.6, dz, outer, curve));
+  });
+
+  it('skrå stikke: ingen hopp når du drar rundt kanten', () => {
+    let last = stickSteer(1, 0);
+    for (let a = 0; a <= Math.PI / 2; a += 0.01) {
+      const v = stickSteer(Math.cos(a), -Math.sin(a));
+      expect(Math.abs(v - last)).toBeLessThan(0.05);
+      last = v;
+    }
+  });
+
+  it('litt drift i stikka bytter ikke hjelpeteksten til gamepad', () => {
+    expect(padInUse(readPad([0.25, 0], buttons({ [PAD.LT]: 0.2 })))).toBe(false);
+    expect(padInUse(readPad([0.8, 0], buttons({})))).toBe(true);
+    expect(padInUse(readPad([0, 0], buttons({ [PAD.A]: 1 })))).toBe(true);
+  });
+
+  it('løfter du styrefingeren, tar en annen finger på venstre side over uten hopp', () => {
+    const t = createSteerTouches(60);
+    t.down(1, 100, 500, 400);
+    t.down(2, 150, 300, 400);
+    t.move(1, 160, 500);
+    expect(t.value()).toBe(1);
+    // finger 2 har flyttet seg litt mens den lå der
+    t.move(2, 170, 300);
+    expect(t.value()).toBe(1); // finger 2 styrer ikke ennå
+    t.up(1);
+    expect(t.value()).toBe(0);
+    expect(t.view()?.anchorX).toBe(170);
+    t.move(2, 200, 300);
+    expect(t.value()).toBeGreaterThan(0.3);
+    t.up(2);
+    expect(t.view()).toBeNull();
+  });
+
+  it('fingre på høyre side blir ikke styrefingre', () => {
+    const t = createSteerTouches(60);
+    expect(t.down(1, 300, 500, 400)).toBe(false);
+    expect(t.view()).toBeNull();
+  });
+
+  it('knappene dekker ikke styresonen, heller ikke på smal telefon', () => {
+    for (const w of [320, 360, 375, 414, 800]) expect(buttonsLeftEdge(w)).toBeGreaterThan(w / 2);
   });
 });

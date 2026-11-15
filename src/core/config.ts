@@ -82,6 +82,14 @@ export const CONFIG = {
   padDeadzone: 0.15,
   padOuterEdge: 0.95,
   padCurve: 1.5,
+  /**
+   * Skrå stikke: er stikka minst så mye sidelengs (andel av utslaget), gir den full sving.
+   * 0,7 ≈ 45°, så en skrå stikke svinger like hardt som en rett til siden.
+   */
+  padSideFull: 0.7,
+  /** Gamepaden regnes som "i bruk" (for hjelpeteksten) først ved så stor styring eller brems, så drift ikke teller. */
+  padActiveSteer: 0.3,
+  padActiveBrake: 0.5,
   /** Venstre trigger (brems) gjør ingenting under dette, så en hvilende finger ikke bremser. */
   triggerDeadzone: 0.06,
   /**

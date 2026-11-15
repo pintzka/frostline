@@ -1,6 +1,5 @@
 import type { SkierInput } from '../physics/skier';
-import { CONFIG } from '../core/config';
-import { createEdge, createKeyLatch, isSteerZone, mergeSteer, readPad, touchSteer, type PadInput } from './logic';
+import { createEdge, createKeyLatch, createSteerTouches, mergeSteer, padInUse, readPad, type PadInput } from './logic';
 
 /**
  * Tastatur, gamepad og berøring. Arbeidsstrøm 2 (Kamera og input) eier denne fila.
@@ -37,35 +36,20 @@ export function createInput(target: HTMLElement, touch?: TouchSurface) {
   });
   addEventListener('keyup', (e) => keys.up(e.code));
 
-  // --- berøring: én tommel styrer, knappene kan holdes med andre fingre samtidig ---
-  let steerId = -1, anchorX = 0, steerY = 0, steerX = 0, touchValue = 0;
+  // --- berøring: én tommel styrer (en annen på venstre side tar over), knappene kan holdes samtidig ---
+  const steer = createSteerTouches();
   // fingrene på knappene huskes på samme måte som tastene, så et raskt tapp på POP teller
   const popFingers = createKeyLatch();
   const brakeFingers = createKeyLatch();
 
   const usedTouch = () => { device = 'touch'; touch?.show(); };
-  const endSteer = (e: PointerEvent) => {
-    if (e.pointerId !== steerId) return;
-    steerId = -1;
-    touchValue = 0;
-  };
   target.addEventListener('pointerdown', (e) => {
     if (e.pointerType === 'mouse') return;
     usedTouch();
-    if (steerId >= 0 || !isSteerZone(e.clientX, innerWidth)) return;
-    steerId = e.pointerId;
-    anchorX = steerX = e.clientX;
-    steerY = e.clientY;
-    touchValue = 0;
-    target.setPointerCapture?.(e.pointerId);
+    if (steer.down(e.pointerId, e.clientX, e.clientY, innerWidth)) target.setPointerCapture?.(e.pointerId);
   });
-  target.addEventListener('pointermove', (e) => {
-    if (e.pointerId !== steerId) return;
-    steerX = e.clientX;
-    const r = touchSteer(anchorX, steerX);
-    anchorX = r.anchor;
-    touchValue = r.steer;
-  });
+  target.addEventListener('pointermove', (e) => steer.move(e.pointerId, e.clientX, e.clientY));
+  const endSteer = (e: PointerEvent) => steer.up(e.pointerId);
   target.addEventListener('pointerup', endSteer);
   target.addEventListener('pointercancel', endSteer);
   target.addEventListener('lostpointercapture', endSteer);
@@ -86,12 +70,12 @@ export function createInput(target: HTMLElement, touch?: TouchSurface) {
   if (touch) {
     holdButton(touch.pop, popFingers);
     holdButton(touch.brake, brakeFingers);
-    // på mobil vises knappene med en gang
-    if (matchMedia('(pointer: coarse)').matches) touch.show();
+    // på mobil vises knappene og mobil-hjelpeteksten med en gang
+    if (matchMedia('(pointer: coarse)').matches) { device = 'touch'; touch.show(); }
   }
 
   // bytter du app eller fane, slippes alt, så ingenting henger fast
-  const releaseAll = () => { keys.clear(); popFingers.clear(); brakeFingers.clear(); steerId = -1; touchValue = 0; };
+  const releaseAll = () => { keys.clear(); popFingers.clear(); brakeFingers.clear(); steer.clear(); };
   addEventListener('blur', releaseAll);
   document.addEventListener('visibilitychange', () => { if (document.hidden) releaseAll(); });
 
@@ -104,7 +88,7 @@ export function createInput(target: HTMLElement, touch?: TouchSurface) {
     let next: PadInput = NO_PAD;
     for (const gp of navigator.getGamepads?.() ?? []) {
       if (!gp || !gp.connected) continue;
-      const p = readPad(gp.axes, gp.buttons);
+      const p = readPad(gp.axes, gp.buttons, gp.mapping === 'standard');
       next = {
         steer: Math.abs(p.steer) > Math.abs(next.steer) ? p.steer : next.steer,
         brake: Math.max(next.brake, p.brake),
@@ -113,14 +97,13 @@ export function createInput(target: HTMLElement, touch?: TouchSurface) {
         pause: next.pause || p.pause,
       };
     }
-    if (next.steer !== 0 || next.brake > 0 || next.pop || next.restart || next.pause) device = 'gamepad';
+    if (padInUse(next)) device = 'gamepad';
     // pause sendes én gang per trykk, ikke hele tiden mens knappen holdes
     if (pauseEdge(next.pause)) for (const fn of pauseListeners) fn();
     if (restartEdge(next.restart)) restartPending = true;
     pad = next;
 
-    const stick = steerId >= 0 ? { anchorX, y: steerY, x: steerX, radius: CONFIG.touchSteerRadius } : null;
-    touch?.update(stick, popFingers.count() > 0, brakeFingers.count() > 0);
+    touch?.update(steer.view(), popFingers.count() > 0, brakeFingers.count() > 0);
     requestAnimationFrame(pollPads);
   }
   requestAnimationFrame(pollPads);
@@ -133,7 +116,7 @@ export function createInput(target: HTMLElement, touch?: TouchSurface) {
       const left = has('ArrowLeft') || has('KeyA');
       const right = has('ArrowRight') || has('KeyD');
       const keySteer = (right ? 1 : 0) - (left ? 1 : 0);
-      const merged = mergeSteer([keySteer, pad.steer, touchValue], steerSource);
+      const merged = mergeSteer([keySteer, pad.steer, steer.value()], steerSource);
       steerSource = merged.source;
       state.steer = merged.value;
       const keyBrake = has('ArrowDown') || has('KeyS') ? 1 : 0;

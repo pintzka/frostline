@@ -55,7 +55,7 @@ export function createHud(root: HTMLElement) {
       if (helpText !== shownHelp) {
         help.textContent = shownHelp = helpText;
         // på mobil skal teksten ikke gå inn under knappene nede til høyre
-        help.style.maxWidth = h.controls === 'touch' ? 'calc(100vw - 260px)' : '';
+        help.style.maxWidth = h.controls === 'touch' ? 'calc(100vw - 150px)' : '';
       }
 
       let text = `${Math.round(h.speed * 3.6)} km/t · ${Math.round(h.distance)} m`;

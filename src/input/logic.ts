@@ -41,11 +41,31 @@ export interface PadInput {
   pause: boolean;
 }
 
-/** Leser én gamepad (stikker og knapper som vanlige lister). */
-export function readPad(axes: readonly number[], buttons: readonly (PadButton | undefined)[]): PadInput {
+/**
+ * Venstre stikke → styring. Dødsonen måles rundt hele stikka (ikke bare sidelengs), og
+ * retningen teller for seg: er stikka minst `padSideFull` sidelengs, svinger du fullt.
+ * Da gir en skrå stikke like hard sving som en rett til siden, og rett opp gir ingen sving.
+ */
+export function stickSteer(x: number, y: number): number {
+  if (!Number.isFinite(x)) return 0;
+  if (!Number.isFinite(y)) y = 0;
+  const m = Math.hypot(x, y);
+  const amount = shapeAxis(m, CONFIG.padDeadzone, CONFIG.padOuterEdge, CONFIG.padCurve);
+  if (amount === 0) return 0;
+  const side = Math.min(1, Math.abs(x) / m / CONFIG.padSideFull);
+  return Math.sign(x) * amount * side;
+}
+
+/**
+ * Leser én gamepad (stikker og knapper som vanlige lister).
+ * Knappenumrene stemmer bare når `standard` er sann (gp.mapping === 'standard'). Ellers kan
+ * f.eks. "brems" ligge på en knapp som alltid står på, så da brukes bare stikka.
+ */
+export function readPad(axes: readonly number[], buttons: readonly (PadButton | undefined)[], standard = true): PadInput {
+  if (!standard) buttons = [];
   const down = (i: number) => buttons[i]?.pressed === true;
   const value = (i: number) => buttons[i]?.value ?? 0;
-  const stick = shapeAxis(axes[0] ?? 0, CONFIG.padDeadzone, CONFIG.padOuterEdge, CONFIG.padCurve);
+  const stick = stickSteer(axes[0] ?? 0, axes[1] ?? 0);
   // piltastene på padden virker som tastaturet: helt av eller helt på
   const dpad = (down(PAD.RIGHT) ? 1 : 0) - (down(PAD.LEFT) ? 1 : 0);
   return {
@@ -123,5 +143,59 @@ export function createKeyLatch() {
     count() { return new Set([...held, ...tapped]).size; },
     endRead() { tapped.clear(); },
     clear() { held.clear(); tapped.clear(); },
+  };
+}
+
+/** Brukes gamepaden tydelig (ikke bare litt drift i stikka)? Da bytter hjelpeteksten til gamepad. */
+export function padInUse(p: PadInput): boolean {
+  return Math.abs(p.steer) >= CONFIG.padActiveSteer || p.brake >= CONFIG.padActiveBrake || p.pop || p.restart || p.pause;
+}
+
+/**
+ * Holder styr på fingrene på venstre side. Den første styrer. Løfter du den mens en annen
+ * finger ligger på venstre side, tar den andre over, med nytt midtpunkt der den er, så det
+ * ikke hopper.
+ */
+export function createSteerTouches(radius = CONFIG.touchSteerRadius) {
+  const fingers = new Map<number, { x: number; y: number }>(); // alle fingre som startet på venstre side
+  let id = -1, anchor = 0, value = 0;
+  const take = (newId: number) => {
+    const f = fingers.get(newId)!;
+    id = newId;
+    anchor = f.x;
+    value = 0;
+  };
+  return {
+    /** Gir true hvis fingeren ble en styrefinger (eller venter på å bli det). */
+    down(pid: number, x: number, y: number, width: number): boolean {
+      if (!isSteerZone(x, width)) return false;
+      fingers.set(pid, { x, y });
+      if (id < 0) take(pid);
+      return true;
+    },
+    move(pid: number, x: number, y: number) {
+      const f = fingers.get(pid);
+      if (!f) return;
+      f.x = x; f.y = y;
+      if (pid !== id) return;
+      const r = touchSteer(anchor, x, radius);
+      anchor = r.anchor;
+      value = r.steer;
+    },
+    up(pid: number) {
+      if (!fingers.delete(pid) || pid !== id) return;
+      id = -1;
+      value = 0;
+      const next = fingers.keys().next();
+      if (!next.done) take(next.value);
+    },
+    clear() { fingers.clear(); id = -1; value = 0; },
+    value() { return value; },
+    /** Hvor ringen og prikken skal tegnes, eller null hvis ingen styrer. */
+    view() {
+      if (id < 0) return null;
+      const f = fingers.get(id)!;
+      return { anchorX: anchor, y: f.y, x: f.x, radius };
+    },
   };
 }
