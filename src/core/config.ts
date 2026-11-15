@@ -52,6 +52,8 @@ export const CONFIG = {
   popChargeTime: 0.5,
   popSpeed: 3.4,
   popSpeedRamp: 1.0,
+  /** Rampen regnes til så langt etter kanten (m), så en pop rett på kanten også er svak. */
+  popRampAfterLip: 0.5,
   popMinCharge: 0.35,
   /** Slipper du pop så kort tid (s) før kanten, er det en perfekt pop, som gir så mye ekstra. */
   popPerfectWindow: 0.12,

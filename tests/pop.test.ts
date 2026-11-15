@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { CONFIG } from '../src/core/config';
-import { createSkier, speedOf, stepSkier, type SkierState } from '../src/physics/skier';
-import { heightAt, normalAt, PARK, type Kicker } from '../src/park/terrain';
+import { createSkier, placeSkier, speedOf, stepSkier, type SkierState } from '../src/physics/skier';
+import { heightAt, normalAt, PARK, rampLength, type Kicker } from '../src/park/terrain';
 
 const dt = 1 / CONFIG.physicsHz;
 const slope = Math.tan((CONFIG.slopeDeg * Math.PI) / 180);
@@ -124,4 +124,37 @@ describe('pop', () => {
   it('er deterministisk', () => {
     expect([...ride(0.05).entries()]).toEqual([...perfect.entries()]);
   });
+});
+
+describe('pop ute på sidene av rampen', () => {
+  /** Lengste hopp (landingssted z) med fullt ladet pop sluppet hvor som helst på rampen, ved x og fart. */
+  function longestPop(k: Kicker, x: number, speed: number): number {
+    let far = 0;
+    for (let rel = -12; rel <= 2; rel += 0.25) {
+      const s = createSkier();
+      placeSkier(s, x, k.z - rampLength(k) - 25, speed);
+      let released = false;
+      for (let i = 0; i < 10 * CONFIG.physicsHz && s.z < k.z + 160; i++) {
+        const pop = !released && s.z < k.z + rel;
+        if (!pop) released = true;
+        const was = s.grounded, air = s.airTime;
+        stepSkier(s, { steer: 0, brake: 0, pop }, dt);
+        if (!was && s.grounded && air > 0.5) { far = Math.max(far, s.z); break; }
+      }
+    }
+    return far;
+  }
+
+  // før: rett utenfor midten (|x| > bredden/2 + 1) ga pop full styrke på rampen, så du fløy forbi
+  // landingen (Stort: 3,6 s i lufta, lander på utkjøringen og mister over 2 m/s på ett steg)
+  for (const k of PARK.kickers) {
+    it(`«${k.name}»: pop på sidene av rampen flyr ikke lenger enn midt på`, () => {
+      const middle = longestPop(k, 0, 24);
+      for (const x of [k.width / 2 + 0.5, k.width / 2 + 1.5, k.width / 2 + 3, k.width / 2 + k.sideWidth / 2]) {
+        expect(longestPop(k, x, 24), `x = ${x}`).toBeLessThan(middle + 1);
+      }
+      // og midt på lander du fortsatt før utkjøringen
+      expect(middle).toBeLessThan(k.z + k.landingStart + PARK.landing.knuckle + PARK.landing.steep);
+    });
+  }
 });

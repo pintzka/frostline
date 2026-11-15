@@ -1,5 +1,5 @@
 import { CONFIG } from '../core/config';
-import { heightAt, normalAt, PARK, rampLength } from '../park/terrain';
+import { heightAt, normalAt, PARK, rampShare } from '../park/terrain';
 
 /**
  * Skiløperens fysikk. Ren logikk uten three.js, så den kan testes.
@@ -75,19 +75,14 @@ function nearLip(z: number): boolean {
   return PARK.kickers.some((k) => Math.abs(z - k.z) < CONFIG.takeoffPullZone);
 }
 
-/** Står skiløperen på rampen til et hopp? Der gjør rampen mesteparten av jobben, så pop er svakere. */
-function onRamp(s: SkierState): boolean {
-  return PARK.kickers.some((k) => {
-    const u = s.z - k.z;
-    return u >= -rampLength(k) && u <= 0.5 && Math.abs(s.x) < k.width / 2 + 1;
-  });
-}
 
 /** Spretter opp fra bakken. Sterkere jo lenger du har ladet, og ekstra sterkt på kanten. */
 function doPop(s: SkierState): void {
   const [nx, ny, nz] = normalAt(s.x, s.z);
   const perfect = atLip(s);
-  const full = onRamp(s) ? CONFIG.popSpeedRamp : CONFIG.popSpeed;
+  // på rampen gjør rampen mesteparten av jobben, så pop er svakere der. Ute på sidene er rampen lavere,
+  // så pop går mykt over til full styrke (før: full styrke rett utenfor midten, så du fløy forbi landingen)
+  const full = CONFIG.popSpeed + (CONFIG.popSpeedRamp - CONFIG.popSpeed) * rampShare(s.x, s.z);
   let strength = full * (CONFIG.popMinCharge + (1 - CONFIG.popMinCharge) * s.popCharge);
   if (perfect) strength *= CONFIG.popPerfectBoost;
   s.vx += nx * strength; s.vy += ny * strength; s.vz += nz * strength;

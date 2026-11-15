@@ -21,6 +21,7 @@ function smoothstep(a: number, b: number, t: number): number {
 export interface Terrain {
   heightAt(x: number, z: number): number;
   normalAt(x: number, z: number): [number, number, number];
+  rampShare(x: number, z: number): number;
 }
 
 /** Lager høyde- og normalfunksjonene for en park. */
@@ -97,7 +98,22 @@ export function createTerrain(park: ParkData): Terrain {
     return [nx / len, ny / len, nz / len];
   }
 
-  return { heightAt, normalAt };
+  /**
+   * Hvor mye av rampen på et hopp som er under skiløperen (0–1): 1 på rampen midt på hoppet, mykt ned mot 0
+   * ute på sidene der rampen blir lavere, og 0 utenfor rampene. Brukes så pop er svakere der rampen gjør jobben.
+   */
+  function rampShare(x: number, z: number): number {
+    let share = 0;
+    for (const k of park.kickers) {
+      const u = z - k.z;
+      if (u < -rampLength(k) || u > CONFIG.popRampAfterLip) continue;
+      const half = k.width / 2;
+      share = Math.max(share, 1 - smoothstep(half, half + k.sideWidth, Math.abs(x)));
+    }
+    return share;
+  }
+
+  return { heightAt, normalAt, rampShare };
 }
 
 /** Parken som kjøres nå (fra JSON-fila). */
@@ -110,3 +126,4 @@ export const LANDING = PARK.landing;
 const current = createTerrain(PARK);
 export const heightAt = current.heightAt;
 export const normalAt = current.normalAt;
+export const rampShare = current.rampShare;
