@@ -74,6 +74,45 @@ export const CONFIG = {
   trailSpacing: 0.25,
   trailMaxPoints: 600,
   skiGap: 0.3,
+  /**
+   * Snøsprut. Mengder er partikler per sekund (sprut) eller per hendelse (puff).
+   * Alt i en fast buffer på sprayMax partikler; er den full, venter ny sprut til gamle forsvinner.
+   */
+  sprayMax: 1600,
+  /** Carving: partikler/s ved full kant i full fart. Fra sprayMinSpeed til sprayFullSpeed (m/s) øker sprut mykt. */
+  sprayCarveRate: 240,
+  sprayMinSpeed: 3,
+  sprayFullSpeed: 20,
+  /** Brems: partikler/s ved full brems i full fart (mest av alt), og hvor fort bremsesprut kommer og går (per sekund). */
+  sprayBrakeRate: 520,
+  sprayBrakeFullSpeed: 12,
+  sprayBrakeResponse: 6,
+  /** Landing: partikler per m/s du treffer bakken med, pluss litt per m/s fart, og høyst så mange. */
+  sprayLandPerImpact: 45,
+  sprayLandPerSpeed: 3,
+  sprayLandMax: 320,
+  /** Korte hopp over småkuler gir ingen puff: lufttid under dette (s) eller slag under dette (m/s) teller ikke. */
+  sprayLandMinAir: 0.15,
+  sprayLandMinImpact: 0.8,
+  /** Pop: så mange partikler i fokket fra avsparket (perfekt pop gir litt mer). */
+  sprayPopCount: 40,
+  /** Lett snø: egen tyngdekraft (m/s²) og luftbrems (per sekund). Faller da høyst ca. 2,4 m/s. */
+  sprayGravity: 6,
+  sprayDrag: 2.5,
+  /** Hvor mye av skiløperens fart snøen tar med seg (0–1). Resten blir liggende igjen bak. */
+  sprayInherit: 0.55,
+  /** Hvor sterk sprutene er (0–1) når de er tettest. */
+  sprayOpacity: 0.6,
+  /**
+   * Hvordan hver type sprut ser ut: levetid (s, fra–til), størrelse når den kommer (m, fra–til),
+   * hvor mange ganger større den blir før den er borte, og hvor fort den kastes ut (m/s).
+   */
+  sprayLooks: {
+    carve: { life: [0.5, 1.0], size: [0.10, 0.24], grow: 2.4, throw: 3.5 },
+    brake: { life: [0.7, 1.4], size: [0.16, 0.36], grow: 2.8, throw: 2.8 },
+    land: { life: [0.8, 1.5], size: [0.22, 0.45], grow: 3.0, throw: 3.2 },
+    pop: { life: [0.4, 0.8], size: [0.10, 0.22], grow: 2.4, throw: 1.6 },
+  },
 } as const;
 
 export type Config = typeof CONFIG;

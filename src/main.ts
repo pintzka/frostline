@@ -10,6 +10,7 @@ import { createPlaceholderSkier } from './character/placeholder';
 import { heightAt, normalAt } from './park/terrain';
 import { poseFor, smoothPose } from './character/pose';
 import { createSkiTrails } from './render/trailMesh';
+import { createSnowSpray } from './render/sprayMesh';
 
 const root = document.getElementById('app')!;
 const { renderer, scene, sun } = createScene(root);
@@ -22,6 +23,7 @@ const skierModel = createPlaceholderSkier();
 const mesh = skierModel.root;
 scene.add(mesh);
 const trails = createSkiTrails(scene);
+const spray = createSnowSpray(scene);
 
 let skier = createSkier();
 let prev = { ...skier };
@@ -67,6 +69,7 @@ const loop = createLoop({
     }), frameDt);
     skierModel.setPose(pose);
     trails.update(target.x, target.y, target.z, heading, skier.grounded);
+    spray.update(skier, target, heading, input.read().brake, wantUp, frameDt, chase.camera, renderer);
 
     sun.position.set(target.x + 30, target.y + 60, target.z - 20);
     sun.target.position.copy(target);
