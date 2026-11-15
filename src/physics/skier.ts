@@ -70,6 +70,11 @@ function atLip(s: SkierState): boolean {
   });
 }
 
+/** Er skiløperen ved kanten på et hopp (der rampen knekker over i platået), uansett hvor langt ute på siden? */
+function nearLip(z: number): boolean {
+  return PARK.kickers.some((k) => Math.abs(z - k.z) < CONFIG.takeoffPullZone);
+}
+
 /** Står skiløperen på rampen til et hopp? Der gjør rampen mesteparten av jobben, så pop er svakere. */
 function onRamp(s: SkierState): boolean {
   return PARK.kickers.some((k) => {
@@ -156,7 +161,17 @@ export function stepSkier(s: SkierState, inp: SkierInput, dt: number): void {
   if (s.grounded) {
     const aheadY = heightAt(s.x + s.vx * dt, s.z + s.vz * dt);
     const flyY = s.y + s.vy * dt - 0.5 * g * dt * dt;
-    if (flyY - aheadY > CONFIG.takeoffGap) { s.grounded = false; s.airTime = 0; }
+    // ved kanten på et hopp letter også en liten knekk nedover deg (ute på sidene er kanten lav), hvis bakken
+    // må trekke deg ned hardere enn takeoffPull · g for at du skal følge den. Ellers ville farten bli bøyd
+    // brått nedover på ett steg (et kraftspark), i stedet for at du flyr et lite stykke.
+    // ser minst takeoffLook meter fram, så knekken oppdages før bakkens retning (målt over et lite stykke rundt
+    // skiløperen) blandes med den. I vanlig hoppfart er det bare ett steg fram.
+    const vh = Math.hypot(s.vx, s.vz);
+    const tl = vh > 0 ? Math.max(dt, CONFIG.takeoffLook / vh) : dt;
+    const aheadL = heightAt(s.x + s.vx * tl, s.z + s.vz * tl);
+    const pull = (2 * (s.y + s.vy * tl - 0.5 * g * tl * tl - aheadL)) / (tl * tl);
+    const kink = pull > CONFIG.takeoffPull * g && nearLip(s.z);
+    if (flyY - aheadY > CONFIG.takeoffGap || kink) { s.grounded = false; s.airTime = 0; }
   }
 
   if (s.grounded) {

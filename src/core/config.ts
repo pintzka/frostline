@@ -38,6 +38,12 @@ export const CONFIG = {
   skidFriction: 0.25,
   /** Faller bakken rett foran mer enn dette (m) bort under skiene på ett steg, letter skiløperen. */
   takeoffGap: 0.02,
+  /** Må bakken rett foran trekke deg ned mer enn så mange g (utover tyngden) for at du skal følge den, letter du i stedet. */
+  takeoffPull: 1,
+  /** ...men bare så nær kanten på et hopp (m), så vanlige kuler og landinger ikke gir små hopp. */
+  takeoffPullZone: 2,
+  /** Ved kanten ser fysikken minst så langt fram (m) etter en knekk. Litt mer enn avstanden normalAt måler over. */
+  takeoffLook: 0.06,
   /**
    * Pop: sekunder å lade fullt, fart opp fra bakken ved full lading (m/s), og andel du får ved et kort trykk.
    * popSpeed gjelder på vanlig bakke (hopp på ca. 60 cm). På rampen til et hopp gjør rampen mesteparten

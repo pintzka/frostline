@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { CONFIG } from '../src/core/config';
-import { createSkier, speedOf, stepSkier } from '../src/physics/skier';
-import { heightAt, normalAt, PARK } from '../src/park/terrain';
+import { createSkier, placeSkier, speedOf, stepSkier } from '../src/physics/skier';
+import { heightAt, normalAt, PARK, rampLength } from '../src/park/terrain';
 
 const dt = 1 / CONFIG.physicsHz;
 
@@ -47,4 +47,39 @@ describe('sidene på hoppene', () => {
       expect(r.maxLanding, `x = ${x}`).toBeLessThan(15);
     }
   });
+});
+
+describe('kanten ute på sidene av hoppene', () => {
+  /**
+   * Kjør rett over ett hopp fra rett før rampen, ved x og med gitt fart. Gir det største kraftsparket
+   * (all kraft fra bakken, i g) og den største fartsendringen (m/s) på ett steg mens du står på snøen.
+   * Før: ute på sidene er kanten lav, og skiløperen ble limt til bakken over knekken (40–80 g på ett steg).
+   */
+  function overKicker(k: (typeof PARK.kickers)[number], x: number, speed: number) {
+    const s = createSkier();
+    placeSkier(s, x, k.z - rampLength(k) - 3, speed);
+    let maxG = 0, maxDv = 0;
+    for (let i = 0; i < 6 * CONFIG.physicsHz && s.z < k.z + 60; i++) {
+      const was = s.grounded, vx0 = s.vx, vy0 = s.vy, vz0 = s.vz, v0 = speedOf(s);
+      stepSkier(s, { steer: 0, brake: 0 }, dt);
+      if (was && s.grounded) {
+        const ax = (s.vx - vx0) / dt, ay = (s.vy - vy0) / dt + CONFIG.gravity, az = (s.vz - vz0) / dt;
+        maxG = Math.max(maxG, Math.hypot(ax, ay, az) / CONFIG.gravity);
+        maxDv = Math.max(maxDv, Math.abs(speedOf(s) - v0));
+      }
+    }
+    return { maxG, maxDv };
+  }
+
+  for (const k of PARK.kickers) {
+    it(`«${k.name}»: under 3 g og under 0,3 m/s fartsendring per steg over hele bredden, i alle farter`, () => {
+      for (const speed of [4, 7, 10, 14, 18]) {
+        for (let x = 0; x <= k.width / 2 + k.sideWidth + 2; x += 0.5) {
+          const r = overKicker(k, x, speed);
+          expect(r.maxG, `x = ${x}, ${speed} m/s`).toBeLessThan(3);
+          expect(r.maxDv, `x = ${x}, ${speed} m/s`).toBeLessThan(0.3);
+        }
+      }
+    });
+  }
 });
