@@ -19,8 +19,10 @@ export interface Kicker {
   lipDeg: number;
   /** Rampens krumning (m). Større = lengre og mykere rampe, mindre spark oppover. */
   radius: number;
-  /** Bredden på hoppet (m). */
+  /** Bredden på hoppet (m), den flate toppen i full høyde. */
   width: number;
+  /** Hvor bred den myke skråningen ut til sidene er, på hver side (m). Større = slakere sider. */
+  sideWidth: number;
   /** Hvor landingen begynner å bli brattere, målt fra kanten (m). */
   landingStart: number;
   /** Hvor mye brattere enn bakken den bratte delen av landingen er (grader). */
@@ -39,8 +41,11 @@ export interface ParkData {
   waves: { height: number; along: number; across: number };
   /** «Bollen» mot kantene: starter ved start · bredde fra midten, og blir brattere med styrken strength. */
   edge: { start: number; strength: number };
-  /** Platået etter kanten: høyde i forhold til kanten (0–1), og hvor kort kanten ned til platået er (m). */
-  deck: { height: number; drop: number };
+  /**
+   * Platået etter kanten: høyde i forhold til kanten (0–1), hvor kort kanten ned til platået er på midten (m),
+   * og hvor mye lengre (slakere) den kanten blir helt ute på sidene av hoppet (m).
+   */
+  deck: { height: number; drop: number; sideDrop: number };
   /** Landingens deler (m): kort kant inn, bratt del der du lander, og lang myk utkjøring. */
   landing: { knuckle: number; steep: number; runout: number };
   /** Hoppene, ovenfra og ned. */
@@ -56,6 +61,16 @@ export function rampLength(k: Kicker): number {
 export function lipHeight(k: Kicker): number {
   return (rampLength(k) * Math.tan(k.lipDeg * DEG)) / 2;
 }
+
+/**
+ * Hvor bratt den bratteste delen av sidene på hoppet er (grader).
+ * Siden er en myk S-kurve (smoothstep), og den er brattest på midten: 1,5 · høyde / bredde.
+ */
+export function sideAngle(k: Kicker): number {
+  return Math.atan((1.5 * lipHeight(k)) / k.sideWidth) / DEG;
+}
+/** Brattere sider enn dette gir kraftspark når du kjører på siden av hoppet. */
+const MAX_SIDE_DEG = 35;
 
 // Trygge grenser. Utenfor disse blir hoppet umulig eller farlig å kjøre.
 const LIMITS = {
@@ -73,11 +88,11 @@ const PARK_FIELDS: Shape = {
 const GROUP_FIELDS: Record<string, Shape> = {
   waves: { height: 'number', along: 'number', across: 'number' },
   edge: { start: 'number', strength: 'number' },
-  deck: { height: 'number', drop: 'number' },
+  deck: { height: 'number', drop: 'number', sideDrop: 'number' },
   landing: { knuckle: 'number', steep: 'number', runout: 'number' },
 };
 const KICKER_FIELDS: Shape = {
-  name: 'string', z: 'number', lipDeg: 'number', radius: 'number', width: 'number', landingStart: 'number', landingDeg: 'number',
+  name: 'string', z: 'number', lipDeg: 'number', radius: 'number', width: 'number', sideWidth: 'number', landingStart: 'number', landingDeg: 'number',
 };
 const TYPE_NAMES = { string: 'tekst', number: 'et tall', object: 'en gruppe { }', array: 'en liste [ ]' };
 
@@ -143,6 +158,7 @@ export function validatePark(data: unknown): string[] {
   if (p.edge.strength < 0) errors.push('"edge.strength" kan ikke være negativ.');
   if (p.deck.height < 0 || p.deck.height > 1) errors.push(`"deck.height" er ${p.deck.height}. Den må være mellom 0 og 1 (1 = like høyt som kanten).`);
   if (p.deck.drop <= 0) errors.push('"deck.drop" må være større enn 0.');
+  if (p.deck.sideDrop < 0) errors.push('"deck.sideDrop" kan ikke være negativ.');
   for (const part of ['knuckle', 'steep', 'runout'] as const) {
     if (p.landing[part] <= 0) errors.push(`"landing.${part}" må være større enn 0.`);
   }
@@ -163,8 +179,18 @@ export function validatePark(data: unknown): string[] {
     const [rMin, rMax] = LIMITS.radius;
     if (k.radius < rMin || k.radius > rMax) errors.push(`${who}: "radius" er ${k.radius} m. Den må være mellom ${rMin} og ${rMax} m.`);
     if (k.width < 2) errors.push(`${who}: "width" er ${k.width} m. Hoppet må være minst 2 m bredt.`);
-    // + 3 m myk overgang på hver side
-    if (k.width + 6 > p.width) errors.push(`${who}: hoppet (${k.width} m + 3 m myk kant på hver side) er bredere enn bakken (${p.width} m).`);
+    if (k.sideWidth <= 0) {
+      errors.push(`${who}: "sideWidth" må være større enn 0.`);
+    } else {
+      const sideDeg = sideAngle(k);
+      if (sideDeg > MAX_SIDE_DEG) {
+        const need = Math.ceil((1.5 * lipHeight(k)) / Math.tan(MAX_SIDE_DEG * DEG));
+        errors.push(`${who}: sidene er ${sideDeg.toFixed(0)}° bratte (høyst ${MAX_SIDE_DEG}°), så de gir kraftspark. Sett "sideWidth" til minst ${need} m.`);
+      }
+    }
+    if (k.width + 2 * k.sideWidth > p.width) {
+      errors.push(`${who}: hoppet (${k.width} m + ${k.sideWidth} m skråning på hver side) er bredere enn bakken (${p.width} m).`);
+    }
     if (k.landingStart <= p.deck.drop) {
       errors.push(`${who}: landingen starter ${k.landingStart} m etter kanten, men platået slutter først etter ${p.deck.drop} m. "landingStart" må være større.`);
     }

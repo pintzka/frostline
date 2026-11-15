@@ -55,18 +55,21 @@ export function createTerrain(park: ParkData): Terrain {
     for (const k of park.kickers) {
       const u = z - k.z;
       const half = k.width / 2;
-      // full høyde på midten, myk overgang ut mot sidene
-      const across = 1 - smoothstep(half, half + 3, Math.abs(x));
+      // full høyde på midten, myk overgang ut mot sidene (så bred at sidene er kjørbare skråninger)
+      const across = 1 - smoothstep(half, half + k.sideWidth, Math.abs(x));
 
       const lr = rampLength(k), h = lipHeight(k);
-      const deck = h * DECK.height, lb = DECK.drop;
+      // ut mot sidene blir kanten ned til platået lengre (slakere), så den ikke gir et kraftspark
+      // når du kjører over den uten å lette. På midten er den akkurat DECK.drop.
+      const deck = h * DECK.height, lb = DECK.drop + (1 - across) * DECK.sideDrop;
+      // platået (table) i høyde med kanten, som går over i landingen. Ut mot sidene er hoppet lavere,
+      // så du flyr kortere: da begynner platået å gå nedover tidligere, så du ikke lander flatt på det.
+      const f0 = k.landingStart * across, f1 = f0 + LANDING.knuckle + LANDING.steep;
       let along = 0;
       if (u >= -lr && u <= 0) along = h * ((u + lr) / lr) ** 2; // rampen opp mot kanten
-      else if (u > 0 && u <= lb) along = deck + (h - deck) * (1 - u / lb) ** 2; // liten kant ned til platået
-      else if (u > lb) {
-        // platået (table) i høyde med kanten, som går over i landingen
-        const f0 = k.landingStart, f1 = k.landingStart + LANDING.knuckle + LANDING.steep;
+      else if (u > 0) {
         along = deck * (1 - smoothstep(f0, f1, u));
+        if (u <= lb) along += (h - deck) * (1 - u / lb) ** 2; // liten kant ned til platået
       }
       sum += along * across;
 

@@ -82,6 +82,25 @@ export function reachedEnd(s: SkierState): boolean {
   return s.z > PARK.length - CONFIG.runEndMargin;
 }
 
+/**
+ * Bremser farten utover mot kanten av parken (side = +1 til høyre, -1 til venstre) med høyst `cut` m/s.
+ * På bakken bremses farten langs snøen (opp bollen), så skiløperen blir liggende på bakken.
+ */
+function softWall(s: SkierState, side: number, cut: number): void {
+  let tx = side, ty = 0, tz = 0;
+  if (s.grounded) {
+    const [nx, ny, nz] = normalAt(s.x, s.z);
+    const d = tx * nx;
+    tx -= d * nx; ty -= d * ny; tz -= d * nz;
+    const l = Math.hypot(tx, ty, tz);
+    tx /= l; ty /= l; tz /= l;
+  }
+  const out = s.vx * tx + s.vy * ty + s.vz * tz;
+  if (out <= 0) return;
+  const c = Math.min(out, cut);
+  s.vx -= c * tx; s.vy -= c * ty; s.vz -= c * tz;
+}
+
 export function speedOf(s: SkierState): number {
   return Math.hypot(s.vx, s.vy, s.vz);
 }
@@ -176,12 +195,17 @@ export function stepSkier(s: SkierState, inp: SkierInput, dt: number): void {
     s.airTime += dt;
   }
 
+  // nær kanten av parken: bollen i terrenget snur deg mykt tilbake, og her bremses farten utover litt ekstra,
+  // mykere jo lenger unna kanten du er, så det aldri blir et brått stopp
+  const half = PARK.width / 2;
+  const into = Math.abs(s.x) - (half - CONFIG.wallZone);
+  if (into > 0) softWall(s, Math.sign(s.x), CONFIG.wallDecel * Math.min(1, into / CONFIG.wallZone) * dt);
+
   s.x += s.vx * dt; s.y += s.vy * dt; s.z += s.vz * dt;
 
-  // hold deg innenfor parken
-  const half = PARK.width / 2;
-  if (s.x < -half) { s.x = -half; s.vx = Math.abs(s.vx) * 0.3; }
-  if (s.x > half) { s.x = half; s.vx = -Math.abs(s.vx) * 0.3; }
+  // nødstopp helt ytterst: ingen sprett tilbake, bare ingen fart videre utover
+  if (s.x < -half) { s.x = -half; s.vx = Math.max(0, s.vx); }
+  if (s.x > half) { s.x = half; s.vx = Math.min(0, s.vx); }
 
   const h = heightAt(s.x, s.z);
   if (s.grounded) {
