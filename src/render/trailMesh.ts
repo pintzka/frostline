@@ -45,8 +45,8 @@ export function createSkiTrails(scene: THREE.Scene) {
   const c = new THREE.Color();
   return {
     /** x, y, z er midt under skiløperen; sporet starter ved bakenden av skiene. */
-    update(x: number, y: number, z: number, heading: number, grounded = true, cut = false) {
-      trail.update(x, y, z, heading, grounded, cut);
+    update(x: number, y: number, z: number, heading: number, grounded = true, move: 'none' | 'restart' | 'respawn' = 'none') {
+      trail.update(x, y, z, heading, grounded, move);
       const pts = trail.points();
       const tip = trail.tip();
       const newest = pts[pts.length - 1];

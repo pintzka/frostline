@@ -28,14 +28,15 @@ export function createTrail() {
      * x, y, z er midt under skiløperen. Sporet legges ved bakenden av skiene.
      * Kalles hvert bilde. Gir true når et nytt punkt ble lagt til.
      */
-    update(cx: number, y: number, cz: number, heading: number, grounded = true, cut = false): boolean {
+    update(cx: number, y: number, cz: number, heading: number, grounded = true, move: 'none' | 'restart' | 'respawn' = 'none'): boolean {
       const back = CONFIG.skiLength / 2;
       const x = cx - Math.sin(heading) * back;
       const z = cz - Math.cos(heading) * back;
       // restart (R eller slutten av bakken): skiløperen hoppet langt på ett bilde, så start et helt nytt spor
-      // satt tilbake etter et fall (cut): behold det gamle sporet, men start et nytt stykke uten strek imellom
-      if (cut) { if (ring.length) airborne = true; }
-      else if (tip && Math.hypot(x - tip.x, z - tip.z) > CONFIG.camSnapDistance) { ring.length = 0; start = 0; airborne = false; }
+      // ny runde: tøm sporet. Satt tilbake etter et fall: behold det gamle sporet, men start et nytt stykke uten strek imellom
+      const far = !!tip && Math.hypot(x - tip.x, z - tip.z) > CONFIG.camSnapDistance;
+      if (move === 'restart' || (move === 'none' && far)) { ring.length = 0; start = 0; airborne = false; }
+      else if (move === 'respawn' && ring.length) airborne = true;
       tip = { x, y, z, rx: Math.cos(heading), rz: -Math.sin(heading) };
 
       // i lufta blir det ikke spor; neste punkt på bakken starter et nytt stykke

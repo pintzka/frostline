@@ -10,7 +10,7 @@ import { createPlaceholderSkier } from './character/placeholder';
 import { heightAt, normalAt } from './park/terrain';
 import { poseFor, smoothPose } from './character/pose';
 import { createSkiTrails } from './render/trailMesh';
-import { createGame, skisOnSnow, stepGame } from './core/game';
+import { createGame, skisOnSnow, stepGame, type Move } from './core/game';
 import { fadeAmount, fallBody, landingWobble } from './tricks/fall';
 import { isSwitch } from './tricks/rotation';
 
@@ -29,8 +29,8 @@ const trails = createSkiTrails(scene);
 const game = createGame();
 let prev = { ...game.skier };
 let prevTricks = { ...game.tricks };
-// sant når skiløperen ble flyttet (restart eller satt tilbake etter fall) siden forrige bilde
-let cut = true;
+// om skiløperen ble flyttet siden forrige bilde: 'restart' (ny runde) eller 'respawn' (satt tilbake etter fall)
+let moved: Move = 'restart';
 const startZ = game.skier.z;
 
 const target = new THREE.Vector3();
@@ -51,13 +51,14 @@ const loop = createLoop({
     prev = { ...game.skier };
     prevTricks = { ...game.tricks };
     // taster, fysikk, triks og fall (se core/game.ts). Flyttet skiløperen seg langt, jevnes det ikke ut.
-    if (stepGame(game, input.read(), input.pressed('KeyR'), dt)) {
-      cut = true;
+    const m = stepGame(game, input.read(), input.pressed('KeyR'), dt);
+    if (m !== 'none') {
+      // ny runde viktigst: den nullstiller også kroppsstillingen
+      if (moved !== 'restart') moved = m;
       prev = { ...game.skier };
       prevTricks = { ...game.tricks };
-      pose = standingPose();
-      up.copy(Y);
     }
+    if (m === 'restart') { pose = standingPose(); up.copy(Y); }
   },
   render(alpha, frameDt) {
     const { skier, tricks, fall } = game;
@@ -70,7 +71,7 @@ const loop = createLoop({
     // på bakken står skiløperen vinkelrett på snøen; i lufta glir den mykt over til å stå rett opp
     const [nx, ny, nz] = skier.grounded ? normalAt(target.x, target.z) : [0, 1, 0];
     wantUp.set(nx, ny, nz);
-    up.lerp(wantUp, 1 - Math.exp(-12 * frameDt)).normalize();
+    up.lerp(wantUp, 1 - Math.exp(-CONFIG.bodyUpFollow * frameDt)).normalize();
     q.setFromUnitVectors(Y, up);
     // retningen jevnes ut mellom fysikkstegene, som posisjonen, så svingene ikke rister
     const heading = prev.heading + (skier.heading - prev.heading) * alpha;
@@ -91,20 +92,20 @@ const loop = createLoop({
       heightAboveSnow: target.y - heightAt(target.x, target.z), sinceLanding: skier.sinceLanding,
     }), frameDt);
     skierModel.setPose({ ...pose, pitch: pose.pitch + body.pitch + wobble.pitch });
-    trails.update(target.x, target.y, target.z, heading, skisOnSnow(game), cut);
+    trails.update(target.x, target.y, target.z, heading, skisOnSnow(game), moved);
 
     sun.position.set(target.x + 30, target.y + 60, target.z - 20);
     sun.target.position.copy(target);
 
     // den ekte farten: landingene følger flybanen, så den holder seg når du lander
     const v = speedOf(skier);
-    chase.update({ x: target.x, y: target.y, z: target.z, vx: skier.vx, vz: skier.vz, heading, speed: v, cut }, frameDt);
+    chase.update({ x: target.x, y: target.y, z: target.z, vx: skier.vx, vz: skier.vz, heading, speed: v, cut: moved !== 'none' }, frameDt);
     hud.update({
       speed: v, distance: skier.z - startZ, airTime: skier.airTime, inAir: !skier.grounded,
       popCharge: skier.popCharge, lastPop: skier.lastPop, popAge: skier.popAge,
       landing: tricks.lastLanding, landingAge: tricks.landingAge, fade: fadeAmount(fall),
     }, frameDt);
-    cut = false;
+    moved = 'none';
     renderer.render(scene, chase.camera);
   },
 });

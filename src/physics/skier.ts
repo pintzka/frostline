@@ -41,7 +41,7 @@ export interface SkierInput {
 }
 
 export function createSkier(): SkierState {
-  const z = 5;
+  const z = CONFIG.startZ;
   return { x: 0, y: heightAt(0, z), z, vx: 0, vy: 0, vz: 2, heading: 0, edge: 0, lean: 0, leanRate: 0, grounded: true, airTime: 0,
     popCharge: 0, popHeld: false, lastPop: '', popAge: 99, sinceLanding: 99 };
 }

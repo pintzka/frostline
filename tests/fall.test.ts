@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { CONFIG } from '../src/core/config';
-import { createGame, skisOnSnow, stepGame, type Game } from '../src/core/game';
+import { createGame, skisOnSnow, stepGame, type Game, type Move } from '../src/core/game';
 import { createSkier, speedOf, stepSkier } from '../src/physics/skier';
 import { createCameraRig, type CameraPose } from '../src/camera/rig';
 import { createTrail } from '../src/render/trail';
 import { smoothSpeed } from '../src/ui/hud';
-import { fadeAmount, fallBody, fallTotalTime, isFalling, landingWobble, respawnSpot } from '../src/tricks/fall';
-import { heightAt, PARK, rampLength } from '../src/park/terrain';
-import { spinCoast } from '../src/tricks/rotation';
+import { createFall, fadeAmount, fallBody, fallTotalTime, isFalling, landingWobble, respawnSpot, startFall } from '../src/tricks/fall';
+import { createTricks, spinCoast } from '../src/tricks/rotation';
+import { heightAt, LANDING, normalAt, PARK, rampLength } from '../src/park/terrain';
 import type { RawControls } from '../src/tricks/controls';
 
 const dt = 1 / CONFIG.physicsHz;
@@ -24,7 +24,7 @@ function spinTo(g: Game, goalDeg: number): RawControls {
   return { ...none, steer: Math.abs(left) > 0.02 ? Math.sign(left) : 0 };
 }
 
-interface Frame { time: number; game: Game; cut: boolean }
+interface Frame { time: number; game: Game; cut: boolean; move: Move }
 
 /**
  * Kjører hele runden fra start til det medium hoppet, lander med gitt spinn, og fortsetter i `after` sekunder.
@@ -40,11 +40,11 @@ function ride(goalDeg: number, after: number, mash: (time: number) => RawControl
     const after0 = landedAt >= 0 ? time - landedAt : -1;
     const raw = landedAt < 0 ? spinTo(g, goalDeg) : mash(after0);
     const wasAir = !g.skier.grounded;
-    const cut = stepGame(g, raw, restartDuring && landedAt >= 0, dt);
+    const move = stepGame(g, raw, restartDuring && landedAt >= 0, dt);
     time += dt;
     if (!g.skier.grounded && g.skier.z > medium.z - 5) tookOff = true;
     if (tookOff && landedAt < 0 && wasAir && g.skier.grounded) landedAt = time;
-    steps.push({ time, game: structuredClone(g), cut });
+    steps.push({ time, game: structuredClone(g), cut: move === 'respawn', move });
     if (landedAt >= 0 && time - landedAt >= after) break;
   }
   return { g, landedAt, steps };
@@ -71,7 +71,7 @@ describe('fall', () => {
     expect(s.x).toBe(0);
     expect(s.grounded).toBe(true);
     expect(s.y).toBeCloseTo(heightAt(s.x, s.z), 6);
-    expect(speedOf(s)).toBeCloseTo(CONFIG.fallRespawnSpeed, 3);
+    expect(speedOf(s)).toBeCloseTo(CONFIG.fallRespawnSpeed[1], 3);
     expect(cut.game.fall.respawnZ).toBe(s.z);
   });
 
@@ -168,7 +168,7 @@ describe('fall', () => {
     const trail = createTrail();
     for (const f of steps) {
       const s = f.game.skier;
-      trail.update(s.x, s.y, s.z, s.heading, skisOnSnow(f.game), f.cut);
+      trail.update(s.x, s.y, s.z, s.heading, skisOnSnow(f.game), f.move);
     }
     const pts = trail.points();
     for (let i = 1; i < pts.length; i++) {
@@ -261,37 +261,146 @@ describe('slurvete og ren landing', () => {
   });
 });
 
-describe('hvor du settes tilbake', () => {
-  it('før rampen på hoppet du falt på, aldri på en rampe, og på start før det første hoppet', () => {
-    for (const k of PARK.kickers) {
-      for (const fallZ of [k.z + 20, k.z + 60]) {
-        const spot = respawnSpot(fallZ);
-        expect(spot.z).toBeLessThan(k.z - rampLength(k));
-        for (const other of PARK.kickers) {
-          const onRamp = spot.z > other.z - rampLength(other) - 5 && spot.z < other.z + 2;
-          expect(onRamp).toBe(false);
-        }
-      }
+/** Kjører rett ned fra en tilstand uten taster og logger hvert hopp: kant-z, fart på kanten, landingsvinkel (grader). */
+function flights(g: Game, untilZ: number) {
+  const out: { z: number; speed: number; angle: number }[] = [];
+  let cur: { z: number; speed: number; angle: number } | null = null;
+  for (let i = 0; i < 60 * CONFIG.physicsHz && g.skier.z < untilZ; i++) {
+    const s = g.skier;
+    const was = s.grounded, vx = s.vx, vy = s.vy, vz = s.vz;
+    stepGame(g, none, false, dt);
+    if (was && !s.grounded) cur = { z: s.z, speed: speedOf(s), angle: 0 };
+    if (!was && s.grounded && cur) {
+      const [nx, ny, nz] = normalAt(s.x, s.z);
+      const v = Math.hypot(vx, vy, vz);
+      cur.angle = Math.asin(Math.max(-1, Math.min(1, -(vx * nx + vy * ny + vz * nz) / v))) / DEG;
+      out.push(cur); cur = null;
     }
-    expect(respawnSpot(100)).toEqual({ x: 0, z: 5 });
+  }
+  return out;
+}
+
+/** Setter en ny runde rett i respawn-øyeblikket for et fall med gitt sted. */
+function respawnAt(fallX: number, fallZ: number, takeoffZ: number): Game {
+  const g = createGame();
+  const spot = respawnSpot(fallX, fallZ, takeoffZ);
+  Object.assign(g.fall, { respawnX: spot.x, respawnZ: spot.z, respawnSpeed: spot.speed, respawned: false, time: CONFIG.fallRespawnAt - dt / 2 });
+  stepGame(g, none, false, dt);
+  return g;
+}
+
+describe('hvor du settes tilbake', () => {
+  const normal = flights(createGame(), PARK.length);
+
+  it('fall på landingen: før rampen på samme hopp, med samme fart på kanten som en vanlig kjøring (innen 3 %) og landing under 10°', () => {
+    expect(CONFIG.fallRespawnBeforeRamp.length).toBe(PARK.kickers.length);
+    expect(CONFIG.fallRespawnSpeed.length).toBe(PARK.kickers.length);
+    PARK.kickers.forEach((k) => {
+      const g = respawnAt(0, k.z + 40, k.z + 0.5);
+      expect(g.skier.z).toBeLessThan(k.z - rampLength(k) - 20);
+      const first = flights(g, k.z + 150)[0];
+      const plain = normal.find((f) => Math.abs(f.z - k.z) < 3)!;
+      // du letter først på kanten av samme hopp (ikke på noe før)
+      expect(Math.abs(first.z - k.z)).toBeLessThan(3);
+      expect(Math.abs(first.speed / plain.speed - 1)).toBeLessThan(0.03);
+      expect(first.angle).toBeLessThan(10);
+    });
   });
 
-  it('fra respawn rekker du å få opp farten: du letter først på kanten av samme hopp, med nesten vanlig lufttid', () => {
-    const normal = [1.18, 1.97, 2.52];
-    PARK.kickers.forEach((k, n) => {
-      const g = createGame();
-      g.fall.respawnZ = respawnSpot(k.z + 30).z;
-      g.fall.time = CONFIG.fallRespawnAt - dt / 2;
-      g.fall.respawned = false;
-      stepGame(g, none, false, dt);
-      let takeoffZ = -1, air = 0;
-      for (let i = 0; i < 20 * CONFIG.physicsHz; i++) {
-        stepGame(g, none, false, dt);
-        if (!g.skier.grounded) { if (takeoffZ < 0) takeoffZ = g.skier.z; air += dt; }
-        else if (takeoffZ >= 0) break;
+  it('andre fall (f.eks. pop på flat bakke): et fast stykke før fallstedet, ikke helt tilbake', () => {
+    const spot = respawnSpot(3, 100, 95);
+    expect(spot).toEqual({ x: 3, z: 100 - CONFIG.fallBackDistance, speed: CONFIG.fallBackSpeed });
+    expect(CONFIG.fallBackDistance).toBeGreaterThanOrEqual(30);
+    expect(CONFIG.fallBackDistance).toBeLessThanOrEqual(40);
+    // før det første hoppet: aldri bak start
+    expect(respawnSpot(0, 20, 15).z).toBe(CONFIG.startZ);
+  });
+
+  it('aldri på en rampe, et platå eller i kanten inn til landingen, uansett hvor du faller', () => {
+    for (let z = 10; z < PARK.length - 50; z += 0.5) {
+      for (const takeoff of [z - 5, z - 40]) {
+        const spot = respawnSpot(0, z, takeoff);
+        for (const k of PARK.kickers) {
+          const inside = spot.z > k.z - rampLength(k) - 5 && spot.z < k.z + k.landingStart + LANDING.knuckle;
+          expect(inside, 'fall z=' + z + ', satt tilbake z=' + spot.z).toBe(false);
+        }
+        expect(spot.z).toBeLessThanOrEqual(z);
+        expect(spot.z).toBeGreaterThanOrEqual(CONFIG.startZ);
       }
-      expect(Math.abs(takeoffZ - k.z)).toBeLessThan(3);
-      expect(air).toBeGreaterThan(normal[n] * 0.75);
-    });
+    }
+  });
+
+  it('pop på flat bakke og fall: satt tilbake ca. 35 m bak, på snøen', () => {
+    const g = createGame();
+    let move: Move = 'none';
+    let fallZ = -1;
+    for (let i = 0; i < 20 * CONFIG.physicsHz && move !== 'respawn'; i++) {
+      const s = g.skier;
+      // lad pop fra z = 80 og slipp ved z = 95, spinn 90° i lufta
+      const pop = s.z > 80 && s.z < 95 && s.grounded && fallZ < 0;
+      const left = 90 * DEG - (g.tricks.spin + spinCoast(g.tricks.spinRate));
+      const steer = !s.grounded && Math.abs(left) > 0.02 ? Math.sign(left) : 0;
+      move = stepGame(g, { ...none, pop, steer }, false, dt);
+      if (isFalling(g.fall) && fallZ < 0) fallZ = g.skier.z;
+    }
+    expect(g.tricks.lastLanding?.quality).toBe('fall');
+    expect(move).toBe('respawn');
+    expect(fallZ - g.skier.z).toBeGreaterThan(CONFIG.fallBackDistance - 1);
+    expect(fallZ - g.skier.z).toBeLessThan(CONFIG.fallBackDistance + 10);
+    expect(g.skier.y).toBeCloseTo(heightAt(g.skier.x, g.skier.z), 6);
+  });
+});
+
+describe('restart og respawn', () => {
+  it('R tømmer skisporet, respawn lar det gamle sporet ligge med et hull', () => {
+    const run = (move: Move) => {
+      const trail = createTrail();
+      for (let z = 5; z < 60; z += 0.3) trail.update(0, 0, z, 0, true);
+      trail.update(0, 0, 50, 0, true, move);
+      return trail.points();
+    };
+    expect(run('restart').length).toBe(1);
+    const kept = run('respawn');
+    expect(kept.length).toBeGreaterThan(100);
+    expect(kept[kept.length - 1].start).toBe(true);
+  });
+
+  it('R gir restart, ikke respawn', () => {
+    const g = createGame();
+    for (let i = 0; i < 240; i++) stepGame(g, none, false, dt);
+    expect(stepGame(g, none, true, dt)).toBe('restart');
+    expect(g.skier.z).toBe(CONFIG.startZ);
+  });
+
+  it('R mens skjermen blekner inn igjen etter fallet virker ikke; blekingen fullføres mykt', () => {
+    const { steps } = ride(90, 0.1);
+    const g = steps[steps.length - 1].game;
+    let fade = fadeAmount(g.fall), biggest = 0, restarted = false;
+    for (let i = 0; i < 2 * CONFIG.physicsHz; i++) {
+      if (stepGame(g, none, true, dt) === 'restart') { restarted = true; break; }
+      const f = fadeAmount(g.fall);
+      biggest = Math.max(biggest, Math.abs(f - fade));
+      fade = f;
+    }
+    expect(biggest).toBeLessThan(0.025);
+    // R virker igjen når blekingen er ferdig
+    expect(restarted).toBe(true);
+    expect(fade).toBe(0);
+  });
+});
+
+describe('fallretning', () => {
+  it('velter mot spinnet bare når det går fort nok, ellers mot leningen', () => {
+    const side = (spinRate: number, lean: number) => {
+      const f = createFall(), t = createTricks(), s = createSkier();
+      t.spinRate = spinRate; s.lean = lean;
+      startFall(f, s, t, -99);
+      return f.side;
+    };
+    expect(side(3, -0.2)).toBe(1);
+    expect(side(-3, 0.2)).toBe(-1);
+    expect(side(0.1, -0.2)).toBe(-1);
+    expect(side(-0.1, 0.2)).toBe(1);
+    expect(side(0, 0)).toBe(1);
   });
 });

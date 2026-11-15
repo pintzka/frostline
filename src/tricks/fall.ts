@@ -1,5 +1,5 @@
 import { CONFIG } from '../core/config';
-import { heightAt, normalAt, PARK, rampLength } from '../park/terrain';
+import { heightAt, LANDING, normalAt, PARK, rampLength } from '../park/terrain';
 import { placeSkier, type SkierState } from '../physics/skier';
 import type { TrickState } from './rotation';
 
@@ -19,6 +19,8 @@ export interface FallState {
   /** Hvor du settes tilbake. */
   respawnX: number;
   respawnZ: number;
+  /** Farten du får når du settes tilbake (m/s). */
+  respawnSpeed: number;
   /** Sant når du allerede er satt tilbake i dette fallet. */
   respawned: boolean;
   /** Sekunder siden siste slurvete landing. 99 = lenge siden. */
@@ -31,7 +33,7 @@ const clamp01 = (t: number) => Math.min(1, Math.max(0, t));
 const ease = (t: number) => { const u = clamp01(t); return u * u * (3 - 2 * u); };
 
 export function createFall(): FallState {
-  return { time: 99, side: 1, respawnX: 0, respawnZ: 5, respawned: true, sloppyAge: 99 };
+  return { time: 99, side: 1, respawnX: 0, respawnZ: CONFIG.startZ, respawnSpeed: CONFIG.fallBackSpeed, respawned: true, sloppyAge: 99 };
 }
 
 /** Ligger du i snøen nå (ingen styring, pop eller triks)? */
@@ -44,26 +46,49 @@ export function fallTotalTime(): number {
   return CONFIG.fallRespawnAt + CONFIG.fallFadeTime;
 }
 
-/**
- * Hvor du settes tilbake: et stykke før rampen på det siste hoppet du passerte, midt i hoppet.
- * Langt nok bak til at du rekker å få opp farten før kanten. Har du ikke passert noe hopp: på start.
- */
-export function respawnSpot(fallZ: number): { x: number; z: number } {
-  const behind = PARK.kickers.filter((k) => k.z < fallZ);
-  if (behind.length === 0) return { x: 0, z: 5 };
-  const k = behind[behind.length - 1];
-  return { x: 0, z: Math.max(5, k.z - rampLength(k) - CONFIG.fallRespawnBeforeRamp) };
+/** Er fallet ferdig, også blekingen inn igjen? Før det virker ikke R. */
+export function fallDone(f: FallState): boolean {
+  return f.time >= fallTotalTime();
 }
 
-/** Starter et fall. Kalles i steget du lander. */
-export function startFall(f: FallState, s: SkierState, t: TrickState): void {
+/** Strekningen (z) der et hopp er: fra litt før rampen til der landingen blir bratt. Der settes du aldri. */
+function kickerZone(k: (typeof PARK.kickers)[number]): [number, number] {
+  return [k.z - rampLength(k) - CONFIG.fallRampMargin, k.z + k.landingStart + LANDING.knuckle];
+}
+
+/**
+ * Hvor du settes tilbake.
+ * - Lettet du fra kanten på et hopp og falt på landingen: et fast stykke før rampen på det hoppet,
+ *   med en fart som gir samme fart på kanten som en vanlig kjøring (så du kan prøve trikset igjen).
+ * - Ellers (f.eks. pop på flat bakke): et fast stykke før fallstedet, men aldri på et hopp.
+ */
+export function respawnSpot(fallX: number, fallZ: number, takeoffZ: number): { x: number; z: number; speed: number } {
+  const i = PARK.kickers.findIndex((k) => Math.abs(takeoffZ - k.z) <= CONFIG.fallTakeoffWindow && fallZ > k.z);
+  if (i >= 0) {
+    const k = PARK.kickers[i];
+    return { x: 0, z: Math.max(CONFIG.startZ, k.z - rampLength(k) - CONFIG.fallRespawnBeforeRamp[i]), speed: CONFIG.fallRespawnSpeed[i] };
+  }
+  const half = PARK.width / 2 - 2;
+  const x = Math.max(-half, Math.min(half, fallX));
+  let z = Math.max(CONFIG.startZ, fallZ - CONFIG.fallBackDistance);
+  // havner du på et hopp, flyttes du bakover til før rampen (de bakerste hoppene sjekkes sist)
+  for (let n = PARK.kickers.length - 1; n >= 0; n--) {
+    const k = PARK.kickers[n];
+    const [from, to] = kickerZone(k);
+    if (Math.abs(x) < k.width / 2 + 4 && z > from && z < to) z = Math.max(CONFIG.startZ, from);
+  }
+  return { x, z, speed: CONFIG.fallBackSpeed };
+}
+
+/** Starter et fall. Kalles i steget du lander. takeoffZ = der du lettet. */
+export function startFall(f: FallState, s: SkierState, t: TrickState, takeoffZ: number): void {
   f.time = 0;
   f.respawned = false;
   // velt mot den siden du snurret mot, ellers mot den siden du lente
-  const lean = t.spinRate !== 0 ? t.spinRate : s.lean;
-  f.side = lean < 0 ? -1 : 1;
-  const spot = respawnSpot(s.z);
-  f.respawnX = spot.x; f.respawnZ = spot.z;
+  if (Math.abs(t.spinRate) > CONFIG.fallSpinSideMin) f.side = Math.sign(t.spinRate);
+  else f.side = s.lean < 0 ? -1 : 1;
+  const spot = respawnSpot(s.x, s.z, takeoffZ);
+  f.respawnX = spot.x; f.respawnZ = spot.z; f.respawnSpeed = spot.speed;
   // kroppen vrir seg mykt tilbake til å se framover (ikke baklengs), så du står riktig når du settes tilbake
   t.spinTarget = Math.round(t.spin / TURN) * TURN;
   t.flipTarget = Math.round(t.flip / TURN) * TURN;
@@ -85,7 +110,7 @@ function slide(s: SkierState, dt: number): void {
   s.vx -= vn * nx; s.vy -= vn * ny; s.vz -= vn * nz;
   s.grounded = true;
   // kanten og leningen slippes mykt
-  const fade = Math.exp(-8 * dt);
+  const fade = Math.exp(-CONFIG.fallLetGo * dt);
   s.edge *= fade; s.lean *= fade; s.leanRate *= fade;
   s.popCharge = 0;
   s.sinceLanding += dt; s.popAge += dt;
@@ -100,7 +125,7 @@ export function stepFall(f: FallState, s: SkierState, dt: number): boolean {
   f.time += dt;
   if (!f.respawned && f.time >= CONFIG.fallRespawnAt) {
     f.respawned = true;
-    placeSkier(s, f.respawnX, f.respawnZ, CONFIG.fallRespawnSpeed);
+    placeSkier(s, f.respawnX, f.respawnZ, f.respawnSpeed);
     return true;
   }
   if (!f.respawned) slide(s, dt);
@@ -132,14 +157,14 @@ export function fallBody(f: FallState): { roll: number; drop: number; pitch: num
   const roll = f.side * CONFIG.fallRoll * down;
   // midten av kroppen (der den roterer) synker ned til den ligger på snøen
   const drop = (CONFIG.trickPivotHeight - CONFIG.fallLieHeight) * (1 - Math.cos(roll));
-  return { roll, drop, pitch: 0.35 * down };
+  return { roll, drop, pitch: CONFIG.fallPitch * down };
 }
 
 /** Kroppen vakler etter en slurvete landing: starter i ro, svinger fra side til side og dør ut. */
 export function landingWobble(f: FallState): { roll: number; pitch: number } {
   const t = f.sloppyAge;
-  if (t > 2) return { roll: 0, pitch: 0 };
-  const env = CONFIG.sloppyWobble * Math.exp(-t / CONFIG.sloppyWobbleDecay) * ease(t / 0.06);
+  if (t > CONFIG.sloppyWobbleEnd) return { roll: 0, pitch: 0 };
+  const env = CONFIG.sloppyWobble * Math.exp(-t / CONFIG.sloppyWobbleDecay) * ease(t / CONFIG.sloppyWobbleRampIn);
   const w = 2 * Math.PI * CONFIG.sloppyWobbleHz;
-  return { roll: env * Math.sin(w * t), pitch: 0.5 * env * Math.sin(w * t * 0.5) };
+  return { roll: env * Math.sin(w * t), pitch: CONFIG.sloppyWobblePitch * env * Math.sin(w * t * 0.5) };
 }
