@@ -127,6 +127,25 @@ export function touchSteer(anchor: number, x: number, radius = CONFIG.touchSteer
   return { steer: shapeAxis(raw, CONFIG.touchDeadzone, 1, CONFIG.touchCurve), anchor };
 }
 
+/**
+ * Tommel opp/ned → flip. `dy` er hvor langt tommelen er fra midtpunktet i høyden (skjermen teller
+ * nedover, så opp er minus). Gir 1 (frontflip, opp), -1 (backflip, ned) eller 0.
+ * Et nytt flip krever `threshold`; et flip som allerede er i gang, holder til tommelen er
+ * nærmere enn `release` (så det ikke blinker av og på rett ved terskelen).
+ */
+export function touchFlip(prev: number, dy: number, threshold = CONFIG.touchFlipThreshold, release = CONFIG.touchFlipRelease): number {
+  const dir = dy < 0 ? 1 : dy > 0 ? -1 : 0;
+  if (Math.abs(dy) >= threshold) return dir;
+  if (prev !== 0 && dir === prev && Math.abs(dy) >= release) return prev;
+  return 0;
+}
+
+/** Grab-knappene på mobil (Nordlys, Isbit, Snøugle) → grab. Holder du flere, vinner den første, som J før K før L. */
+export function pickGrab(down: readonly boolean[]): 0 | 1 | 2 | 3 {
+  const i = down.slice(0, 3).indexOf(true);
+  return (i + 1) as 0 | 1 | 2 | 3;
+}
+
 /** Er berøringen på venstre side av skjermen, der tommelen styrer? */
 export function isSteerZone(x: number, width: number): boolean {
   return x < width / 2;
@@ -174,15 +193,19 @@ export function padInUse(p: PadInput): boolean {
  * Holder styr på fingrene på venstre side. Den første styrer. Løfter du den mens en annen
  * finger ligger på venstre side, tar den andre over, med nytt midtpunkt der den er, så det
  * ikke hopper.
+ * Styrefingeren gir også flip: dra den tydelig opp eller ned (se touchFlip og CONFIG.touchFlip...).
+ * Kall tick(dt) hvert bilde, så midtpunktet i høyden sakte følger en tommel som glir.
  */
 export function createSteerTouches(radius = CONFIG.touchSteerRadius) {
   const fingers = new Map<number, { x: number; y: number }>(); // alle fingre som startet på venstre side
-  let id = -1, anchor = 0, value = 0;
+  let id = -1, anchor = 0, anchorY = 0, value = 0, flip = 0;
   const take = (newId: number) => {
     const f = fingers.get(newId)!;
     id = newId;
     anchor = f.x;
+    anchorY = f.y;
     value = 0;
+    flip = 0;
   };
   return {
     /** Gir true hvis fingeren ble en styrefinger (eller venter på å bli det). */
@@ -200,21 +223,36 @@ export function createSteerTouches(radius = CONFIG.touchSteerRadius) {
       const r = touchSteer(anchor, x, radius);
       anchor = r.anchor;
       value = r.steer;
+      // i høyden: midtpunktet henger etter i et bånd, så du kan snu flippen uten å dra hele veien tilbake
+      const leash = CONFIG.touchFlipLeash;
+      if (y - anchorY > leash) anchorY = y - leash;
+      else if (anchorY - y > leash) anchorY = y + leash;
+      flip = touchFlip(flip, y - anchorY);
+    },
+    /** Hvert bilde: uten flip glir midtpunktet i høyden sakte etter tommelen, så langsom drift aldri blir flip. */
+    tick(dt: number) {
+      if (id < 0 || flip !== 0) return;
+      const y = fingers.get(id)!.y;
+      const step = CONFIG.touchFlipRecenter * dt;
+      anchorY += Math.max(-step, Math.min(step, y - anchorY));
     },
     up(pid: number) {
       if (!fingers.delete(pid) || pid !== id) return;
       id = -1;
       value = 0;
+      flip = 0;
       const next = fingers.keys().next();
       if (!next.done) take(next.value);
     },
-    clear() { fingers.clear(); id = -1; value = 0; },
+    clear() { fingers.clear(); id = -1; value = 0; flip = 0; },
     value() { return value; },
+    /** 1 = frontflip (dratt opp), -1 = backflip (dratt ned), 0 = ingen. */
+    flip() { return flip; },
     /** Hvor ringen og prikken skal tegnes, eller null hvis ingen styrer. */
     view() {
       if (id < 0) return null;
       const f = fingers.get(id)!;
-      return { anchorX: anchor, y: f.y, x: f.x, radius };
+      return { anchorX: anchor, y: f.y, x: f.x, radius, flip };
     },
   };
 }

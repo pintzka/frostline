@@ -314,6 +314,6 @@ describe('kvalitetsrettinger', () => {
   });
 
   it('knappene dekker ikke styresonen, heller ikke på smal telefon', () => {
-    for (const w of [320, 360, 375, 414, 800]) expect(buttonsLeftEdge(w)).toBeGreaterThan(w / 2);
+    for (const w of [320, 360, 375, 414, 568, 667, 800, 932]) expect(buttonsLeftEdge(w)).toBeGreaterThan(w / 2);
   });
 });

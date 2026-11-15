@@ -58,6 +58,12 @@ Slipp grabben før du lander: holder du fortsatt en grab som teller når skiene 
 | J | Nordlys | høyre hånd fram til skituppene |
 | K | Isbit | begge hender ned til midten av skiene |
 | L | Snøugle | venstre hånd bak til skihælene |
+
+## Mobil
+- Venstre tommel (venstre halvdel av skjermen): dra sidelengs for å styre, i lufta spinner det.
+- I lufta: dra tommelen tydelig opp (frontflip) eller ned (backflip), minst 50 px (`touchFlipThreshold`). Flippen holder til tommelen er under 30 px fra midten (`touchFlipRelease`).
+- En tommel som sakte glir opp eller ned mens du styrer gir aldri flip: midtpunktet følger etter med 30 px/s (`touchFlipRecenter`). Er tommelen dratt opp/ned når du letter, sperres flippen til du drar på nytt.
+- Høyre side: POP (hold og slipp), BREMS (hold), og tre grab-knapper NORDLYS / ISBIT / SNØUGLE (hold, som J / K / L). Liggende telefon: grabbene står til venstre for POP. Stående: over BREMS. Ingen knapp dekker venstre halvdel.
 ## Landing og fall (fase 2)
 | Landing | Hva skjer |
 |---|---|
