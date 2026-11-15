@@ -1,6 +1,6 @@
 import type { SkierInput } from '../physics/skier';
 import { CONFIG } from '../core/config';
-import { isSteerZone, mergeSteer, readPad, touchSteer, type PadInput } from './logic';
+import { createEdge, isSteerZone, mergeSteer, readPad, touchSteer, type PadInput } from './logic';
 
 /**
  * Tastatur, gamepad og berøring. Arbeidsstrøm 2 (Kamera og input) eier denne fila.
@@ -24,8 +24,12 @@ const NO_PAD: PadInput = { steer: 0, brake: 0, pop: false, restart: false, pause
 export function createInput(target: HTMLElement, touch?: TouchSurface) {
   const keys = new Set<string>();
   let device: InputDevice = 'keyboard';
+  // restart skjer én gang per trykk; settes her og hentes av spillet med takeRestart()
+  let restartPending = false;
   addEventListener('keydown', (e) => {
     keys.add(e.code);
+    // tasten gjentar seg selv når den holdes; bare det første trykket teller
+    if (e.code === 'KeyR' && !e.repeat) restartPending = true;
     device = 'keyboard';
     // mellomrom skal lade pop, ikke rulle siden
     if (e.code === 'Space') e.preventDefault();
@@ -91,7 +95,8 @@ export function createInput(target: HTMLElement, touch?: TouchSurface) {
 
   // --- gamepad: leses hvert skjermbilde i egen løkke, så Start virker selv om spillet står på pause ---
   let pad: PadInput = NO_PAD;
-  let pauseWasDown = false;
+  const pauseEdge = createEdge();
+  const restartEdge = createEdge();
   const pauseListeners: (() => void)[] = [];
   function pollPads() {
     let next: PadInput = NO_PAD;
@@ -108,8 +113,8 @@ export function createInput(target: HTMLElement, touch?: TouchSurface) {
     }
     if (next.steer !== 0 || next.brake > 0 || next.pop || next.restart || next.pause) device = 'gamepad';
     // pause sendes én gang per trykk, ikke hele tiden mens knappen holdes
-    if (next.pause && !pauseWasDown) for (const fn of pauseListeners) fn();
-    pauseWasDown = next.pause;
+    if (pauseEdge(next.pause)) for (const fn of pauseListeners) fn();
+    if (restartEdge(next.restart)) restartPending = true;
     pad = next;
 
     const stick = steerId >= 0 ? { anchorX, y: steerY, x: steerX, radius: CONFIG.touchSteerRadius } : null;
@@ -133,8 +138,12 @@ export function createInput(target: HTMLElement, touch?: TouchSurface) {
       state.pop = keys.has('Space') || pad.pop || popFingers.size > 0;
       return state;
     },
-    /** R på tastaturet, eller Y/Back på gamepad. */
-    restart(): boolean { return keys.has('KeyR') || pad.restart; },
+    /** Ble R (eller Y/Back på gamepad) trykket siden sist? Gir true én gang per trykk. */
+    takeRestart(): boolean {
+      const r = restartPending;
+      restartPending = false;
+      return r;
+    },
     /** Kalles én gang hver gang Start trykkes på en gamepad. Selve pausen bygges et annet sted. */
     onPause(fn: () => void) { pauseListeners.push(fn); },
     /** Hva ble sist brukt, så hjelpeteksten kan vise riktige knapper. */

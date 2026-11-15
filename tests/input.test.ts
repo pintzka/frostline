@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CONFIG } from '../src/core/config';
-import { isSteerZone, mergeSteer, PAD, readPad, shapeAxis, shapeTrigger, touchSteer, type PadButton } from '../src/input/logic';
+import { createEdge, isSteerZone, mergeSteer, PAD, readPad, shapeAxis, shapeTrigger, touchSteer, type PadButton } from '../src/input/logic';
 
 const dz = CONFIG.padDeadzone, outer = CONFIG.padOuterEdge, curve = CONFIG.padCurve;
 
@@ -159,5 +159,28 @@ describe('tommel-styring', () => {
   it('venstre halvdel av skjermen styrer', () => {
     expect(isSteerZone(100, 800)).toBe(true);
     expect(isSteerZone(500, 800)).toBe(false);
+  });
+});
+
+describe('restart og pause skjer én gang per trykk', () => {
+  it('å holde knappen inne gir bare én restart', () => {
+    const edge = createEdge();
+    let restarts = 0;
+    // knappen holdes i 2 sekunder (240 steg i sekundet)
+    for (let i = 0; i < 480; i++) if (edge(true)) restarts++;
+    expect(restarts).toBe(1);
+  });
+
+  it('slipp og trykk igjen gir en ny restart', () => {
+    const edge = createEdge();
+    const presses = [false, true, true, false, false, true, true, true, false].filter((d) => edge(d)).length;
+    expect(presses).toBe(2);
+  });
+
+  it('gamepad: Y holdt inne over mange bilder gir én restart', () => {
+    const edge = createEdge();
+    let restarts = 0;
+    for (let i = 0; i < 120; i++) if (edge(readPad([0, 0], buttons({ [PAD.Y]: 1 })).restart)) restarts++;
+    expect(restarts).toBe(1);
   });
 });

@@ -40,7 +40,7 @@ const loop = createLoop({
   hz: CONFIG.physicsHz,
   step(dt) {
     // R (eller Y på gamepad), eller slutten av bakken: ny runde med en gang
-    if (input.restart() || reachedEnd(skier)) { skier = createSkier(); }
+    if (input.takeRestart() || reachedEnd(skier)) { skier = createSkier(); }
     prev = { ...skier };
     stepSkier(skier, input.read(), dt);
   },

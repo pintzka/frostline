@@ -92,3 +92,16 @@ export function touchSteer(anchor: number, x: number, radius = CONFIG.touchSteer
 export function isSteerZone(x: number, width: number): boolean {
   return x < width / 2;
 }
+
+/**
+ * Gjør "knappen er nede" om til "knappen ble trykket nå": gir true bare i det første
+ * øyeblikket knappen går ned, ikke hele tiden mens den holdes.
+ */
+export function createEdge() {
+  let wasDown = false;
+  return (down: boolean): boolean => {
+    const pressed = down && !wasDown;
+    wasDown = down;
+    return pressed;
+  };
+}
