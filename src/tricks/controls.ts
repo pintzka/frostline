@@ -52,13 +52,21 @@ export function resetLatch(latch: ControlLatch): void {
   Object.assign(latch, createLatch());
 }
 
+/**
+ * Er tasten/stikka sluppet eller flyttet siden den ble sperret? Analog styring skjelver litt hele tiden,
+ * så den må flyttes mer enn latchRelease, bytte retning eller slippes helt for å telle som et nytt trykk.
+ */
+export function movedFrom(raw: number, block: number): boolean {
+  return Math.sign(raw) !== Math.sign(block) || Math.abs(raw - block) > CONFIG.latchRelease;
+}
+
 export function splitControls(raw: RawControls, grounded: boolean, latch: ControlLatch, dt: number): { skier: SkierInput; spin: number; flip: number; grab: GrabKind } {
   if (!grounded) {
     // akkurat lettet: tastene som allerede ble holdt på bakken, teller ikke som triks
     if (latch.wasGrounded) { latch.spinBlock = latch.groundSteer; latch.flipBlock = latch.groundFlip; }
     latch.wasGrounded = false;
-    if (raw.steer !== latch.spinBlock) latch.spinBlock = 0;
-    if (raw.flip !== latch.flipBlock) latch.flipBlock = 0;
+    if (movedFrom(raw.steer, latch.spinBlock)) latch.spinBlock = 0;
+    if (movedFrom(raw.flip, latch.flipBlock)) latch.flipBlock = 0;
     const spin = latch.spinBlock !== 0 ? 0 : raw.steer;
     const flip = latch.flipBlock !== 0 ? 0 : raw.flip;
     latch.lastSpin = spin; latch.lastFlip = flip;
@@ -76,7 +84,7 @@ export function splitControls(raw: RawControls, grounded: boolean, latch: Contro
   latch.groundFlip = raw.flip;
   latch.sinceLanding += dt;
   const timeUp = latch.sinceLanding >= CONFIG.landKeyLock;
-  if (timeUp || raw.steer !== latch.steerBlock) latch.steerBlock = 0;
+  if (timeUp || movedFrom(raw.steer, latch.steerBlock)) latch.steerBlock = 0;
   if (timeUp || raw.brake === 0) latch.brakeBlock = false;
   return {
     skier: { steer: latch.steerBlock !== 0 ? 0 : raw.steer, brake: latch.brakeBlock ? 0 : raw.brake, pop: raw.pop },

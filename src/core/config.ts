@@ -126,6 +126,8 @@ export const CONFIG = {
   landGripTime: 0.1,
   /** Holder du spinn- eller backflip-tasten når du lander, styrer/bremser den ikke før etter så mange sekunder (eller du slipper). */
   landKeyLock: 0.25,
+  /** Sperret styring (fra avsats eller landing) slippes når stikka flyttes mer enn dette (0–1), bytter retning eller slippes. Tåler skjelving i analog styring. */
+  latchRelease: 0.25,
   /** Skiløperen roterer rundt dette punktet (m over føttene), ca. midt på kroppen. */
   trickPivotHeight: 1.0,
   /** Sekunder triksnavnet og poengene vises etter landing. */
