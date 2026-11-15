@@ -331,6 +331,38 @@ export const CONFIG = {
     land: { radius: [0.2, 0.8], up: [0.5, 2.5], throwMul: [0.4, 1.2] },
     pop: { along: [0.4, 1.0], side: 0.3, up: [0.3, 1.3], throwMul: [0.5, 1.3], jitter: 1 },
   },
+  /**
+   * Gamepad: stikka gjør ingenting innenfor dødsonen (så den ikke "kryper"), og gir fullt utslag
+   * allerede ved padOuterEdge (stikker når sjelden helt ut). padCurve > 1 gjør små utslag ekstra
+   * fine, så du kan legge inn en slak sving uten å vri hardt.
+   */
+  padDeadzone: 0.15,
+  padOuterEdge: 0.95,
+  padCurve: 1.5,
+  /**
+   * Skrå stikke: er stikka minst så mye sidelengs (andel av utslaget), gir den full sving.
+   * 0,7 ≈ 45°, så en skrå stikke svinger like hardt som en rett til siden.
+   */
+  padSideFull: 0.7,
+  /** Stikka må skyves så langt opp eller ned (0–1) før den gir flip i lufta. */
+  padFlipThreshold: 0.6,
+  /** Gamepaden regnes som "i bruk" (for hjelpeteksten) først ved så stor styring eller brems, så drift ikke teller. */
+  padActiveSteer: 0.3,
+  padActiveBrake: 0.5,
+  /** Venstre trigger (brems) gjør ingenting under dette, så en hvilende finger ikke bremser. */
+  triggerDeadzone: 0.06,
+  /**
+   * Mobil: dra tommelen så mange CSS-piksler sidelengs fra der du satte den ned for full sving.
+   * Drar du lenger, følger midtpunktet etter, så du kan snu retning med en gang.
+   */
+  touchSteerRadius: 60,
+  touchDeadzone: 0.06,
+  touchCurve: 1.3,
+  /**
+   * Brukes flere styringer samtidig (tastatur, gamepad, berøring), vinner den med størst utslag.
+   * Den som styrer nå, beholder styringen til en annen er så mye større, så det ikke hopper fram og tilbake.
+   */
+  inputMergeMargin: 0.1,
 } as const;
 
 export type Config = typeof CONFIG;

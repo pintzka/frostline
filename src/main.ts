@@ -6,6 +6,7 @@ import { createInput } from './input/input';
 import { createChaseCamera } from './camera/chase';
 import { createScene } from './render/scene';
 import { createHud } from './ui/hud';
+import { createTouchControls } from './ui/touchControls';
 import { createPlaceholderSkier } from './character/placeholder';
 import { heightAt, normalAt } from './park/terrain';
 import { poseFor, smoothPose } from './character/pose';
@@ -21,8 +22,8 @@ const root = document.getElementById('app')!;
 const { renderer, scene, env, sunFollow } = createScene(root);
 const chase = createChaseCamera(innerWidth / innerHeight);
 addEventListener('resize', () => chase.resize(innerWidth / innerHeight));
-const input = createInput(renderer.domElement);
 const hud = createHud(root);
+const input = createInput(renderer.domElement, createTouchControls(root));
 const audio = createAudio();
 
 const skierModel = createPlaceholderSkier();
@@ -55,8 +56,8 @@ const loop = createLoop({
   step(dt) {
     prev = { ...game.skier };
     prevTricks = { ...game.tricks };
-    // taster, fysikk, triks og fall (se core/game.ts). Flyttet skiløperen seg langt, jevnes det ikke ut.
-    const m = stepGame(game, input.read(), input.pressed('KeyR'), dt);
+    // taster (R eller Y på gamepad = ny runde), fysikk, triks og fall (se core/game.ts). Flyttet skiløperen seg langt, jevnes det ikke ut.
+    const m = stepGame(game, input.read(), input.takeRestart(), dt);
     if (m !== 'none') {
       // ny runde viktigst: den nullstiller også kroppsstillingen
       if (moved !== 'restart') moved = m;
@@ -116,7 +117,7 @@ const loop = createLoop({
       speed: v, distance: skier.z - startZ, airTime: skier.airTime, inAir: !skier.grounded,
       popCharge: skier.popCharge, lastPop: skier.lastPop, popAge: skier.popAge,
       landing: tricks.lastLanding, landingAge: tricks.landingAge, fade: fadeAmount(fall),
-      score: game.score, best: game.best, grab: tricks.grabs.held, grabTime: tricks.grabs.holdTime,
+      score: game.score, best: game.best, controls: input.device(), grab: tricks.grabs.held, grabTime: tricks.grabs.holdTime,
     }, frameDt);
     moved = 'none';
     env.follow(chase.camera.position, performance.now() / 1000);

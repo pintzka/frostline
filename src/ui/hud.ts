@@ -29,6 +29,8 @@ export interface HudInfo {
   /** grabben du holder nå i lufta, og hvor lenge */
   grab: GrabKind;
   grabTime: number;
+  /** hva spilleren styrer med nå, så hjelpeteksten viser riktige knapper */
+  controls?: 'keyboard' | 'gamepad' | 'touch';
   /** Hvor mye skjermen er bleket etter et fall (0–1). */
   fade: number;
 }
@@ -91,6 +93,12 @@ export function countUp(shown: number, total: number, dt: number): number {
   const next = shown + (total - shown) * (1 - Math.exp(-CONFIG.hudCountUp * dt));
   return total - next < 1 ? total : next;
 }
+
+const HELP = {
+  keyboard: 'Styr: ← → / A D · Brems: ↓ / S · Pop: hold og slipp mellomrom · I lufta: ← → spinn, ↑ / W frontflip, ↓ / S backflip, hold J / K / L grab · Start på nytt: R',
+  gamepad: 'Styr: venstre stikke · Brems: LT / B · Pop: hold og slipp A · I lufta: stikke sidelengs spinn, opp/ned flip, hold X / RB / LB grab · Start på nytt: Y',
+  touch: 'Styr: dra tommelen sidelengs på venstre side · POP: hold og slipp · BREMS: hold · I lufta: dra sidelengs for å spinne',
+} as const;
 
 export function createHud(root: HTMLElement) {
   // myk bleking over spillet etter et fall; lagt først, så teksten ligger oppå
@@ -155,13 +163,21 @@ export function createHud(root: HTMLElement) {
 
   const help = document.createElement('div');
   help.style.cssText = 'position:fixed;left:16px;bottom:16px;color:#fffc;font:14px system-ui,sans-serif;pointer-events:none;';
-  help.textContent = 'Styr: ← → / A D · Brems: ↓ / S · Pop: hold og slipp mellomrom · I lufta: ← → spinn, ↑ / W frontflip, ↓ / S backflip, hold J / K / L grab · Start på nytt: R · Mobil: trykk venstre/høyre';
   root.appendChild(help);
+  let shownHelp = '';
 
   let shown = 0;
   return {
     /** dt = sekunder siden forrige bilde */
     update(h: HudInfo, dt: number) {
+      // bytter bare tekst når du bytter kontroller, ikke hvert bilde
+      const helpText = HELP[h.controls ?? 'keyboard'];
+      if (helpText !== shownHelp) {
+        help.textContent = shownHelp = helpText;
+        // på mobil skal teksten ikke gå inn under knappene nede til høyre
+        help.style.maxWidth = h.controls === 'touch' ? 'calc(100vw - 150px)' : '';
+      }
+
       fade.style.opacity = h.fade.toFixed(3);
       shown = smoothSpeed(shown, h.speed, dt);
       let text = `${Math.round(shown * 3.6)} km/t · ${Math.round(h.distance)} m`;
