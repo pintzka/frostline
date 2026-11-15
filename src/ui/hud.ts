@@ -100,11 +100,15 @@ const HELP = {
   touch: 'Styr: dra tommelen sidelengs på venstre side · POP: hold og slipp · BREMS: hold · I lufta: dra sidelengs for å spinne',
 } as const;
 
-export function createHud(root: HTMLElement) {
+export function createHud(parent: HTMLElement) {
   // myk bleking over spillet etter et fall; lagt først, så teksten ligger oppå
   const fade = document.createElement('div');
   fade.style.cssText = 'position:fixed;inset:0;background:#eef3f8;pointer-events:none;opacity:0;';
-  root.appendChild(fade);
+  parent.appendChild(fade);
+  // alt annet i HUD-en ligger i én boks, så hele HUD-en kan blekne bort bak start- og resultatskjermen
+  const root = document.createElement('div');
+  root.style.cssText = 'position:fixed;inset:0;pointer-events:none;';
+  parent.appendChild(root);
 
   const el = document.createElement('div');
   el.style.cssText = 'position:fixed;left:16px;top:16px;color:#fff;font:600 18px/1.3 system-ui,sans-serif;text-shadow:0 1px 3px #0008;pointer-events:none;';
@@ -168,6 +172,8 @@ export function createHud(root: HTMLElement) {
 
   let shown = 0;
   return {
+    /** 0 = skjult, 1 = synlig */
+    setOpacity(o: number) { root.style.opacity = String(o); },
     /** dt = sekunder siden forrige bilde */
     update(h: HudInfo, dt: number) {
       // bytter bare tekst når du bytter kontroller, ikke hvert bilde

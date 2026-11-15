@@ -1,22 +1,19 @@
-import * as THREE from 'three';
 import { CONFIG } from './core/config';
 import { createLoop } from './core/loop';
+import { skisOnSnow, type Move } from './core/game';
 import { speedOf } from './physics/skier';
 import { createInput } from './input/input';
 import { createChaseCamera } from './camera/chase';
 import { createScene } from './render/scene';
+import { createSkiTrails } from './render/trailMesh';
+import { createSnowSpray } from './render/sprayMesh';
+import { createSkierView } from './character/view';
+import { fadeAmount } from './tricks/fall';
 import { createHud } from './ui/hud';
 import { createTouchControls } from './ui/touchControls';
 import { createPauseUi } from './ui/pause';
-import { createPlaceholderSkier } from './character/placeholder';
-import { heightAt, normalAt } from './park/terrain';
-import { poseFor, smoothPose } from './character/pose';
-import { createTilt, stepTilt } from './character/tilt';
-import { createSkiTrails } from './render/trailMesh';
-import { createGame, skisOnSnow, stepGame, type Move } from './core/game';
-import { fadeAmount, fallBody, landingWobble } from './tricks/fall';
-import { isSwitch } from './tricks/rotation';
-import { createSnowSpray } from './render/sprayMesh';
+import { createMenu } from './ui/menu';
+import { createGame, stepGame } from './ui/flow';
 import { createAudio } from './audio/engine';
 
 const root = document.getElementById('app')!;
@@ -25,14 +22,14 @@ const chase = createChaseCamera(innerWidth / innerHeight);
 addEventListener('resize', () => chase.resize(innerWidth / innerHeight));
 const hud = createHud(root);
 const input = createInput(renderer.domElement, createTouchControls(root));
+const menu = createMenu(root);
 const audio = createAudio();
 
-const skierModel = createPlaceholderSkier();
-const mesh = skierModel.root;
-scene.add(mesh);
+const view = createSkierView(scene);
 const trails = createSkiTrails(scene);
 const spray = createSnowSpray(scene);
 
+// startskjerm → kjører → resultat (ui/flow.ts); selve kjøringen, fall og poeng er core/game.ts
 const game = createGame();
 let prev = { ...game.skier };
 let prevTricks = { ...game.tricks };
@@ -40,86 +37,44 @@ let prevTricks = { ...game.tricks };
 let moved: Move = 'restart';
 const startZ = game.skier.z;
 
-const target = new THREE.Vector3();
-const up = new THREE.Vector3(0, 1, 0);
-const tilt = createTilt();
-const q = new THREE.Quaternion();
-const qYaw = new THREE.Quaternion();
-const Y = new THREE.Vector3(0, 1, 0);
-const standingPose = () => {
-  const p = poseFor({ grounded: true, popCharge: 0, airTime: 0, heightAboveSnow: 0, sinceLanding: 99 });
-  return smoothPose(p, p, 0);
-};
-let pose = standingPose();
-
 const loop = createLoop({
   hz: CONFIG.physicsHz,
   step(dt) {
     prev = { ...game.skier };
     prevTricks = { ...game.tricks };
-    // taster (R eller Y på gamepad = ny runde), fysikk, triks og fall (se core/game.ts). Flyttet skiløperen seg langt, jevnes det ikke ut.
-    const m = stepGame(game, input.read(), input.takeRestart(), dt);
+    // R (eller Y på gamepad) gir ny runde med en gang; mellomrom eller klikk starter fra start- og resultatskjermen
+    const ev = stepGame(game, { raw: input.read(), click: menu.takeClick(), restart: input.takeRestart() }, dt);
+    if (ev) menu.onEvent(ev, game);
+    const m = game.flow.move;
     if (m !== 'none') {
-      // ny runde viktigst: den nullstiller også kroppsstillingen
+      // flyttet langt: ingen utjevning mellom gammel og ny plass. Ny runde er viktigst (den tømmer også sporet)
       if (moved !== 'restart') moved = m;
       prev = { ...game.skier };
       prevTricks = { ...game.tricks };
+      view.moved(m);
+      // lyden dukkes kort, så den ikke hopper
+      audio.newRun();
     }
-    // flyttet (ny runde eller respawn): kroppen står rett på snøen med en gang, uten å tippe dit
-    if (m !== 'none') Object.assign(tilt, createTilt());
-    if (m === 'restart') pose = standingPose();
-    // lyden dukkes kort når du flyttes, så den ikke hopper (ny runde eller satt tilbake etter fall)
-    if (m !== 'none') audio.newRun();
     // prev er satt på nytt etter en flytting, så det ikke høres ut som en landing
     audio.step(prev, game.skier, { steer: 0, brake: game.skier.brake, pop: false });
   },
   render(alpha, frameDt) {
-    const { skier, tricks, fall } = game;
-    target.set(
-      prev.x + (skier.x - prev.x) * alpha,
-      prev.y + (skier.y - prev.y) * alpha,
-      prev.z + (skier.z - prev.z) * alpha,
-    );
-    mesh.position.copy(target);
-    // vinkelrett på snøen på bakken, rett opp høyt i lufta, og tipper mykt mot snøen før landing
-    const snowY = heightAt(target.x, target.z);
-    const [ux, uy, uz] = stepTilt(tilt, { grounded: skier.grounded, heightAboveSnow: target.y - snowY, vy: skier.vy, normal: normalAt(target.x, target.z) }, frameDt);
-    q.setFromUnitVectors(Y, up.set(ux, uy, uz));
-    // retningen jevnes ut mellom fysikkstegene, som posisjonen, så svingene ikke rister
-    const heading = prev.heading + (skier.heading - prev.heading) * alpha;
-    qYaw.setFromAxisAngle(Y, heading);
-    mesh.quaternion.copy(q).multiply(qYaw);
-    // spinn og flip jevnes ut mellom stegene; kameraet får dem ikke, så det snurrer ikke med
-    const spin = prevTricks.spin + (tricks.spin - prevTricks.spin) * alpha;
-    // fall: kroppen velter og synker ned i snøen; slurvete landing: kroppen vakler litt
-    const body = fallBody(fall), wobble = landingWobble(fall);
-    skierModel.setTrick(spin, prevTricks.flip + (tricks.flip - prevTricks.flip) * alpha, body.roll);
-    skierModel.setFallDrop(body.drop);
-    // leningen er i kroppens retning: kjører du baklengs (switch), må den snus for å lene inn i svingen
-    // Bruker stillingen du sto i (ikke spinnet underveis), så leningen ikke svaier mens du spinner
-    skierModel.setLean((prev.lean + (skier.lean - prev.lean) * alpha) * (isSwitch(tricks) ? -1 : 1) + wobble.roll);
-    // kroppen glir mellom stillingene, så avspark og landing ikke rykker
-    pose = smoothPose(pose, poseFor({
-      grounded: skier.grounded, popCharge: skier.popCharge, airTime: skier.airTime,
-      heightAboveSnow: target.y - snowY, sinceLanding: skier.sinceLanding,
-    }), frameDt);
-    skierModel.setGrab(tricks.grabs.blend, pose.skiLift);
-    skierModel.setPose({ ...pose, pitch: pose.pitch + body.pitch + wobble.pitch });
-    trails.update(target.x, target.y, target.z, heading, skisOnSnow(game), moved);
-    const [snx, sny, snz] = normalAt(target.x, target.z);
-    spray.update(skier, target, heading, skier.brake, { x: snx, y: sny, z: snz }, frameDt, chase.camera, renderer);
-
-    sunFollow(target);
+    const { skier, tricks } = game;
+    const { at, heading, normal } = view.update(game, prev, prevTricks, alpha, frameDt);
+    trails.update(at.x, at.y, at.z, heading, skisOnSnow(game), moved);
+    spray.update(skier, at, heading, skier.brake, normal, frameDt, chase.camera, renderer);
+    sunFollow(at);
 
     // den ekte farten: landingene følger flybanen, så den holder seg når du lander
     const v = speedOf(skier);
-    chase.update({ x: target.x, y: target.y, z: target.z, vx: skier.vx, vz: skier.vz, heading, speed: v, cut: moved !== 'none' }, frameDt);
+    chase.update({ x: at.x, y: at.y, z: at.z, vx: skier.vx, vz: skier.vz, heading, speed: v, cut: moved !== 'none' }, frameDt);
     hud.update({
       speed: v, distance: skier.z - startZ, airTime: skier.airTime, inAir: !skier.grounded,
       popCharge: skier.popCharge, lastPop: skier.lastPop, popAge: skier.popAge,
-      landing: tricks.lastLanding, landingAge: tricks.landingAge, fade: fadeAmount(fall),
+      landing: tricks.lastLanding, landingAge: tricks.landingAge, fade: fadeAmount(game.fall),
       score: game.score, best: game.best, controls: input.device(), grab: tricks.grabs.held, grabTime: tricks.grabs.holdTime,
     }, frameDt);
+    hud.setOpacity(menu.update(game.flow, frameDt));
     moved = 'none';
     env.follow(chase.camera.position, performance.now() / 1000);
     audio.frame();

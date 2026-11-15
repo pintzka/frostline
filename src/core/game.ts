@@ -49,8 +49,11 @@ export function skisOnSnow(g: Game): boolean {
   return g.skier.grounded && !isFalling(g.fall);
 }
 
-/** Kjører ett fysikksteg. restart = R-tasten. Sier om skiløperen ble flyttet (se Move). */
-export function stepGame(g: Game, raw: RawControls, restart: boolean, dt: number): Move {
+/**
+ * Kjører ett fysikksteg. restart = R-tasten. Sier om skiløperen ble flyttet (se Move).
+ * endRestarts = false: slutten av bakken starter ikke ny runde (da viser ui/flow.ts resultatskjermen i stedet).
+ */
+export function stepGame(g: Game, raw: RawControls, restart: boolean, dt: number, endRestarts = true): Move {
   // under fallet virker ingen taster
   if (isFalling(g.fall)) {
     stepTricks(g.tricks, { spin: 0, flip: 0, grounded: true }, dt);
@@ -62,7 +65,7 @@ export function stepGame(g: Game, raw: RawControls, restart: boolean, dt: number
     return 'respawn';
   }
   // R virker først når skjermen er helt klar igjen etter et fall, så blekingen ikke kuttes brått
-  if ((restart && fallDone(g.fall)) || reachedEnd(g.skier)) {
+  if ((restart && fallDone(g.fall)) || (endRestarts && reachedEnd(g.skier))) {
     restartGame(g);
     return 'restart';
   }
