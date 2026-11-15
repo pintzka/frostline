@@ -1,5 +1,6 @@
 import { CONFIG } from '../core/config';
 import type { Landing } from '../tricks/rotation';
+import { CONTROLS } from './controlsText';
 
 /**
  * Enkel HUD. Arbeidsstrøm 8 (UI og flyt) eier denne fila.
@@ -31,7 +32,11 @@ export function landingText(l: Landing | null): { title: string; sub: string } {
   return { title: l.name, sub: LANDING_TEXT[l.quality] };
 }
 
-export function createHud(root: HTMLElement) {
+export function createHud(parent: HTMLElement) {
+  // alt i HUD-en ligger i én boks, så hele HUD-en kan blekne bort bak start- og resultatskjermen
+  const root = document.createElement('div');
+  root.style.cssText = 'position:fixed;inset:0;pointer-events:none;';
+  parent.appendChild(root);
   const el = document.createElement('div');
   el.style.cssText = 'position:fixed;left:16px;top:16px;color:#fff;font:600 18px/1.3 system-ui,sans-serif;text-shadow:0 1px 3px #0008;pointer-events:none;';
   root.appendChild(el);
@@ -61,10 +66,12 @@ export function createHud(root: HTMLElement) {
 
   const help = document.createElement('div');
   help.style.cssText = 'position:fixed;left:16px;bottom:16px;color:#fffc;font:14px system-ui,sans-serif;pointer-events:none;';
-  help.textContent = 'Styr: ← → / A D · Brems: ↓ / S · Pop: hold og slipp mellomrom · I lufta: ← → spinn, ↑ / W frontflip, ↓ / S backflip · Start på nytt: R · Mobil: trykk venstre/høyre';
+  help.textContent = CONTROLS.map(([what, key]) => `${what}: ${key.replace(/ \(.*\)/, '')}`).join(' · ');
   root.appendChild(help);
 
   return {
+    /** 0 = skjult, 1 = synlig */
+    setOpacity(o: number) { root.style.opacity = String(o); },
     update(h: HudInfo) {
       let text = `${Math.round(h.speed * 3.6)} km/t · ${Math.round(h.distance)} m`;
       if (h.airTime > 0.3) text += ` · ${h.inAir ? 'I lufta' : 'Lufttid'} ${h.airTime.toFixed(1).replace('.', ',')} s`;

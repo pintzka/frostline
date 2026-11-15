@@ -97,6 +97,20 @@ export const CONFIG = {
   trickPivotHeight: 1.0,
   /** Sekunder triksnavnet vises etter landing. */
   trickShowTime: 1.6,
+
+  // --- Meny og flyt (src/ui/) ---
+  /** Sekunder startskjermen bruker på å blekne bort når du starter. */
+  startFadeOut: 0.3,
+  /** Sekunder resultatskjermen bruker på å komme fram, og på å blekne bort ved ny runde. */
+  resultFadeIn: 0.35,
+  resultFadeOut: 0.2,
+  /** Så lenge (s) resultatet vises før mellomrom eller klikk kan starte ny runde (R virker alltid). */
+  resultMinTime: 0.4,
+  /** Etter målet bremser skiløperen inn med så mye ekstra (m/s²), så den stopper før bakken tar slutt. */
+  finishStopDecel: 20,
+  /** Ved ny runde dekker et mørkt slør skjermen så mye (0–1) og blekner bort på så mange sekunder. Skjuler hoppet til toppen. */
+  restartVeil: 0.6,
+  restartVeilTime: 0.3,
 } as const;
 
 export type Config = typeof CONFIG;

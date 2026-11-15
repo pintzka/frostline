@@ -1,17 +1,17 @@
 import * as THREE from 'three';
 import { CONFIG } from './core/config';
 import { createLoop } from './core/loop';
-import { createSkier, reachedEnd, speedOf, stepSkier } from './physics/skier';
+import { speedOf } from './physics/skier';
 import { createInput } from './input/input';
 import { createChaseCamera } from './camera/chase';
 import { createScene } from './render/scene';
 import { createHud } from './ui/hud';
+import { createMenu } from './ui/menu';
+import { createGame, stepGame } from './ui/flow';
 import { createPlaceholderSkier } from './character/placeholder';
 import { heightAt, normalAt } from './park/terrain';
 import { poseFor, smoothPose } from './character/pose';
 import { createSkiTrails } from './render/trailMesh';
-import { createTricks, stepTricks } from './tricks/rotation';
-import { createLatch, splitControls } from './tricks/controls';
 
 const root = document.getElementById('app')!;
 const { renderer, scene, sun } = createScene(root);
@@ -19,17 +19,18 @@ const chase = createChaseCamera(innerWidth / innerHeight);
 addEventListener('resize', () => chase.resize(innerWidth / innerHeight));
 const input = createInput(renderer.domElement);
 const hud = createHud(root);
+const menu = createMenu(root);
 
 const skierModel = createPlaceholderSkier();
 const mesh = skierModel.root;
 scene.add(mesh);
 const trails = createSkiTrails(scene);
 
-let skier = createSkier();
+// startskjerm → kjører → resultat: se ui/flow.ts
+const game = createGame();
+let skier = game.skier, tricks = game.tricks;
 let prev = { ...skier };
-let tricks = createTricks();
 let prevTricks = { ...tricks };
-const latch = createLatch();
 const startZ = skier.z;
 
 const target = new THREE.Vector3();
@@ -43,14 +44,13 @@ let pose = smoothPose(poseFor({ grounded: true, popCharge: 0, airTime: 0, height
 const loop = createLoop({
   hz: CONFIG.physicsHz,
   step(dt) {
-    // R, eller slutten av bakken: ny runde med en gang
-    if (input.pressed('KeyR') || reachedEnd(skier)) { skier = createSkier(); tricks = createTricks(); }
-    prev = { ...skier };
-    prevTricks = { ...tricks };
-    // på bakken styrer tastene skiene, i lufta spinner og flipper de
-    const c = splitControls(input.read(), skier.grounded, latch);
-    stepSkier(skier, c.skier, dt);
-    stepTricks(tricks, { spin: c.spin, flip: c.flip, grounded: skier.grounded }, dt);
+    prev = { ...game.skier };
+    prevTricks = { ...game.tricks };
+    const ev = stepGame(game, { raw: input.read(), click: menu.takeClick(), restart: input.pressed('KeyR') }, dt);
+    // ny runde: start fra toppen uten å gli mellom gammel og ny plass
+    if (ev === 'ny-runde') { prev = { ...game.skier }; prevTricks = { ...game.tricks }; }
+    if (ev) menu.onEvent(ev, game.flow);
+    skier = game.skier; tricks = game.tricks;
   },
   render(alpha, frameDt) {
     target.set(
@@ -92,6 +92,7 @@ const loop = createLoop({
       popCharge: skier.popCharge, lastPop: skier.lastPop, popAge: skier.popAge,
       landing: tricks.lastLanding, landingAge: tricks.landingAge,
     });
+    hud.setOpacity(menu.update(game.flow, frameDt));
     renderer.render(scene, chase.camera);
   },
 });
