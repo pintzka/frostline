@@ -295,7 +295,7 @@ describe('hvor du settes tilbake', () => {
 
   it('fall på landingen: før rampen på samme hopp, med samme fart på kanten som en vanlig kjøring (innen 3 %) og landing under 10°', () => {
     // tallene står i park-fila for hvert hopp (ikke standardverdiene)
-    for (const k of PARK.kickers) expect(k.respawnBefore !== undefined && k.respawnSpeed !== undefined).toBe(true);
+    for (const k of PARK.kickers) expect(k.respawnBeforeRamp !== undefined && k.respawnSpeed !== undefined).toBe(true);
     PARK.kickers.forEach((k) => {
       const g = respawnAt(0, k.z + 40, k.z + 0.5);
       expect(g.skier.z).toBeLessThan(k.z - rampLength(k) - 20);

@@ -31,7 +31,7 @@ export interface Kicker {
    * Valgfritt. Faller du på landingen, settes du så mange meter før rampen (m), med denne farten (m/s).
    * Velg dem så farten på kanten blir som i en vanlig kjøring. Mangler de, brukes standardverdier fra config.
    */
-  respawnBefore?: number;
+  respawnBeforeRamp?: number;
   respawnSpeed?: number;
 }
 
@@ -60,7 +60,7 @@ export interface ParkData {
 
 /** Hvor du settes tilbake etter et fall på landingen til hoppet: meter før rampen og fart (m/s). */
 export function respawnOf(k: Kicker): { before: number; speed: number } {
-  return { before: k.respawnBefore ?? CONFIG.fallRespawnBeforeDefault, speed: k.respawnSpeed ?? CONFIG.fallRespawnSpeedDefault };
+  return { before: k.respawnBeforeRamp ?? CONFIG.fallRespawnBeforeDefault, speed: k.respawnSpeed ?? CONFIG.fallRespawnSpeedDefault };
 }
 
 /** Rampens lengde: en parabel med gitt krumning ender i riktig vinkel når lengde = radius · tan(vinkel). */
@@ -106,7 +106,7 @@ const KICKER_FIELDS: Shape = {
   name: 'string', z: 'number', lipDeg: 'number', radius: 'number', width: 'number', sideWidth: 'number', landingStart: 'number', landingDeg: 'number',
 };
 /** Felt et hopp kan ha, men ikke må ha. */
-const KICKER_OPTIONAL: Shape = { respawnBefore: 'number', respawnSpeed: 'number' };
+const KICKER_OPTIONAL: Shape = { respawnBeforeRamp: 'number', respawnSpeed: 'number' };
 const TYPE_NAMES = { string: 'tekst', number: 'et tall', object: 'en gruppe { }', array: 'en liste [ ]' };
 
 function isObject(v: unknown): v is Record<string, unknown> {
@@ -227,14 +227,20 @@ export function validatePark(data: unknown): string[] {
 
     // respawn etter fall på landingen: et stykke før rampen, med en rimelig fart, og ikke oppe på hoppet over
     const back = respawnOf(k);
-    if (back.before <= 0) errors.push(`${who}: "respawnBefore" må være større enn 0.`);
-    if (back.speed <= 0 || back.speed > CONFIG.fallRespawnSpeedMax) {
-      errors.push(`${who}: "respawnSpeed" er ${back.speed} m/s. Den må være over 0 og høyst ${CONFIG.fallRespawnSpeedMax} m/s.`);
+    // samme regler som i park-nybegynner-grenen: begge eller ingen, minst 10 m før rampen, ikke over toppfarten
+    if ((k.respawnBeforeRamp === undefined) !== (k.respawnSpeed === undefined)) {
+      errors.push(`${who}: skriv både "respawnBeforeRamp" og "respawnSpeed", eller ingen av dem.`);
+    }
+    if (k.respawnBeforeRamp !== undefined && k.respawnBeforeRamp < CONFIG.fallRespawnBeforeMin) {
+      errors.push(`${who}: "respawnBeforeRamp" er ${k.respawnBeforeRamp} m. Du må settes minst ${CONFIG.fallRespawnBeforeMin} m før rampen.`);
+    }
+    if (k.respawnSpeed !== undefined && (k.respawnSpeed < 0 || k.respawnSpeed > CONFIG.maxSpeed)) {
+      errors.push(`${who}: "respawnSpeed" er ${k.respawnSpeed} m/s. Den må være mellom 0 og ${CONFIG.maxSpeed} m/s.`);
     }
     const spot = start - back.before;
     const prev = p.kickers[i - 1];
     if (prev && spot > prev.z - rampLength(prev) - CONFIG.fallRampMargin && spot < prev.z + prev.landingStart + p.landing.knuckle) {
-      errors.push(`${who}: etter et fall settes du tilbake ved ${spot.toFixed(1)} m, oppe på «${prev.name}». Gjør "respawnBefore" mindre.`);
+      errors.push(`${who}: etter et fall settes du tilbake ved ${spot.toFixed(1)} m, oppe på «${prev.name}». Gjør "respawnBeforeRamp" mindre.`);
     }
     if (prev) {
       if (k.z <= prev.z) {

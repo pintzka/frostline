@@ -46,7 +46,7 @@ describe('parkformat: testbakken fra JSON', () => {
     expect(PARK.width).toBe(legacy.PARK.width);
     expect(PARK.length).toBe(legacy.PARK.length);
     // sideWidth og respawn-tallene er nye felt (ikke formen på hoppet), resten skal være likt
-    expect(PARK.kickers.map(({ sideWidth: _, respawnBefore: _b, respawnSpeed: _s, ...k }) => k)).toEqual(legacy.PARK.kickers);
+    expect(PARK.kickers.map(({ sideWidth: _, respawnBeforeRamp: _b, respawnSpeed: _s, ...k }) => k)).toEqual(legacy.PARK.kickers);
     expect({ height: PARK.deck.height, drop: PARK.deck.drop }).toEqual(legacy.DECK);
     expect(PARK.landing).toEqual(legacy.LANDING);
   });
@@ -155,11 +155,13 @@ describe('parkformat: validering', () => {
   });
 
   it('respawn-tall som ikke gir mening', () => {
-    has(errorsFor((p) => (p.kickers[1].respawnSpeed = 0)), 'respawnSpeed');
+    has(errorsFor((p) => (p.kickers[1].respawnSpeed = -1)), 'respawnSpeed');
     has(errorsFor((p) => (p.kickers[1].respawnSpeed = 99)), 'respawnSpeed');
-    has(errorsFor((p) => (p.kickers[1].respawnBefore = -5)), 'respawnBefore');
+    has(errorsFor((p) => (p.kickers[1].respawnBeforeRamp = 5)), 'respawnBeforeRamp');
+    // begge eller ingen
+    has(errorsFor((p) => delete p.kickers[1].respawnSpeed), 'eller ingen av dem');
     has(errorsFor((p) => (p.kickers[1].respawnSpeed = 'fort')), 'respawnSpeed');
     // så langt tilbake at du havner oppe på hoppet over
-    has(errorsFor((p) => (p.kickers[1].respawnBefore = 80)), 'oppe på «Lite»');
+    has(errorsFor((p) => (p.kickers[1].respawnBeforeRamp = 80)), 'oppe på «Lite»');
   });
 });

@@ -49,7 +49,7 @@ Helningen på bakken (18°) står i `src/core/config.ts` (`slopeDeg`), ikke i pa
 | `sideWidth` | Hvor bred den myke skråningen ned på hver side av hoppet er (m). Større = slakere sider som du kan kjøre på. |
 | `landingStart` | Hvor langt etter kanten landingen begynner (m). Lengre hopp trenger større tall. |
 | `landingDeg` | Hvor mye brattere enn bakken landingen er (grader). |
-| `respawnBefore` | Valgfritt. Faller du på landingen, settes du så mange meter før rampen (m). Standard 75. |
+| `respawnBeforeRamp` | Valgfritt. Faller du på landingen, settes du så mange meter før rampen (m). Standard 75. |
 | `respawnSpeed` | Valgfritt. Farten du settes tilbake med (m/s). Velg den så farten på kanten blir som i en vanlig kjøring. Standard 11. |
 
 ## Lage et nytt hopp
@@ -70,8 +70,8 @@ Tallene for dagens hopp er ikke gjettet. De er funnet ved å teste mange kombina
 | `width` | 8–14 | minst 2 |
 | `sideWidth` | ca. 3–3,5 × kanthøyden (Lite 4, Medium 20, Stort 22) | sidene kan være høyst 35° bratte; feilmeldingen sier hvor bred den må være. `width` + 2 · `sideWidth` må få plass i bakken |
 | `landingStart` | 19–45 | må være større enn `deck.drop` |
-| `respawnBefore` | 60–100 (Lite 100, Medium 75, Stort 60) | større enn 0, og du må ikke havne oppe på hoppet over |
-| `respawnSpeed` | 10–14 (Lite 14, Medium 11, Stort 10) | over 0 og høyst 30 m/s |
+| `respawnBeforeRamp` | 60–100 (Lite 100, Medium 75, Stort 60) | minst 10 m, og du må ikke havne oppe på hoppet over. Skriv begge respawn-feltene eller ingen |
+| `respawnSpeed` | 10–14 (Lite 14, Medium 11, Stort 10) | mellom 0 og toppfarten (25 m/s) |
 
 Tommelfingerregel: øker du `lipDeg`, flyr du lenger, så `landingStart` må også øke. Gjør du hoppet høyere, må også `sideWidth` øke.
 
