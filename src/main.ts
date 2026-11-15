@@ -13,7 +13,7 @@ import { createHud } from './ui/hud';
 import { createTouchControls } from './ui/touchControls';
 import { createPauseUi } from './ui/pause';
 import { createMenu } from './ui/menu';
-import { createGame, resumeGame, stepGame } from './ui/flow';
+import { createGame, resumeGame, soundSkier, stepGame } from './ui/flow';
 import { createAudio } from './audio/engine';
 
 const root = document.getElementById('app')!;
@@ -56,7 +56,8 @@ const loop = createLoop({
       audio.newRun();
     }
     // prev er satt på nytt etter en flytting, så det ikke høres ut som en landing
-    audio.step(prev, game.skier, { steer: 0, brake: game.skier.brake, pop: false });
+    const heard = soundSkier(game);
+    audio.step(heard === game.skier ? prev : heard, heard, { steer: 0, brake: heard.brake, pop: false });
   },
   render(alpha, frameDt) {
     const { skier, tricks } = game;

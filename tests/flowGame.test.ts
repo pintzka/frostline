@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CONFIG } from '../src/core/config';
-import { createGame, createStats, resumeGame, scoreLines, stepGame, type Game, type GameInput } from '../src/ui/flow';
+import { createGame, createStats, resumeGame, scoreLines, soundSkier, stepGame, type Game, type GameInput } from '../src/ui/flow';
 import { createScore } from '../src/tricks/score';
 import { heightAt, PARK } from '../src/park/terrain';
 import { isFalling } from '../src/tricks/fall';
@@ -183,5 +183,16 @@ describe('fortsett etter pause', () => {
     for (let i = 0; i < 0.3 / dt; i++) expect(stepGame(g, pop(true), dt)).toBeNull();
     stepGame(g, pop(false), dt);
     expect(stepGame(g, pop(true), dt)).toBe('ny-runde');
+  });
+});
+
+describe('lyd på startskjermen', () => {
+  it('skiløperen er stille for lyden til runden starter', () => {
+    const g = createGame();
+    // createSkier gir 2 m/s, men på startskjermen skal det ikke suse
+    expect(speedOf(g.skier)).toBeGreaterThan(0);
+    expect(speedOf(soundSkier(g))).toBe(0);
+    stepGame(g, idle({ click: true }), dt);
+    expect(soundSkier(g)).toBe(g.skier);
   });
 });

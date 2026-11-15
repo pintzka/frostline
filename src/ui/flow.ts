@@ -116,6 +116,11 @@ function newRun(g: Game, bySpace: boolean): void {
   g.flow.move = 'restart';
 }
 
+/** Skiløperen slik lyden skal høre den: på startskjermen står den stille (ingen vind eller snø-sus). */
+export function soundSkier(g: Game): SkierState {
+  return g.flow.phase === 'start' ? { ...g.skier, vx: 0, vy: 0, vz: 0, edge: 0, brake: 0 } : g.skier;
+}
+
 /**
  * Fortsetter etter pause (eller fanebytte): pop som ble holdt eller ladet før pausen kastes,
  * og mellomrom som fortsatt holdes, må slippes før det starter en runde eller gir pop.
