@@ -51,6 +51,7 @@ Justert 15. november: Daniel valgte et høyere stort hopp. Rampen på det store 
 
 ## Grabs
 Hold en tast i lufta. Grabben teller først etter 0,3 s, og den lengste grabben i hoppet er den som teller.
+Slipp grabben før du lander: holder du fortsatt en grab som teller når skiene treffer snøen, blir landingen slurvete (halve poeng).
 
 | Tast | Grab | Stilling |
 |---|---|---|
@@ -61,7 +62,7 @@ Hold en tast i lufta. Grabben teller først etter 0,3 s, og den lengste grabben 
 ## Poeng
 Tallene står i `src/core/config.ts` og regnes ut i `src/tricks/score.ts`.
 
-Poeng for ett triks = (spinn + flip + grab) × grab-gangetall × perfekt pop × landing × gjentakelse × kombo.
+Poeng for ett triks = (spinn + flip + grab) × grab-gangetall × perfekt pop × switch × landing × gjentakelse × kombo.
 
 | Spinn | 180 | 360 | 540 | 720 | 900 | 1080 | 1260 | 1440 | 1620 | mer |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -74,9 +75,11 @@ Poeng for ett triks = (spinn + flip + grab) × grab-gangetall × perfekt pop × 
 - **Bare ekte triks gir poeng:** 540 eller mer, minst én flip, eller en grab som teller. Et 180 eller 360 alene vises, men gir 0.
 - **Grab:** +300 poeng, og hele trikset ganges med x1,25 når grabben teller. Gangetallet vokser med 0,5 per sekund du holder etter 0,3 s, opp til x2.
 - **Perfekt pop:** x1,2.
+- **Switch** (hoppet starter baklengs): liten bonus, x1,1.
+- **Småhopp:** et hopp med under 0,9 s i lufta (en pop på flaten gir ca. 0,7 s, det lille hoppet 1,2 s) gir bare 5 % av poengene og påvirker ikke komboen. Da lønner det seg ikke å spamme pop og grabs på flaten.
 - **Landing:** ren full sum, slurvete halv sum, fall null.
-- **Gjentakelse:** samme triks igjen på rad gir 60 %, så 36 %, og aldri under 20 %. Andre spinnretning, en annen grab eller switch er et nytt triks og gir full verdi.
-- **Kombo:** hvert ekte triks med ren landing øker gangetallet med +0,25 (x1, x1,25, x1,5 ... opp til x4). Slurvete landing beholder komboen uten å øke den. Fall eller 9 sekunder på snøen uten nytt ekte triks nullstiller den. Poengene du har fått beholdes.
+- **Gjentakelse:** de 4 siste triksene huskes. For hver gang trikset finnes der, gir det 60 % (så 36 %, 22 % ...), men aldri under 20 %. Også A-B-A-B gir mindre. Andre spinnretning eller switch gjør det ikke til et nytt triks; en annen rotasjon, flip eller grab gjør det.
+- **Kombo:** hvert ekte triks med ren landing øker gangetallet med +0,25 (x1, x1,25, x1,5 ... opp til x4). Slurvete landing beholder komboen uten å øke den. Fall eller 9 sekunder på snøen uten nytt ekte triks nullstiller den. Poengene du har fått beholdes. Et fall vises alltid («Fall», og «Kombo tapt» hvis komboen var over x1).
 - Eksempler: 540 = 400, 720 = 800, 1080 = 2 200. 720 + Backflip + Isbit holdt 1 s med perfekt pop = (800 + 700 + 300) × 1,6 × 1,2 ≈ 3 460.
 - Når runden starter på nytt (R eller nederst i bakken), huskes beste runde i HUD-en.
 
