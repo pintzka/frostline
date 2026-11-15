@@ -1,17 +1,19 @@
 import * as THREE from 'three';
 import { buildGroundMesh } from './groundGrid';
 import { createEnvironment, HAZE } from './environment';
-import { snapShadowTarget, type Vec3 } from './envMath';
+import { shadowTexel, snapShadowTarget, type Vec3 } from './envMath';
 import { LOOK } from './look';
+import type { QualitySettings } from './quality';
 import { useRadialFog } from './radialFog';
 import { createRailMeshes } from './rails';
 
 /**
  * Scene, lys og testbakken, med miljøet rundt (environment.ts). Arbeidsstrøm 6 (Grafikk og effekter) eier denne fila.
  */
-export function createScene(root: HTMLElement) {
-  const renderer = new THREE.WebGLRenderer({ antialias: true });
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+export function createScene(root: HTMLElement, start: QualitySettings) {
+  // myke kanter kan bare velges når rendereren lages, så de følger nivået spillet startet på
+  const renderer = new THREE.WebGLRenderer({ antialias: start.antialias });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, start.pixelRatio));
   renderer.setSize(innerWidth, innerHeight);
   renderer.shadowMap.enabled = true;
   root.appendChild(renderer.domElement);
@@ -36,7 +38,71 @@ export function createScene(root: HTMLElement) {
 
   // preparert bakke: riller langs fallinja og korn som suser forbi, så farten synes.
   // Punktene står tett der hoppene krummer (groundGrid.ts), så snøen ligger der fysikken er.
-  const mesh = buildGroundMesh();
+  const tex = snowTexture(renderer);
+  let tolerance = start.groundTolerance;
+  const ground = new THREE.Mesh(groundGeometry(tolerance), new THREE.MeshStandardMaterial({ color: 0xdde3ea, map: tex, roughness: 0.9 }));
+  ground.receiveShadow = true;
+  scene.add(ground);
+
+  // rails og bokser fra parkfila (tegnes likt på alle kvalitetsnivåer)
+  scene.add(createRailMeshes());
+
+  // himmel, fjell, skog og lykter rundt bakken
+  const env = createEnvironment(scene, sun.position.clone().normalize());
+
+  /** Sola og skyggeboksen følger skiløperen, men bare i hele skyggepiksler, så skyggene ikke flimrer. */
+  let texel = shadowTexel();
+  function sunFollow(target: THREE.Vector3) {
+    const [x, y, z] = snapShadowTarget([target.x, target.y, target.z], toSun, texel);
+    sun.target.position.set(x, y, z);
+    sun.position.set(x + toSun[0], y + toSun[1], z + toSun[2]);
+  }
+
+  /**
+   * Bytter kvalitetsnivå. Kalles hvert bilde; gjør bare noe når noe er endret.
+   * Oppløsning og skyggestørrelse byttes med en gang (det merkes knapt).
+   * Resten venter til heavyOk er sant (pause, startskjermen eller resultatskjermen): skog og tåke
+   * ville poppet midt i en runde, skygger av/på lager shaderne på nytt, og ny bakke tar ca. 0,3 s.
+   */
+  let pixelRatio = start.pixelRatio, shadowSize = -1, forest = -1, fogFar = -1;
+  function applyQuality(q: QualitySettings, heavyOk: boolean) {
+    if (q.pixelRatio !== pixelRatio) {
+      pixelRatio = q.pixelRatio;
+      renderer.setPixelRatio(Math.min(devicePixelRatio, pixelRatio));
+      renderer.setSize(innerWidth, innerHeight);
+    }
+    if ((q.forest !== forest || q.fogFar !== fogFar) && heavyOk) {
+      forest = q.forest; fogFar = q.fogFar;
+      (scene.fog as THREE.Fog).far = fogFar;
+      env.setQuality(forest, fogFar);
+    }
+    // skygger på/av endrer lysoppsettet, og three.js bygger shaderne på nytt
+    const wantShadow = q.shadowMapSize > 0;
+    if (wantShadow !== sun.castShadow && heavyOk) sun.castShadow = wantShadow;
+    if (sun.castShadow && wantShadow && q.shadowMapSize !== shadowSize) {
+      shadowSize = q.shadowMapSize;
+      sun.shadow.mapSize.set(shadowSize, shadowSize);
+      // kartet lages på nytt i riktig størrelse neste gang skyggene tegnes
+      sun.shadow.map?.dispose();
+      sun.shadow.map = null;
+      texel = shadowTexel(shadowSize);
+    }
+    if (q.groundTolerance !== tolerance && heavyOk) {
+      tolerance = q.groundTolerance;
+      const old = ground.geometry;
+      ground.geometry = groundGeometry(tolerance);
+      old.dispose();
+    }
+  }
+  applyQuality(start, true);
+
+  addEventListener('resize', () => renderer.setSize(innerWidth, innerHeight));
+  return { renderer, scene, env, sunFollow, applyQuality };
+}
+
+/** Den preparerte bakken som three.js-geometri, med teksturkoordinater. */
+function groundGeometry(tolerance: number) {
+  const mesh = buildGroundMesh(tolerance);
   const uv = new Float32Array((mesh.positions.length / 3) * 2);
   for (let i = 0, j = 0; i < mesh.positions.length; i += 3) {
     // teksturen gjentas hver TILE_M meter; rillene går langs bakken
@@ -47,26 +113,7 @@ export function createScene(root: HTMLElement) {
   geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
   geo.setIndex(new THREE.BufferAttribute(mesh.indices, 1));
   geo.computeVertexNormals();
-  const tex = snowTexture(renderer);
-  const ground = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0xdde3ea, map: tex, roughness: 0.9 }));
-  ground.receiveShadow = true;
-  scene.add(ground);
-
-  // rails og bokser fra parkfila
-  scene.add(createRailMeshes());
-
-  // himmel, fjell, skog og lykter rundt bakken
-  const env = createEnvironment(scene, sun.position.clone().normalize());
-
-  /** Sola og skyggeboksen følger skiløperen, men bare i hele skyggepiksler, så skyggene ikke flimrer. */
-  function sunFollow(target: THREE.Vector3) {
-    const [x, y, z] = snapShadowTarget([target.x, target.y, target.z], toSun);
-    sun.target.position.set(x, y, z);
-    sun.position.set(x + toSun[0], y + toSun[1], z + toSun[2]);
-  }
-
-  addEventListener('resize', () => renderer.setSize(innerWidth, innerHeight));
-  return { renderer, scene, env, sunFollow };
+  return geo;
 }
 
 /** Teksturen dekker så mange meter i hver retning. */

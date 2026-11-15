@@ -15,9 +15,9 @@ export function fogAmount(distance: number): number {
   return Math.min(1, Math.max(0, (distance - near) / (far - near)));
 }
 
-/** Hvor sterk lyktegløden er (0–1): full nært, borte litt lenger ute enn tåka. */
-export function glowStrength(distance: number): number {
-  const { near, far } = LOOK.fog;
+/** Hvor sterk lyktegløden er (0–1): full nært, borte litt lenger ute enn tåka. far: synsavstanden (kvalitetsnivået). */
+export function glowStrength(distance: number, far: number = LOOK.fog.far): number {
+  const { near } = LOOK.fog;
   const end = far * LOOK.glow.fadeEndFactor;
   const t = Math.min(1, Math.max(0, (distance - near) / (end - near)));
   return 1 - t * t * (3 - 2 * t);
@@ -33,9 +33,9 @@ export function distanceToBox(p: Vec3, min: Vec3, max: Vec3): number {
   return Math.sqrt(s);
 }
 
-/** Er hele boksen så langt unna at den bare er tåke? Da trenger den ikke tegnes. */
-export function hiddenByFog(cam: Vec3, min: Vec3, max: Vec3): boolean {
-  return distanceToBox(cam, min, max) >= LOOK.fog.far;
+/** Er hele boksen så langt unna at den bare er tåke? Da trenger den ikke tegnes. far: synsavstanden (kvalitetsnivået). */
+export function hiddenByFog(cam: Vec3, min: Vec3, max: Vec3, far: number = LOOK.fog.far): boolean {
+  return distanceToBox(cam, min, max) >= far;
 }
 
 /** Retningene skyggekameraet ser verden i: høyre, opp, og retningen mot sola (samme som three.js lookAt). */
@@ -52,9 +52,9 @@ function lightAxes(toSun: Vec3): [Vec3, Vec3, Vec3] {
 
 const dot = (a: Vec3, b: Vec3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 
-/** Størrelsen på én skyggepiksel (m). */
-export function shadowTexel(): number {
-  return (2 * LOOK.shadow.half) / LOOK.shadow.mapSize;
+/** Størrelsen på én skyggepiksel (m). mapSize: skyggekartets oppløsning (kvalitetsnivået). */
+export function shadowTexel(mapSize: number = LOOK.shadow.mapSize): number {
+  return (2 * LOOK.shadow.half) / mapSize;
 }
 
 /**

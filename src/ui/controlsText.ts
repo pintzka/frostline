@@ -11,7 +11,7 @@ export const CONTROLS: [string, string][] = [
   ['Grab i lufta', 'hold J / K / L (slipp før landing)'],
   ['Rail og boks', 'kjør opp rampen eller pop opp på den; på tvers = boardslide. Ikke hold styring for lenge, pop = hopp av'],
   ['Start på nytt', 'R'],
-  ['Pause · lyd', 'P / Esc · M'],
+  ['Pause · lyd · fps', 'P / Esc · M · F'],
   ['Gamepad', 'stikke, A pop, LT/B brems, X/RB/LB grab, Y ny runde, Start pause'],
   ['Mobil', 'dra tommelen på venstre side, POP og BREMS til høyre'],
 ];

@@ -70,7 +70,8 @@ function parkPicker(): HTMLDivElement {
   return row;
 }
 
-export function createMenu(root: HTMLElement) {
+/** extra: noe som skal stå på startskjermen over «Trykk mellomrom», f.eks. grafikkvalget. */
+export function createMenu(root: HTMLElement, extra?: HTMLElement) {
   let clicked = false;
   const click = (e: Event) => { e.preventDefault(); clicked = true; };
 
@@ -80,6 +81,7 @@ export function createMenu(root: HTMLElement) {
     text('FROSTLINE', `font:800 clamp(44px,12vw,88px)/1 ${FONT};letter-spacing:.12em;`),
     parkPicker(),
     table(CONTROLS, 16),
+    ...(extra ? [extra] : []),
     text('Trykk mellomrom eller klikk for å kjøre', `font:700 22px ${FONT};margin-top:8px;text-align:center;`),
   );
   start.addEventListener('pointerdown', click);
