@@ -10,8 +10,8 @@ import { createPlaceholderSkier } from './character/placeholder';
 import { heightAt, normalAt } from './park/terrain';
 import { poseFor, smoothPose } from './character/pose';
 import { createSkiTrails } from './render/trailMesh';
-import { createTricks, stepTricks } from './tricks/rotation';
-import { createLatch, splitControls } from './tricks/controls';
+import { createTricks, isSwitch, stepTricks } from './tricks/rotation';
+import { createLatch, resetLatch, splitControls } from './tricks/controls';
 
 const root = document.getElementById('app')!;
 const { renderer, scene, sun } = createScene(root);
@@ -38,17 +38,30 @@ const wantUp = new THREE.Vector3();
 const q = new THREE.Quaternion();
 const qYaw = new THREE.Quaternion();
 const Y = new THREE.Vector3(0, 1, 0);
-let pose = smoothPose(poseFor({ grounded: true, popCharge: 0, airTime: 0, heightAboveSnow: 0, sinceLanding: 99 }), poseFor({ grounded: true, popCharge: 0, airTime: 0, heightAboveSnow: 0, sinceLanding: 99 }), 0);
+const standingPose = () => {
+  const p = poseFor({ grounded: true, popCharge: 0, airTime: 0, heightAboveSnow: 0, sinceLanding: 99 });
+  return smoothPose(p, p, 0);
+};
+let pose = standingPose();
+
+/** Ny runde: alt starter helt på nytt (fysikk, rotasjon, tastesperrer og kroppsstilling). */
+function newRun() {
+  skier = createSkier();
+  tricks = createTricks();
+  resetLatch(latch);
+  pose = standingPose();
+  up.copy(Y);
+}
 
 const loop = createLoop({
   hz: CONFIG.physicsHz,
   step(dt) {
     // R, eller slutten av bakken: ny runde med en gang
-    if (input.pressed('KeyR') || reachedEnd(skier)) { skier = createSkier(); tricks = createTricks(); }
+    if (input.pressed('KeyR') || reachedEnd(skier)) newRun();
     prev = { ...skier };
     prevTricks = { ...tricks };
     // på bakken styrer tastene skiene, i lufta spinner og flipper de
-    const c = splitControls(input.read(), skier.grounded, latch);
+    const c = splitControls(input.read(), skier.grounded, latch, dt);
     stepSkier(skier, c.skier, dt);
     stepTricks(tricks, { spin: c.spin, flip: c.flip, grounded: skier.grounded }, dt);
   },
@@ -71,8 +84,9 @@ const loop = createLoop({
     // spinn og flip jevnes ut mellom stegene; kameraet får dem ikke, så det snurrer ikke med
     const spin = prevTricks.spin + (tricks.spin - prevTricks.spin) * alpha;
     skierModel.setTrick(spin, prevTricks.flip + (tricks.flip - prevTricks.flip) * alpha);
-    // leningen er i kroppens retning: kjører du baklengs (switch), må den snus for å lene inn i svingen
-    skierModel.setLean((prev.lean + (skier.lean - prev.lean) * alpha) * Math.cos(spin));
+    // leningen er i kroppens retning: kjører du baklengs (switch), må den snus for å lene inn i svingen.
+    // Bruker stillingen du sto i (ikke spinnet underveis), så leningen ikke svaier mens du spinner
+    skierModel.setLean((prev.lean + (skier.lean - prev.lean) * alpha) * (isSwitch(tricks) ? -1 : 1));
     // kroppen glir mellom stillingene, så avspark og landing ikke rykker
     pose = smoothPose(pose, poseFor({
       grounded: skier.grounded, popCharge: skier.popCharge, airTime: skier.airTime,
