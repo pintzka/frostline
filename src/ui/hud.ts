@@ -29,6 +29,13 @@ export interface HudInfo {
   /** grabben du holder nå i lufta, og hvor lenge */
   grab: GrabKind;
   grabTime: number;
+  /** Hvor mye skjermen er bleket etter et fall (0–1). */
+  fade: number;
+}
+
+/** Fartsmåleren følger den ekte farten mykt, så tallet aldri hopper (f.eks. når du settes tilbake etter et fall). */
+export function smoothSpeed(shown: number, actual: number, dt: number): number {
+  return shown + (actual - shown) * (1 - Math.exp(-CONFIG.hudSpeedFollow * dt));
 }
 
 const LANDING_TEXT = { ren: 'Ren landing', slurvete: 'Slurvete landing', fall: 'Fall' } as const;
@@ -86,6 +93,11 @@ export function countUp(shown: number, total: number, dt: number): number {
 }
 
 export function createHud(root: HTMLElement) {
+  // myk bleking over spillet etter et fall; lagt først, så teksten ligger oppå
+  const fade = document.createElement('div');
+  fade.style.cssText = 'position:fixed;inset:0;background:#eef3f8;pointer-events:none;opacity:0;';
+  root.appendChild(fade);
+
   const el = document.createElement('div');
   el.style.cssText = 'position:fixed;left:16px;top:16px;color:#fff;font:600 18px/1.3 system-ui,sans-serif;text-shadow:0 1px 3px #0008;pointer-events:none;';
   root.appendChild(el);
@@ -135,9 +147,6 @@ export function createHud(root: HTMLElement) {
   root.appendChild(scoreBox);
   let shownTotal = 0;
   let trickAlpha = 0;
-  let lastTime = performance.now();
-  /** sekunder siden forrige bilde (for den myke opptellingen) */
-  const frameDt = () => { const now = performance.now(); const d = Math.min(0.1, (now - lastTime) / 1000); lastTime = now; return d; };
 
   // grabben du holder, over ladestolpen
   const grab = document.createElement('div');
@@ -149,9 +158,13 @@ export function createHud(root: HTMLElement) {
   help.textContent = 'Styr: ← → / A D · Brems: ↓ / S · Pop: hold og slipp mellomrom · I lufta: ← → spinn, ↑ / W frontflip, ↓ / S backflip, hold J / K / L grab · Start på nytt: R · Mobil: trykk venstre/høyre';
   root.appendChild(help);
 
+  let shown = 0;
   return {
-    update(h: HudInfo) {
-      let text = `${Math.round(h.speed * 3.6)} km/t · ${Math.round(h.distance)} m`;
+    /** dt = sekunder siden forrige bilde */
+    update(h: HudInfo, dt: number) {
+      fade.style.opacity = h.fade.toFixed(3);
+      shown = smoothSpeed(shown, h.speed, dt);
+      let text = `${Math.round(shown * 3.6)} km/t · ${Math.round(h.distance)} m`;
       if (h.airTime > 0.3) text += ` · ${h.inAir ? 'I lufta' : 'Lufttid'} ${h.airTime.toFixed(1).replace('.', ',')} s`;
       el.textContent = text;
 
@@ -163,7 +176,6 @@ export function createHud(root: HTMLElement) {
       const show = h.lastPop === 'perfekt' && h.popAge < 1.2;
       flash.style.opacity = show ? String(Math.min(1, (1.2 - h.popAge) * 2)) : '0';
 
-      const dt = frameDt();
       // triksnavn og poeng: glir inn ovenfra og blekner mykt bort (ingen blinking).
       // Forsvinner trikset plutselig (ny runde), blekner teksten som står der bort i stedet for å bli borte på ett bilde
       const r = h.score.last;

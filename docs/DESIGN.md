@@ -58,6 +58,19 @@ Slipp grabben før du lander: holder du fortsatt en grab som teller når skiene 
 | J | Nordlys | høyre hånd fram til skituppene |
 | K | Isbit | begge hender ned til midten av skiene |
 | L | Snøugle | venstre hånd bak til skihælene |
+## Landing og fall (fase 2)
+| Landing | Hva skjer |
+|---|---|
+| Ren | ingenting, du kjører videre |
+| Slurvete | du mister ca. 12 % av farten over 0,3 s, og kroppen vakler fra side til side i ca. 0,6 s |
+| Fall | kroppen velter, du sklir og bremser opp i snøen, skjermen blekner, og du settes tilbake |
+
+- Settes tilbake 1,1 s etter landingen, skjermen er klar igjen etter 1,4 s (målet er under 1,5 s).
+- Falt du på landingen til et hopp, settes du tilbake før rampen på det hoppet, midt i hoppet. Avstand og fart er valgt per hopp så farten på kanten blir som i en vanlig kjøring (innen 3 %): Lite 100 m før rampen i 50 km/t, Medium 75 m i 40 km/t, Stort 60 m i 36 km/t.
+- Andre fall (f.eks. pop på flat bakke): 35 m før fallstedet i 36 km/t. Havner du da på et hopp (rampe, platå eller kanten inn til landingen), settes du 10 m før rampen i stedet.
+- Mens du faller virker ingen taster. R virker først når skjermen er helt klar igjen. Pop holdt fra fallet teller ikke før du slipper.
+- R og slutten av bakken tømmer skisporet; respawn etter fall lar det gamle sporet ligge med et hull.
+- Tallene ligger i `src/core/config.ts` (`sloppy...` og `fall...`).
 
 ## Poeng
 Tallene står i `src/core/config.ts` og regnes ut i `src/tricks/score.ts`.

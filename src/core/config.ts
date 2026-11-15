@@ -2,6 +2,8 @@
 export const CONFIG = {
   /** Fast fysikksteg (Hz). Fysikken er deterministisk med dette steget. */
   physicsHz: 240,
+  /** Hvor runden starter (m nedover bakken, midt i bakken). */
+  startZ: 5,
   gravity: 9.81,
   /** Bakkens grunnhelning i grader. */
   slopeDeg: 18,
@@ -163,6 +165,56 @@ export const CONFIG = {
   comboMax: 4,
   /** Så mange sekunder på snøen uten nytt ekte triks før komboen nullstilles. */
   comboTimeout: 9,
+
+  // --- Konsekvens av landingen (src/tricks/fall.ts) ---
+  /** Slurvete landing: så stor del av farten mistes (0,12 = 12 %), fordelt over så mange sekunder (ikke brått). */
+  sloppySpeedLoss: 0.12,
+  sloppyLossTime: 0.3,
+  /** Slurvete landing: kroppen vakler fra side til side, så mye (rad), så mange ganger per sekund, og dør ut så fort (s). */
+  sloppyWobble: 0.3,
+  sloppyWobbleHz: 2.5,
+  sloppyWobbleDecay: 0.25,
+  /** Vaklingen bygges opp på så lang tid (s), så den ikke starter brått, og er helt borte etter sloppyWobbleEnd (s). */
+  sloppyWobbleRampIn: 0.06,
+  sloppyWobbleEnd: 2,
+  /** Hvor mye kroppen vakler fram og tilbake, som andel av vaklingen fra side til side. */
+  sloppyWobblePitch: 0.5,
+  /** Fall: sklien i snøen bremses av en del som øker med farten (per s) og en fast del (m/s²). Stopper på ca. 1 s. */
+  fallSlideDrag: 2.5,
+  fallSlideDecel: 4,
+  /** Fall: kroppen velter over på så lang tid (s), så langt (rad, 1,35 ≈ 77°), og ligger så høyt over snøen (m). */
+  fallTipTime: 0.4,
+  fallRoll: 1.35,
+  fallLieHeight: 0.28,
+  /** Fall: så mye kroppen bøyer seg framover når den ligger (rad). */
+  fallPitch: 0.35,
+  /** Fall: hvor fort kanten og leningen slippes mens du sklir (per sekund). */
+  fallLetGo: 8,
+  /** Fall: velter mot den siden du spinner, men bare når spinnet er raskere enn dette (rad/s). Ellers mot leningen, eller høyre. */
+  fallSpinSideMin: 0.5,
+  /** Fall: kroppen reiser seg fra dette tidspunktet (s etter landing) og bruker så lang tid (s), ferdig før respawn. */
+  fallGetUpStart: 0.65,
+  fallGetUpTime: 0.4,
+  /** Fall: så mange sekunder etter landingen settes du tilbake. Skjermen blekner ut og inn igjen på fallFadeTime (s). */
+  fallRespawnAt: 1.1,
+  fallFadeTime: 0.3,
+  /**
+   * Falt du på landingen til et hopp, settes du tilbake så mange meter før starten på rampen, med denne farten (m/s).
+   * Én verdi per hopp (Lite, Medium, Stort), valgt så farten på kanten blir som i en vanlig kjøring fra start.
+   */
+  fallRespawnBeforeRamp: [100, 75, 60],
+  fallRespawnSpeed: [14, 11, 10],
+  /** Avsatsen regnes som fra et hopp når du lettet innenfor så mange meter fra kanten. */
+  fallTakeoffWindow: 3,
+  /** Andre fall (f.eks. etter pop på flat bakke): tilbake så mange meter før fallstedet, med denne farten (m/s). */
+  fallBackDistance: 35,
+  fallBackSpeed: 10,
+  /** Havner du da på et hopp (rampe, platå eller kant inn til landingen), settes du så mange meter før rampen i stedet. */
+  fallRampMargin: 10,
+  /** Fartsmåleren følger den ekte farten mykt (per sekund), så tallet aldri hopper. */
+  hudSpeedFollow: 6,
+  /** Hvor fort kroppen legger seg vinkelrett på bakken (per sekund), så den ikke rykker over kuler og ved landing. */
+  bodyUpFollow: 12,
 } as const;
 
 export type Config = typeof CONFIG;

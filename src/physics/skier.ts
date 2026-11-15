@@ -41,9 +41,22 @@ export interface SkierInput {
 }
 
 export function createSkier(): SkierState {
-  const z = 5;
+  const z = CONFIG.startZ;
   return { x: 0, y: heightAt(0, z), z, vx: 0, vy: 0, vz: 2, heading: 0, edge: 0, lean: 0, leanRate: 0, grounded: true, airTime: 0,
     popCharge: 0, popHeld: false, lastPop: '', popAge: 99, sinceLanding: 99 };
+}
+
+/**
+ * Setter skiløperen på bakken i (x, z), rett ned bakken, med gitt fart langs snøen.
+ * Brukes når du settes tilbake etter et fall. Alt annet (kant, lening, pop) starter på nytt.
+ */
+export function placeSkier(s: SkierState, x: number, z: number, speed: number): void {
+  Object.assign(s, createSkier());
+  s.x = x; s.z = z; s.y = heightAt(x, z);
+  // farten følger bakken (ikke vannrett), ellers letter skiløperen med en gang
+  const dy = heightAt(x, z + 0.5) - heightAt(x, z - 0.5);
+  const len = Math.hypot(1, dy);
+  s.vx = 0; s.vz = speed / len; s.vy = (speed * dy) / len;
 }
 
 /** Er skiløperen akkurat foran kanten på et hopp (innenfor vinduet for perfekt pop)? */
