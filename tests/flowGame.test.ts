@@ -71,6 +71,8 @@ describe('mållinja', () => {
   /** Skiløperen i lufta rett før mållinja, snurret 90° (lander sidelengs = fall). */
   function airborneAtFinish(): Game {
     const g = createGame();
+    // uten landingshjelp: ellers fullføres 90° rolig til en ren 180 (se landAssist.test.ts)
+    g.landingAssist = false;
     stepGame(g, idle({ click: true }), dt);
     const z = PARK.length - CONFIG.runEndMargin - 1;
     Object.assign(g.skier, { z, x: 0, y: heightAt(0, z) + 2.5, vx: 0, vy: 2, vz: 14, grounded: false, airTime: 1 });

@@ -39,13 +39,16 @@ export function cloneGame(g: Game): Game {
 }
 
 function copyInput(i: GameInput): GameInput {
-  return { raw: { ...i.raw }, click: i.click, restart: i.restart };
+  const c: GameInput = { raw: { ...i.raw }, click: i.click, restart: i.restart };
+  if (i.assist !== undefined) c.assist = i.assist;
+  return c;
 }
 
 function sameInput(a: GameInput, b: GameInput): boolean {
   const x = a.raw, y = b.raw;
   return x.steer === y.steer && x.brake === y.brake && x.flip === y.flip && !!x.pop === !!y.pop
-    && (x.grab ?? 0) === (y.grab ?? 0) && !!x.flipByThumb === !!y.flipByThumb && a.click === b.click && a.restart === b.restart;
+    && (x.grab ?? 0) === (y.grab ?? 0) && !!x.flipByThumb === !!y.flipByThumb && a.click === b.click && a.restart === b.restart
+    && a.assist === b.assist;
 }
 
 export function createRecorder(): Recorder {

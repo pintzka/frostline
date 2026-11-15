@@ -5,6 +5,7 @@ import { createLatch, resetLatch, splitControls, type ControlLatch, type RawCont
 import { createFall, fallDone, isFalling, startFall, stepFall, stepSloppy, type FallState } from '../tricks/fall';
 import { createScore, scoreLanding, scoreRail, stepScore, type ScoreState } from '../tricks/score';
 import { CONFIG } from './config';
+import { heightAt } from '../park/terrain';
 
 /**
  * Ett steg av spillet: taster → fysikk → triks → landing (ren, slurvete eller fall) → poeng.
@@ -25,6 +26,11 @@ export interface Game {
   best: number;
   /** Rail eller boks du glir på (physics/rail.ts). */
   rail: RailRide;
+  /**
+   * Landingshjelp (valget «Landingshjelp: På / Av»): slipper du nær en ren stilling, fullføres rotasjonen rolig.
+   * Ligger i spillet, så den er med i kopien reprisen starter fra. Overlever ny runde.
+   */
+  landingAssist: boolean;
 }
 
 /**
@@ -37,14 +43,14 @@ export type Move = 'none' | 'restart' | 'respawn';
 export function createGame(): Game {
   return {
     skier: createSkier(), tricks: createTricks(), fall: createFall(), latch: createLatch(), popLock: false, takeoffZ: -99,
-    score: createScore(), best: 0, rail: createRailRide(),
+    score: createScore(), best: 0, rail: createRailRide(), landingAssist: true,
   };
 }
 
 /** Ny runde: alt starter på nytt, men beste runde huskes (også poengene fra runden som nettopp sluttet). */
 export function restartGame(g: Game): void {
   const best = Math.max(g.best, g.score.total);
-  Object.assign(g, createGame(), { best });
+  Object.assign(g, createGame(), { best, landingAssist: g.landingAssist });
 }
 
 /** Står skiene i snøen og lager spor? Ikke i lufta, ikke på en rail, og ikke mens du ligger og sklir etter et fall. */
@@ -94,7 +100,12 @@ export function stepGame(g: Game, raw: RawControls, dt: number): Move {
   const wasInAir = g.tricks.inAir;
   // et hopp som starter rett etter en perfekt pop, regnes som perfekt pop (gir mer poeng)
   const perfectPop = g.skier.lastPop === 'perfekt' && g.skier.popAge < CONFIG.popTakeoffWindow;
-  stepTricks(g.tricks, { spin: c.spin, flip: c.flip, grab: c.grab, grounded: g.skier.grounded, perfectPop }, dt);
+  // ingen hjelp når du faller av en rail (det er et fall uansett)
+  const assist = g.landingAssist && !g.skier.grounded && !g.rail.bail;
+  stepTricks(g.tricks, {
+    spin: c.spin, flip: c.flip, grab: c.grab, grounded: g.skier.grounded, perfectPop,
+    assist, toLand: assist ? timeToLand(g.skier) : undefined,
+  }, dt);
   // poeng og kombo: regnes ut én gang når du lander (fall gir 0 og nullstiller komboen)
   if (g.tricks.justLanded && g.rail.bail && g.tricks.lastLanding) {
     // falt av railen: landingen i snøen er et fall, med navnet på railtrikset
@@ -117,6 +128,21 @@ export function stepGame(g: Game, raw: RawControls, dt: number): Move {
   }
   stepSloppy(g.fall, g.skier, dt);
   return 'none';
+}
+
+/**
+ * Anslått tid (s) til skiene treffer snøen: høyden over snøen og farten ned mot den (snøen under kan
+ * falle bort eller stige mens du flyr, så helningen langs farten regnes med). Brukes av landingshjelpen.
+ */
+export function timeToLand(s: SkierState): number {
+  const h = s.y - heightAt(s.x, s.z);
+  if (h <= 0) return 0;
+  const e = 0.05;
+  // hvor fort snøen rett under deg går opp (+) eller ned (−) når du flyr videre
+  const ground = (heightAt(s.x + s.vx * e, s.z + s.vz * e) - heightAt(s.x, s.z)) / e;
+  const up = s.vy - ground;
+  const g = CONFIG.gravity;
+  return (up + Math.sqrt(up * up + 2 * g * h)) / g;
 }
 
 /**

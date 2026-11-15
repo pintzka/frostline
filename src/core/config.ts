@@ -185,6 +185,28 @@ export const CONFIG = {
   /** Lufttiden vises i HUD-en først når du har vært i lufta lenger enn dette (s), så små kuler ikke blinker. */
   hudAirTimeMin: 0.3,
 
+  // --- Landingshjelp (src/tricks/rotation.ts, valget på startskjermen og i pausen) ---
+  /**
+   * Slipper du spinn- eller flip-tasten når rotasjonen (med glidet) mangler opptil så mange grader
+   * til neste rene stilling (hel/halv runde for spinn, hel runde for flip), fullfører hjelpen rolig resten.
+   */
+  landAssistSpinAheadDeg: 100,
+  landAssistFlipAheadDeg: 90,
+  /** Er du litt forbi en ren stilling (opptil så mange grader), trekker hjelpen deg tilbake. */
+  landAssistBackDeg: 30,
+  /** Største fart hjelpen roterer med (grader per sekund). Mye saktere enn spinnfarten du har selv. */
+  landAssistSpinMaxDeg: 120,
+  landAssistFlipMaxDeg: 100,
+  /** Langt fra landingen roterer hjelpen med minst så stor del av største fart; nær landingen opp til full. */
+  landAssistMinShare: 0.5,
+  /** Hvor fort hjelpe-farten bygger seg opp (grader per sekund per sekund). Bremsing er som glidet når du slipper. */
+  landAssistSpinAccelDeg: 900,
+  landAssistFlipAccelDeg: 750,
+  /** Helt nær målet glir hjelpen mykt inn (per sekund). 8 ≈ 0,3 s for de siste gradene. */
+  landAssistSettle: 8,
+  /** Hjelpen prøver å være ferdig så mange sekunder før anslått landing. */
+  landAssistMargin: 0.1,
+
   // --- Off-axis: cork og rodeo (src/tricks/offaxis.ts og rotation.ts) ---
   /** Trykker du spinn og flip (W/S) begge innen så mange sekunder etter avsatsen, blir hoppet off-axis. */
   offAxisWindow: 0.25,

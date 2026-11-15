@@ -44,10 +44,33 @@ Justert 15. november: Daniel valgte et høyere stort hopp. Rampen på det store 
 |---|---|
 | Spinnfart | ca. 540° per sekund (et 720 på et medium hopp) |
 | Flipfart | ca. 360° per 0,9 s |
-| Gli etter slipp | ca. 25° (spinn) og 18° (flip), så du lander rent hvis du slipper når trikset er rundt |
+| Gli etter slipp | ca. 25° (spinn) og 18° (flip), så du lander rent hvis du slipper når trikset er rundt (med landingshjelp: se under) |
 | Grab | J / K / L holdes for poeng, minst 0,3 s for å telle (se Grabs under) |
 | Landing | ren hvis vinkelen mot bakken er under 25° og spinnet er innenfor ±30° av en hel eller halv runde (switch) |
 | Poeng og boost | bare for ekte triks: 540 eller mer, en flip eller en grab |
+
+## Landingshjelp
+Daniels ønske: «auto complete hopp for spilleren, sakte, ikke for raskt, men man må være litt snill med dem».
+Valget **Landingshjelp: På / Av** står på startskjermen og pauseskjermen (under grafikkvalget), huskes i nettleseren, og er **På** som standard. Med Av virker alt nøyaktig som før.
+
+Regelen: **slipper du spinn- eller flip-tasten når du er nesten rundt, fullfører spillet rolig resten**, så du lander rent.
+- Hjelpen virker bare på en akse når du **ikke** holder tasten for den (spinn A/D, flip W/S). Den kjemper aldri imot. Gjelder spinn, flip og off-axis (cork/rodeo).
+- Målet er nærmeste rene stilling i retningen du roterer, regnet fra der rotasjonen ville stoppet med glidet: hel eller halv runde for spinn (switch er greit), hel runde for flip.
+- **Rekkevidde:** mangler du opptil **100°** (spinn) / **90°** (flip), fullfører den framover. Er du opptil **30°** forbi, trekker den deg tilbake. Er du lenger unna, hjelper den ikke (et 200° spinn eller en 150° flip er fortsatt slurvete eller fall).
+- **Fart:** maks **120°/s** (spinn) og **100°/s** (flip), mye saktere enn din egen (540 / 400). Minst halvparten av det langt fra landingen, opp til full jo nærmere landingen er (anslått tid fra høyden over snøen og farten ned). Bygger seg opp mykt (900 / 750 °/s²), bremser som glidet, og glir mykt inn de siste gradene. Aldri et hopp i rotasjonsfarten, aldri raskere enn du selv kan, og aldri mer enn én stilling fram (300° blir aldri 720°).
+- **Poeng:** ingen straff. Navn og poeng etter stillingen du faktisk lander i (en 640° som blir en ren 720 er en 720).
+- **Reprise:** valget er en del av inputen hvert steg og med i kopien av spillet når runden starter, så reprisen blir lik.
+
+| Eksempel (ekte fysikk) | Uten hjelp | Med hjelp |
+|---|---|---|
+| Slipp spinn ved 270° (medium) | 295°, fall | ren 360 |
+| Slipp spinn ved 300° | 324°, slurvete 360 | ren 360 |
+| Slipp spinn ved 640° | 664°, fall | ren 720 |
+| Slipp backflip ved 290° | 308°, fall | ren backflip |
+| Cork: spinn 640°, flip 300° | fall | ren Cork 720 |
+| Spinn 200° / flip 150° | 225° slurvete / 167° fall | det samme |
+
+Tallene står i `src/core/config.ts` (`landAssist...`), logikken i `src/tricks/rotation.ts` (`assistTarget`, `assistRate`), tid til landing i `src/core/game.ts` (`timeToLand`).
 
 ## Off-axis: cork og rodeo
 Regelen: **trykk spinn (A/D) og flip (W/S) begge innen 0,25 s etter avsatsen**, så blir hoppet off-axis resten av hoppet.

@@ -55,6 +55,11 @@ export interface GameInput {
   click: boolean;
   /** R holdes (eller ble trykket nå) */
   restart: boolean;
+  /**
+   * Valget «Landingshjelp: På / Av» slik det står nå (utelatt = uendret). Det er en del av inputen,
+   * så reprisen bytter på nøyaktig samme steg som runden, også hvis du byttet i pausen.
+   */
+  assist?: boolean;
 }
 
 export function createStats(): RunStats {
@@ -121,6 +126,7 @@ function stopAtFinish(s: SkierState, dt: number): void {
 /** Ett fysikksteg for hele spillet: flyten, skiløperen og triksene. */
 export function stepGame(g: Game, inp: GameInput, dt: number): FlowEvent {
   const f = g.flow;
+  if (inp.assist !== undefined) g.landingAssist = inp.assist;
   const space = !!inp.raw.pop;
   const spacePressed = space && !f.spaceWas;
   const restartPressed = inp.restart && !f.restartWas;

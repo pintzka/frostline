@@ -6,8 +6,9 @@ import { countedGrab, createGrabs, grabName, resetGrabJump, stepGrabs, type Grab
  * Spinn og flips i lufta. Ren logikk uten three.js, så den kan testes.
  * Arbeidsstrøm 3 (Triks og poeng) eier denne fila.
  *
- * Ingen automatisk fullføring: holder du tasten, bygger rotasjonen seg mykt opp. Slipper du,
- * glir den litt videre (ca. 25°) og bremses så. Du kan altså rotere for lite eller for mye.
+ * Holder du tasten, bygger rotasjonen seg mykt opp. Slipper du, glir den litt videre (ca. 25°) og bremses så.
+ * Uten landingshjelp kan du altså rotere for lite eller for mye.
+ * Med landingshjelp (assist): slipper du nær en ren stilling, fullfører spillet rolig resten (se assistRate).
  * Ved landing sjekkes hvor nær en hel eller halv runde du er, og kroppen retter seg mykt opp.
  *
  * Off-axis (cork og rodeo): trykker du spinn og flip begge innen offAxisWindow sekunder etter avsatsen,
@@ -73,6 +74,10 @@ export interface TrickInput {
   grab?: GrabKind;
   /** var hoppet en perfekt pop? Leses i steget hoppet starter. */
   perfectPop?: boolean;
+  /** Landingshjelp på? Uten den (eller false) virker alt nøyaktig som før. */
+  assist?: boolean;
+  /** Anslått tid (s) til skiene treffer snøen. Hjelpen blir litt sterkere jo nærmere landingen er. */
+  toLand?: number;
 }
 
 export interface TrickState {
@@ -225,6 +230,61 @@ function settle(x: number, v: number, target: number, w: number, dt: number): [n
   return [target + nx, nv];
 }
 
+/** Tallene for landingshjelpen på én akse (spinn eller flip). Leses fra CONFIG hver gang, så tester kan endre dem. */
+interface AssistAxis {
+  ahead: () => number; maxDeg: () => number; accelDeg: () => number; playerDeg: () => number; coastDeg: () => number;
+}
+const SPIN_AXIS: AssistAxis = {
+  ahead: () => CONFIG.landAssistSpinAheadDeg, maxDeg: () => CONFIG.landAssistSpinMaxDeg, accelDeg: () => CONFIG.landAssistSpinAccelDeg,
+  playerDeg: () => CONFIG.spinSpeedDeg, coastDeg: () => CONFIG.spinCoastDeg,
+};
+const FLIP_AXIS: AssistAxis = {
+  ahead: () => CONFIG.landAssistFlipAheadDeg, maxDeg: () => CONFIG.landAssistFlipMaxDeg, accelDeg: () => CONFIG.landAssistFlipAccelDeg,
+  playerDeg: () => CONFIG.flipSpeedDeg, coastDeg: () => CONFIG.flipCoastDeg,
+};
+
+/**
+ * Hvilken ren stilling hjelpen sikter mot (rad), eller null hvis du er for langt unna til å få hjelp.
+ * Ser på hvor rotasjonen ville stoppet av seg selv (med glidet), i retningen du roterer:
+ * mangler den opptil «ahead» grader til neste rene stilling, er målet den. Er den opptil landAssistBackDeg forbi
+ * en ren stilling, er målet den du er forbi (tilbake). Aldri mer enn én stilling fram, så den legger aldri til rotasjoner.
+ */
+export function assistTarget(pos: number, rate: number, origin: number, jumpStart: number, step: number, aheadDeg: number, coastDeg: number, playerDeg: number): number | null {
+  const stop = pos + (Math.sign(rate) * rate * rate) / (2 * stopDecel(playerDeg * DEG, coastDeg));
+  // retningen du roterer; står rotasjonen stille, retningen du har rotert i dette hoppet
+  const dir = Math.abs(rate) > 1e-9 ? Math.sign(rate) : Math.sign(pos - jumpStart);
+  if (dir === 0) return null;
+  const a = dir * (stop - origin);
+  const lower = Math.floor(a / step) * step;
+  if (a - lower <= CONFIG.landAssistBackDeg * DEG) return origin + dir * lower;
+  if (lower + step - a <= aheadDeg * DEG) return origin + dir * (lower + step);
+  return null;
+}
+
+/**
+ * Landingshjelp for én akse: ny rotasjonsfart (rad/s), eller null når hjelpen ikke gjelder (da virker alt som før).
+ * Farten går mot målet med begrenset fart (landAssist...MaxDeg, aldri raskere enn spilleren kan selv),
+ * bygger seg opp mykt (landAssist...AccelDeg) og bremser som glidet når du slipper, så det aldri blir et hopp i farten.
+ * Jo mindre tid det er igjen til landing, jo nærmere største fart går den.
+ */
+function assistRate(pos: number, rate: number, origin: number, jumpStart: number, step: number, ax: AssistAxis, toLand: number | undefined, dt: number): number | null {
+  const target = assistTarget(pos, rate, origin, jumpStart, step, ax.ahead(), ax.coastDeg(), ax.playerDeg());
+  if (target === null) return null;
+  const rem = target - pos;
+  const dist = Math.abs(rem);
+  const maxRate = Math.min(ax.maxDeg(), ax.playerDeg()) * DEG;
+  const accel = ax.accelDeg() * DEG;
+  // fart som trengs for å være framme litt før landing, mellom minst-andelen og største fart
+  const left = Math.max(0.05, (toLand ?? Infinity) - CONFIG.landAssistMargin);
+  const cap = Math.max(maxRate * CONFIG.landAssistMinShare, Math.min(maxRate, dist / left));
+  // nær målet: bremser mykt inn (rekker å stoppe med accel), og de siste gradene glir den inn
+  const want = Math.sign(rem) * Math.min(cap, Math.sqrt(2 * accel * dist), CONFIG.landAssistSettle * dist);
+  // senke farten (bremse) går like fort som glidet når du slipper; øke farten går saktere
+  const braking = rate !== 0 && Math.sign(want - rate) === -Math.sign(rate);
+  const lim = (braking ? Math.max(accel, stopDecel(ax.playerDeg() * DEG, ax.coastDeg())) : accel) * dt;
+  return rate + Math.max(-lim, Math.min(lim, want - rate));
+}
+
 export function stepTricks(t: TrickState, inp: TrickInput, dt: number): void {
   t.landingAge += dt;
   t.justLanded = false;
@@ -288,12 +348,16 @@ export function stepTricks(t: TrickState, inp: TrickInput, dt: number): void {
   if (t.inAir) {
     t.airTime += dt;
     if (inp.spin !== 0) t.turnOut = false;
-    t.flipRate = approach(t.flipRate, inp.flip, CONFIG.flipSpeedDeg * DEG, CONFIG.flipBuild, CONFIG.flipCoastDeg, dt);
+    // landingshjelp bare på en akse der tasten ikke holdes, så den aldri kjemper imot
+    const flipHelp = inp.assist && inp.flip === 0 ? assistRate(t.flip, t.flipRate, t.flipStart, t.flipStart, TURN, FLIP_AXIS, inp.toLand, dt) : null;
+    t.flipRate = flipHelp ?? approach(t.flipRate, inp.flip, CONFIG.flipSpeedDeg * DEG, CONFIG.flipBuild, CONFIG.flipCoastDeg, dt);
     if (t.turnOut) {
       // ut av en boardslide uten å spinne selv: kroppen vris mykt tilbake langs fallinja
       [t.spin, t.spinRate] = settle(t.spin, t.spinRate, turnOutTarget(t.spin), CONFIG.railTurnOut, dt);
     } else {
-      t.spinRate = approach(t.spinRate, inp.spin, CONFIG.spinSpeedDeg * DEG, CONFIG.spinBuild, CONFIG.spinCoastDeg, dt);
+      // rene stillinger for spinn er hele og halve runder (switch er greit)
+      const spinHelp = inp.assist && inp.spin === 0 ? assistRate(t.spin, t.spinRate, 0, t.spinStart, HALF, SPIN_AXIS, inp.toLand, dt) : null;
+      t.spinRate = spinHelp ?? approach(t.spinRate, inp.spin, CONFIG.spinSpeedDeg * DEG, CONFIG.spinBuild, CONFIG.spinCoastDeg, dt);
       t.spin += t.spinRate * dt;
     }
     t.flip += t.flipRate * dt;

@@ -20,6 +20,7 @@ import { backToResult, canReplay, createRecorder, createSession, exitPressed, ne
 import { createReplayUi } from './ui/replayUi';
 import { createAudio } from './audio/engine';
 import { createQualityUi } from './ui/qualityUi';
+import { createAssistUi } from './ui/assistUi';
 import { createChallengesUi } from './ui/challengesUi';
 import { CURRENT_CHALLENGES } from './challenges/index';
 import { CURRENT_PARK_ID } from './park/parks';
@@ -34,7 +35,16 @@ const chase = createChaseCamera(innerWidth / innerHeight);
 addEventListener('resize', () => chase.resize(innerWidth / innerHeight));
 const hud = createHud(root);
 const input = createInput(renderer.domElement, createTouchControls(root));
-const menu = createMenu(root, quality.picker());
+// landingshjelp På / Av (ui/assistUi.ts), også valgt på startskjermen og i pausen
+const assist = createAssistUi();
+/** Grafikkvalget og landingshjelpen under hverandre. */
+function settingsBox(): HTMLElement {
+  const box = document.createElement('div');
+  box.style.cssText = 'display:flex;flex-direction:column;gap:10px;align-items:center;';
+  box.append(quality.picker(), assist.picker());
+  return box;
+}
+const menu = createMenu(root, settingsBox());
 const audio = createAudio();
 const challenges = createChallengesUi(root, menu, CURRENT_PARK_ID, PARK, CURRENT_CHALLENGES);
 const replayUi = createReplayUi(root);
@@ -109,7 +119,7 @@ const loop = createLoop({
     prev = { ...game.skier };
     prevTricks = { ...game.tricks };
     // R (eller Y på gamepad) gir ny runde med en gang; mellomrom eller klikk starter fra start- og resultatskjermen
-    const inp: GameInput = { raw: input.read(), click: menu.takeClick(), restart: input.takeRestart() };
+    const inp: GameInput = { raw: input.read(), click: menu.takeClick(), restart: input.takeRestart(), assist: assist.on };
     const ev = stepGame(game, inp, dt);
     recordStep(recorder, game, inp, ev);
     if (ev) { menu.onEvent(ev, game); saveBest(CURRENT_PARK_ID, Math.max(game.best, game.score.total)); }
@@ -178,4 +188,4 @@ const pausable = {
   toggle() { if (loop.isPaused()) pausable.resume(); else pausable.pause(); return loop.isPaused(); },
   isPaused: () => loop.isPaused(),
 };
-input.onPause(createPauseUi(root, pausable, quality.picker()).toggle);
+input.onPause(createPauseUi(root, pausable, settingsBox()).toggle);
