@@ -1,4 +1,5 @@
 import { heightAt, PARK } from '../park/terrain';
+import { LOOK } from './look';
 
 /**
  * Hvor trær, hoppmerker og fjell skal stå. Ren logikk uten three.js, så det kan testes.
@@ -13,7 +14,7 @@ export const GROUND_HALF = PARK.width / 2 + 20;
 export const WORLD = { halfWidth: 340, zMin: -260, zMax: 980 };
 
 /** Trærne står minst så langt fra midten (m). Skiløperen kommer aldri lenger ut enn PARK.width / 2. */
-export const TREE_MIN_X = PARK.width / 2 + 7;
+export const TREE_MIN_X = PARK.width / 2 + LOOK.forest.edgeMargin;
 
 // terrenget utenfor bakken: fortsetter "bollen", flater mykt ut og ender i en rygg
 const OUTER_FAR_GRAD = 0.12;
@@ -77,7 +78,7 @@ export function trunkRadius(t: { height: number; girth: number }): number {
 }
 
 /** Minste avstand mellom to trær (m). */
-export const MIN_TREE_GAP = 2.8;
+export const MIN_TREE_GAP = LOOK.forest.gap;
 
 /** Ingen trær nærmere enn dette fra et hopp eller et hoppmerke (m). */
 export const KICKER_CLEARANCE = 12;
@@ -117,7 +118,8 @@ export function treeAllowed(x: number, z: number): boolean {
  * Trær i grupper langs begge sider. Tett ved løypa (der de suser forbi), glissent lenger ut.
  * Hver gruppe er en klynge rundt et midtpunkt, så det blir skog og lysninger, ikke rutenett.
  */
-export function planTrees(seed = 2026): Tree[] {
+export function planTrees(seed: number = LOOK.forest.seed): Tree[] {
+  const F = LOOK.forest;
   const rnd = makeRandom(seed);
   const trees: Tree[] = [];
   // rutenett bare for å finne naboer fort og holde avstand, ikke for plassering
@@ -135,7 +137,7 @@ export function planTrees(seed = 2026): Tree[] {
 
   const addTree = (x: number, z: number, big: number) => {
     if (!treeAllowed(x, z) || !free(x, z)) return;
-    const height = (5.5 + rnd() * 6.5) * big;
+    const height = (F.height.min + rnd() * F.height.range) * big;
     const girth = 0.85 + rnd() * 0.3;
     // sett foten så dypt at hele stammen står i snøen, også i bratte lier
     const y = groundAt(x, z) - 0.3 - steepness(x, z) * trunkRadius({ height, girth }) * 1.5;
@@ -146,29 +148,46 @@ export function planTrees(seed = 2026): Tree[] {
     if (list) list.push(t); else cellTrees.set(k, [t]);
   };
 
-  for (const side of [-1, 1]) {
-    // nær løypa: en klynge omtrent hver 14. meter nedover
-    for (let z = WORLD.zMin + 20; z < WORLD.zMax - 20; z += 6 + rnd() * 10) {
-      const cx = TREE_MIN_X + 2 + rnd() * 22;
-      const n = 3 + Math.floor(rnd() * 8);
-      const spread = 3 + rnd() * 5;
+  // nær løypa: små klynger tett i tett (de suser forbi). Lenger ut: større, glisnere skogholt opp i liene.
+  const bands = [
+    { ...F.near, scale: 1, stretch: 1.6 },
+    { ...F.far, scale: F.height.farScale, stretch: 1.4 },
+  ];
+  for (const side of [-1, 1]) for (const b of bands) {
+    for (let z = WORLD.zMin + 20; z < WORLD.zMax - 20; z += b.step[0] + rnd() * b.step[1]) {
+      const cx = TREE_MIN_X + b.out[0] + rnd() * b.out[1];
+      const n = b.count[0] + Math.floor(rnd() * b.count[1]);
+      const spread = b.spread[0] + rnd() * b.spread[1];
       for (let i = 0; i < n; i++) {
         const a = rnd() * Math.PI * 2, r = spread * Math.sqrt(rnd());
-        addTree(side * (cx + Math.cos(a) * r), z + Math.sin(a) * r * 1.6, 1);
-      }
-    }
-    // lenger ut: større, glisnere skogholt opp i liene
-    for (let z = WORLD.zMin + 20; z < WORLD.zMax - 20; z += 9 + rnd() * 15) {
-      const cx = TREE_MIN_X + 25 + rnd() * 105;
-      const n = 6 + Math.floor(rnd() * 12);
-      const spread = 6 + rnd() * 10;
-      for (let i = 0; i < n; i++) {
-        const a = rnd() * Math.PI * 2, r = spread * Math.sqrt(rnd());
-        addTree(side * (cx + Math.cos(a) * r), z + Math.sin(a) * r * 1.4, 1.15);
+        addTree(side * (cx + Math.cos(a) * r), z + Math.sin(a) * r * b.stretch, b.scale);
       }
     }
   }
   return trees;
+}
+
+export interface ForestChunk {
+  trees: Tree[];
+  /** Boksen rundt alle trærne i biten (hjørnene). */
+  min: [number, number, number];
+  max: [number, number, number];
+}
+
+/** Deler skogen i biter langs bakken og på hver side, med en boks rundt hver bit (for å skjule bitene i tåka). */
+export function forestChunks(trees: Tree[]): ForestChunk[] {
+  const map = new Map<string, ForestChunk>();
+  for (const t of trees) {
+    const k = `${Math.floor(t.z / LOOK.forest.chunk)},${t.x > 0 ? 1 : 0}`;
+    let c = map.get(k);
+    if (!c) { c = { trees: [], min: [Infinity, Infinity, Infinity], max: [-Infinity, -Infinity, -Infinity] }; map.set(k, c); }
+    c.trees.push(t);
+    // kronen er omtrent en tredel av høyden bred til hver side
+    const r = t.height * t.girth * 0.3;
+    const lo = [t.x - r, t.y, t.z - r], hi = [t.x + r, t.y + t.height, t.z + r];
+    for (let i = 0; i < 3; i++) { c.min[i] = Math.min(c.min[i], lo[i]); c.max[i] = Math.max(c.max[i], hi[i]); }
+  }
+  return [...map.values()];
 }
 
 export interface Marker {

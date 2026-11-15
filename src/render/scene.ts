@@ -1,7 +1,9 @@
 import * as THREE from 'three';
-import { heightAt } from '../park/terrain';
-import { gridIndex, groundColumns, groundRows } from './groundGrid';
+import { buildGroundMesh } from './groundGrid';
 import { createEnvironment, HAZE } from './environment';
+import { snapShadowTarget, type Vec3 } from './envMath';
+import { LOOK } from './look';
+import { useRadialFog } from './radialFog';
 
 /**
  * Scene, lys og testbakken, med miljøet rundt (environment.ts). Arbeidsstrøm 6 (Grafikk og effekter) eier denne fila.
@@ -14,34 +16,35 @@ export function createScene(root: HTMLElement) {
   root.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();
-  // tåka har samme farge som disen i horisonten, så bakken glir over i himmelen
+  // tåka har samme farge som disen i horisonten, så bakken glir over i himmelen.
+  // Den regnes ut fra avstanden til kameraet, så den ikke endrer seg når du svinger.
+  useRadialFog();
   scene.background = new THREE.Color(HAZE);
-  scene.fog = new THREE.Fog(HAZE, 60, 280);
+  scene.fog = new THREE.Fog(HAZE, LOOK.fog.near, LOOK.fog.far);
 
   scene.add(new THREE.HemisphereLight(0xdfeeff, 0x8899aa, 1.1));
   const sun = new THREE.DirectionalLight(0xffffff, 1.6);
-  sun.position.set(30, 60, -20);
+  const toSun: Vec3 = [30, 60, -20];
+  sun.position.set(...toSun);
   sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.mapSize.set(LOOK.shadow.mapSize, LOOK.shadow.mapSize);
   const sc = sun.shadow.camera;
-  sc.left = -30; sc.right = 30; sc.top = 30; sc.bottom = -30; sc.near = 1; sc.far = 200;
+  const S = LOOK.shadow.half;
+  sc.left = -S; sc.right = S; sc.top = S; sc.bottom = -S; sc.near = 1; sc.far = 200;
   scene.add(sun, sun.target);
 
   // preparert bakke: riller langs fallinja og korn som suser forbi, så farten synes.
   // Punktene står tett der hoppene krummer (groundGrid.ts), så snøen ligger der fysikken er.
-  const xs = groundColumns(), zs = groundRows();
-  const pos = new Float32Array(xs.length * zs.length * 3);
-  const uv = new Float32Array(xs.length * zs.length * 2);
-  let n = 0, m = 0;
-  for (const z of zs) for (const x of xs) {
-    pos[n++] = x; pos[n++] = heightAt(x, z); pos[n++] = z;
+  const mesh = buildGroundMesh();
+  const uv = new Float32Array((mesh.positions.length / 3) * 2);
+  for (let i = 0, j = 0; i < mesh.positions.length; i += 3) {
     // teksturen gjentas hver TILE_M meter; rillene går langs bakken
-    uv[m++] = x / TILE_M; uv[m++] = -z / TILE_M;
+    uv[j++] = mesh.positions[i] / TILE_M; uv[j++] = -mesh.positions[i + 2] / TILE_M;
   }
   const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('position', new THREE.BufferAttribute(mesh.positions, 3));
   geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
-  geo.setIndex(new THREE.BufferAttribute(gridIndex(xs.length, zs.length), 1));
+  geo.setIndex(new THREE.BufferAttribute(mesh.indices, 1));
   geo.computeVertexNormals();
   const tex = snowTexture(renderer);
   const ground = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0xdde3ea, map: tex, roughness: 0.9 }));
@@ -51,8 +54,15 @@ export function createScene(root: HTMLElement) {
   // himmel, fjell, skog og lykter rundt bakken
   const env = createEnvironment(scene, sun.position.clone().normalize());
 
+  /** Sola og skyggeboksen følger skiløperen, men bare i hele skyggepiksler, så skyggene ikke flimrer. */
+  function sunFollow(target: THREE.Vector3) {
+    const [x, y, z] = snapShadowTarget([target.x, target.y, target.z], toSun);
+    sun.target.position.set(x, y, z);
+    sun.position.set(x + toSun[0], y + toSun[1], z + toSun[2]);
+  }
+
   addEventListener('resize', () => renderer.setSize(innerWidth, innerHeight));
-  return { renderer, scene, sun, env };
+  return { renderer, scene, env, sunFollow };
 }
 
 /** Teksturen dekker så mange meter i hver retning. */

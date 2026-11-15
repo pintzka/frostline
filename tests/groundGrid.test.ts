@@ -1,43 +1,77 @@
 import { describe, expect, it } from 'vitest';
 import { CONFIG } from '../src/core/config';
 import { heightAt, LANDING, PARK, rampLength } from '../src/park/terrain';
-import { FINE, groundColumns, groundRows, gridIndex, meshHeight } from '../src/render/groundGrid';
-import { GROUND_HALF, makeRandom, WORLD } from '../src/render/sceneryLayout';
+import { buildGroundMesh, FINE, groundRows, type GroundMesh } from '../src/render/groundGrid';
+import { GROUND_HALF, WORLD } from '../src/render/sceneryLayout';
 
-const xs = groundColumns();
-const zs = groundRows();
-const shown = (x: number, z: number) => meshHeight(xs, zs, heightAt, x, z);
 const MAX_GAP = 0.03;
 
-describe('den synlige bakken stemmer med fysikkbakken', () => {
-  it('rundt hvert hopp: under 3 cm forskjell, også på sidene av platået', () => {
-    for (const k of PARK.kickers) {
-      let worst = 0;
-      const z0 = k.z - rampLength(k) - 2, z1 = k.z + k.landingStart + LANDING.knuckle + 4;
-      for (let z = z0; z <= z1; z += 0.13) for (let x = -(k.width / 2 + 6); x <= k.width / 2 + 6; x += 0.07) {
-        worst = Math.max(worst, Math.abs(shown(x, z) - heightAt(x, z)));
-      }
-      expect(worst, `${k.name}: ${worst.toFixed(3)} m`).toBeLessThan(MAX_GAP);
+/**
+ * Største forskjell mellom det meshen viser (rett linje mellom punktene i hver trekant)
+ * og fysikkbakken, prøvd på 15 punkter i hver trekant.
+ */
+function worstGap(mesh: GroundMesh, keep: (x: number, z: number) => boolean = () => true): number {
+  const p = mesh.positions, ix = mesh.indices;
+  let worst = 0;
+  for (let t = 0; t < ix.length; t += 3) {
+    const a = ix[t] * 3, b = ix[t + 1] * 3, c = ix[t + 2] * 3;
+    if (!keep((p[a] + p[b] + p[c]) / 3, (p[a + 2] + p[b + 2] + p[c + 2]) / 3)) continue;
+    for (let i = 0; i <= 4; i++) for (let j = 0; i + j <= 4; j++) {
+      const u = i / 4, v = j / 4, w = 1 - u - v;
+      const x = u * p[a] + v * p[b] + w * p[c];
+      const y = u * p[a + 1] + v * p[b + 1] + w * p[c + 1];
+      const z = u * p[a + 2] + v * p[b + 2] + w * p[c + 2];
+      worst = Math.max(worst, Math.abs(y - heightAt(x, z)));
     }
-  });
+  }
+  return worst;
+}
 
-  it('i hele løypa: under 3 cm forskjell', () => {
-    const rnd = makeRandom(5);
-    let worst = 0;
-    for (let i = 0; i < 60000; i++) {
-      const x = (rnd() * 2 - 1) * PARK.width / 2, z = FINE.zMin + rnd() * (FINE.zMax - FINE.zMin);
-      worst = Math.max(worst, Math.abs(shown(x, z) - heightAt(x, z)));
-    }
-    expect(worst).toBeLessThan(MAX_GAP);
+const mesh = buildGroundMesh();
+const zs = groundRows();
+
+describe('den synlige bakken stemmer med fysikkbakken', () => {
+  it('under 3 cm forskjell overalt i løypa og rundt hoppene', () => {
+    expect(worstGap(mesh)).toBeLessThan(MAX_GAP);
   });
 
   it('har en rad punkter akkurat på hver hoppkant (der rampen knekker)', () => {
     for (const k of PARK.kickers) expect(zs).toContain(k.z);
   });
 
+  it('den tette sonen følger hoppene: et mye bredere hopp stemmer også', () => {
+    const k = PARK.kickers[2];
+    const old = k.width;
+    k.width = 34;
+    try {
+      const wide = buildGroundMesh();
+      const near = (x: number, z: number) => Math.abs(x) < k.width / 2 + 8 && z > k.z - rampLength(k) - 3 && z < k.z + 60;
+      expect(worstGap(wide, near)).toBeLessThan(MAX_GAP);
+    } finally {
+      k.width = old;
+    }
+  });
+
+  it('er glissen der bakken er rett: få trekanter langt fra hoppene', () => {
+    const p = mesh.positions, ix = mesh.indices;
+    let calm = 0;
+    for (let t = 0; t < ix.length; t += 3) {
+      const z = p[ix[t] * 3 + 2];
+      if (z > 20 && z < 120) calm++;
+    }
+    // 100 m bakke uten hopp: bare noen tusen trekanter
+    expect(calm).toBeLessThan(15000);
+  });
+
   it('dekker hele bredden og går forbi restart og slutten av utkjøringen', () => {
-    expect(xs[0]).toBe(-GROUND_HALF);
-    expect(xs[xs.length - 1]).toBe(GROUND_HALF);
+    let minX = Infinity, maxX = -Infinity;
+    for (let i = 0; i < mesh.positions.length; i += 3) {
+      minX = Math.min(minX, mesh.positions[i]); maxX = Math.max(maxX, mesh.positions[i]);
+    }
+    expect(minX).toBe(-GROUND_HALF);
+    expect(maxX).toBe(GROUND_HALF);
+    expect(zs[0]).toBe(FINE.zMin);
+    expect(zs[zs.length - 1]).toBe(FINE.zMax);
     const restart = PARK.length - CONFIG.runEndMargin;
     const runoutEnd = Math.max(...PARK.kickers.map((k) => k.z + k.landingStart + LANDING.knuckle + LANDING.steep + LANDING.runout));
     expect(FINE.zMax).toBeGreaterThanOrEqual(restart + 20);
@@ -47,7 +81,6 @@ describe('den synlige bakken stemmer med fysikkbakken', () => {
   });
 
   it('holder antall trekanter nede (god ytelse)', () => {
-    const tris = gridIndex(xs.length, zs.length).length / 3;
-    expect(tris).toBeLessThan(300000);
+    expect(mesh.indices.length / 3).toBeLessThan(200000);
   });
 });

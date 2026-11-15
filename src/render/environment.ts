@@ -1,7 +1,9 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { FINE } from './groundGrid';
-import { GROUND_HALF, groundAt, planMarkers, planTrees, ridgeProfile, WORLD, type Tree } from './sceneryLayout';
+import { glowStrength, hiddenByFog, ringCenter, type Vec3 } from './envMath';
+import { LOOK } from './look';
+import { forestChunks, GROUND_HALF, groundAt, planMarkers, planTrees, ridgeProfile, WORLD } from './sceneryLayout';
 
 /**
  * Miljøet rundt bakken: himmel, fjell i dis, terrenget utenfor løypa, skog og lykter ved hoppene.
@@ -26,15 +28,25 @@ const SKY = {
 export function createEnvironment(scene: THREE.Scene, sunDir: THREE.Vector3) {
   const sky = createSky(sunDir);
   const mountains = createMountains();
-  scene.add(sky.mesh, ...mountains.map((m) => m.mesh), createOuterGround(), ...createForest(), createMarkers());
+  const forest = createForest();
+  const markers = createMarkers();
+  scene.add(sky.mesh, ...mountains.map((m) => m.mesh), createOuterGround(), ...forest.map((f) => f.mesh), markers.group);
+  // fast punkt i verden (starten) som den nærmeste fjellringen glir rundt
+  const anchor: Vec3 = [0, 0, 0];
+  const c: Vec3 = [0, 0, 0];
 
   return {
     /** Himmel og fjell flytter seg med kameraet, så de alltid er langt unna og aldri kan nås. */
     follow(cam: THREE.Vector3, time: number) {
+      c[0] = cam.x; c[1] = cam.y; c[2] = cam.z;
       sky.mesh.position.copy(cam);
       sky.uniforms.uTime.value = time;
-      // de nærmeste fjellene henger litt etter, så de glir sakte forbi (dybde)
-      for (const m of mountains) m.mesh.position.set(cam.x * m.follow, cam.y, cam.z * m.follow);
+      // den nærmeste ringen står litt fast i verden, så den glir sakte forbi (dybde)
+      for (const m of mountains) m.mesh.position.set(...ringCenter(c, anchor, m.parallax));
+      // skog-biter som er helt i tåka trenger ikke tegnes (de er uansett bare tåkefarge)
+      for (const f of forest) f.mesh.visible = !hiddenByFog(c, f.min, f.max);
+      // lyktegløden blekner med avstanden, så den ikke lyser gjennom tett dis
+      for (const g of markers.glows) g.sprite.material.opacity = LOOK.glow.opacity * glowStrength(g.at.distanceTo(cam));
     },
   };
 }
@@ -126,16 +138,11 @@ function mix(a: number, b: number, t: number): THREE.Color {
 
 function createMountains() {
   const haze = new THREE.Color(HAZE);
-  const layers = [
-    { r: 820, low: 0.8, high: 5.5, body: 0x324a6e, hazeAmt: 0.25, follow: 0.9, seed: 11, glowAmt: 0 },
-    { r: 1200, low: 1.8, high: 8, body: 0x5a7099, hazeAmt: 0.5, follow: 1, seed: 23, glowAmt: 0.25 },
-    { r: 1600, low: 2.8, high: 11, body: 0x8796b8, hazeAmt: 0.68, follow: 1, seed: 37, glowAmt: 0.6 },
-  ];
   const N = 320;
   const BASE = -10 * (Math.PI / 180);
   const ROWS = 4;
 
-  return layers.map((L) => {
+  return LOOK.mountains.layers.map((L, i) => {
     const ridge = ridgeProfile(L.seed, N, L.low, L.high);
     const pos: number[] = [], col: number[] = [], idx: number[] = [];
     const push = (a: number, elev: number, c: THREE.Color) => {
@@ -148,12 +155,12 @@ function createMountains() {
       const u = (ridge[i % N] - L.low) / (L.high - L.low); // 0 = skar, 1 = topp
       // snø på de høyeste toppene, og varm kveldsglød på de fjerneste
       const snowy = mix(L.body, 0xe8eef7, THREE.MathUtils.smoothstep(u, 0.35, 0.8) * 0.85);
-      const peak = mix(snowy.getHex(), 0xf0c4b8, L.glowAmt * u);
+      const peak = mix(snowy.getHex(), 0xf0c4b8, L.glow * u);
       // fire rader: dis nederst, fjellside, snøgrense og topp (snøen ligger bare øverst)
       push(a, BASE, haze);
-      push(a, top * 0.5, mix(L.body, HAZE, L.hazeAmt + (1 - L.hazeAmt) * 0.6));
-      push(a, top * 0.85, mix(L.body, HAZE, L.hazeAmt));
-      push(a, top, mix(peak.getHex(), HAZE, L.hazeAmt));
+      push(a, top * 0.5, mix(L.body, HAZE, L.haze + (1 - L.haze) * 0.6));
+      push(a, top * 0.85, mix(L.body, HAZE, L.haze));
+      push(a, top, mix(peak.getHex(), HAZE, L.haze));
       if (i < N) {
         const b = i * ROWS;
         for (const row of [0, 1, 2]) {
@@ -170,7 +177,7 @@ function createMountains() {
     const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, fog: false, side: THREE.DoubleSide }));
     mesh.renderOrder = -1;
     mesh.frustumCulled = false;
-    return { mesh, follow: L.follow };
+    return { mesh, parallax: i === 0 ? LOOK.mountains.parallax : 0 };
   });
 }
 
@@ -247,24 +254,19 @@ function treeGeometry() {
 }
 
 /**
- * Skogen: ett InstancedMesh per bit av bakken (ca. 120 m), så kameraet bare tegner bitene
- * som er i bildet.
+ * Skogen: ett InstancedMesh per bit av bakken, så kameraet bare tegner bitene som er i bildet
+ * og ikke helt i tåka. Trærne kaster ikke skygge: skyggene finnes bare i en liten boks rundt
+ * skiløperen, og treskygger ville kommet og gått med en hard kant.
  */
 function createForest() {
   const geo = treeGeometry();
   const mat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
-  const chunks = new Map<number, Tree[]>();
-  for (const t of planTrees()) {
-    const k = Math.floor(t.z / 120) * 2 + (t.x > 0 ? 1 : 0);
-    const list = chunks.get(k);
-    if (list) list.push(t); else chunks.set(k, [t]);
-  }
   const m = new THREE.Matrix4(), q = new THREE.Quaternion(), p = new THREE.Vector3(), s = new THREE.Vector3();
   const Y = new THREE.Vector3(0, 1, 0);
   const tint = new THREE.Color();
-  return [...chunks.values()].map((trees) => {
-    const mesh = new THREE.InstancedMesh(geo, mat, trees.length);
-    trees.forEach((t, i) => {
+  return forestChunks(planTrees()).map((chunk) => {
+    const mesh = new THREE.InstancedMesh(geo, mat, chunk.trees.length);
+    chunk.trees.forEach((t, i) => {
       p.set(t.x, t.y, t.z);
       q.setFromAxisAngle(Y, t.turn);
       s.set(t.height * t.girth, t.height, t.height * t.girth);
@@ -274,8 +276,7 @@ function createForest() {
       mesh.setColorAt(i, tint);
     });
     mesh.computeBoundingSphere();
-    mesh.castShadow = true;
-    return mesh;
+    return { mesh, min: chunk.min, max: chunk.max };
   });
 }
 
@@ -293,25 +294,26 @@ function createMarkers() {
   lampGeo.translate(0, 3.3, 0);
   const lampMat = new THREE.MeshBasicMaterial({ color: 0xffd9a0 });
   // myk glød rundt lykta som syns gjennom disen (tegnet i kode)
-  const glowMat = new THREE.SpriteMaterial({
-    map: glowTexture(), color: 0xffb36b, transparent: true, depthWrite: false,
-    blending: THREE.AdditiveBlending, fog: false, opacity: 0.7,
-  });
+  const glowMap = glowTexture();
+  const glows: { sprite: THREE.Sprite; at: THREE.Vector3 }[] = [];
   for (const mk of planMarkers()) {
     const post = new THREE.Group();
     post.position.set(mk.x, mk.y, mk.z);
     const flag = new THREE.Mesh(flagGeo, flagMat);
     // flagget peker utover, bort fra hoppet
     flag.rotation.y = mk.x > 0 ? 0 : Math.PI;
-    const glow = new THREE.Sprite(glowMat);
+    // hver glød har sitt eget materiale, så den kan blekne for seg selv med avstanden
+    const glow = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: glowMap, color: 0xffb36b, transparent: true, depthWrite: false,
+      blending: THREE.AdditiveBlending, fog: false, opacity: LOOK.glow.opacity,
+    }));
     glow.position.y = 3.3;
-    glow.scale.setScalar(2.6);
-    const postMesh = new THREE.Mesh(postGeo, postMat);
-    postMesh.castShadow = true;
-    post.add(postMesh, flag, new THREE.Mesh(lampGeo, lampMat), glow);
+    glow.scale.setScalar(LOOK.glow.size);
+    glows.push({ sprite: glow, at: new THREE.Vector3(mk.x, mk.y + 3.3, mk.z) });
+    post.add(new THREE.Mesh(postGeo, postMat), flag, new THREE.Mesh(lampGeo, lampMat), glow);
     group.add(post);
   }
-  return group;
+  return { group, glows };
 }
 
 function glowTexture() {

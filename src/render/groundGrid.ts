@@ -1,82 +1,146 @@
-import { DECK, PARK } from '../park/terrain';
+import { heightAt, PARK } from '../park/terrain';
+import { LOOK } from './look';
 import { GROUND_HALF } from './sceneryLayout';
 
 /**
  * Punktene i den preparerte bakken (meshen i scene.ts). Ren logikk uten three.js, så den kan testes.
- * Punktene står tett der bakken krummer mye (sidene av hoppene og kanten ned til platået),
- * og glissent der bakken er nesten rett. Da stemmer den synlige snøen med fysikkbakken (heightAt).
+ *
+ * Punktene settes ut fra hvor mye bakken faktisk krummer (målt på heightAt): tett der hoppene
+ * bøyer seg (rampe, kant, sider og landing), glissent der bakken er nesten rett. Da følger den
+ * tette sonen hoppene av seg selv, også hvis hoppene blir bredere eller flyttes.
+ * Hver rad kan ha sine egne punkter på tvers; radene sys sammen med trekanter uten hull.
  * Arbeidsstrøm 6 (Grafikk og effekter) eier denne fila.
  */
 
 /** Hvor den preparerte bakken begynner og slutter (m nedover). Slutten ligger godt forbi restart og utkjøringen. */
 export const FINE = { zMin: -20, zMax: 600 };
 
-/** Avstand mellom punktene (m). */
-const STEP = { x: 2, xCenter: 1.5, xKickerSide: 0.2, z: 0.5, zLip: 0.25 };
+const G = LOOK.ground;
 
-/** Hopper over tall som ligger nesten oppå hverandre, og sorterer. */
-function tidy(v: number[]): number[] {
-  const s = [...v].sort((a, b) => a - b);
-  return s.filter((x, i) => i === 0 || x - s[i - 1] > 1e-6);
-}
-
-/** Punkter fra a til b med høyst `step` mellom, og alltid med a og b. */
-function fill(a: number, b: number, step: number): number[] {
-  const n = Math.max(1, Math.ceil((b - a) / step - 1e-9));
-  return Array.from({ length: n + 1 }, (_, i) => a + ((b - a) * i) / n);
-}
-
-/** Punktene på tvers (x). Tett i overgangen der hoppene møter bakken på sidene. */
-export function groundColumns(): number[] {
-  // hoppene bøyer seg ned til bakken mellom halve bredden og halve bredden + 3 m (se terrain.ts)
-  const sideMin = Math.min(...PARK.kickers.map((k) => k.width / 2));
-  const sideMax = Math.max(...PARK.kickers.map((k) => k.width / 2 + 3));
-  const half = [
-    ...fill(0, sideMin, STEP.xCenter),
-    ...fill(sideMin, sideMax, STEP.xKickerSide),
-    ...fill(sideMax, GROUND_HALF, STEP.x),
-  ];
-  return tidy([...half.map((x) => -x), ...half]);
-}
-
-/** Punktene langs bakken (z). Tettere ved kanten ned til platået, og en rad akkurat på hver hoppkant. */
-export function groundRows(): number[] {
-  const rows = fill(FINE.zMin, FINE.zMax, STEP.z);
-  for (const k of PARK.kickers) rows.push(...fill(k.z, k.z + DECK.drop, STEP.zLip));
-  return tidy(rows);
-}
-
-/** Finn ruta (indeksen til punktet foran) som tallet ligger i. */
-function cellOf(v: number[], x: number): number {
-  let lo = 0, hi = v.length - 2;
-  while (lo < hi) {
-    const mid = (lo + hi + 1) >> 1;
-    if (v[mid] <= x) lo = mid; else hi = mid - 1;
-  }
-  return lo;
+/** Avstanden mellom punktene som holder avviket under toleransen der bakken krummer så mye. */
+function spacingFor(curvature: number, max: number): number {
+  if (curvature < 1e-9) return max;
+  return Math.min(max, Math.max(G.minSpacing, Math.sqrt((8 * G.tolerance) / curvature)));
 }
 
 /**
- * Høyden meshen faktisk viser i (x, z): hver rute er delt i to trekanter langs diagonalen
- * fra (x1, z0) til (x0, z1), akkurat som i scene.ts.
+ * Setter ut punkter fra a til b. `need[k]` er største tillatte avstand ved prøvepunkt k (hver `h` meter).
+ * Punktene i `must` kommer alltid med (f.eks. hoppkanten, der rampen knekker).
  */
-export function meshHeight(xs: number[], zs: number[], h: (x: number, z: number) => number, x: number, z: number): number {
-  const i = cellOf(xs, x), j = cellOf(zs, z);
-  const x0 = xs[i], x1 = xs[i + 1], z0 = zs[j], z1 = zs[j + 1];
-  const s = (x - x0) / (x1 - x0), t = (z - z0) / (z1 - z0);
-  const ha = h(x0, z0), hb = h(x1, z0), hc = h(x0, z1), hd = h(x1, z1);
-  if (s + t <= 1) return ha + s * (hb - ha) + t * (hc - ha);
-  return hd + (1 - s) * (hc - hd) + (1 - t) * (hb - hd);
+function place(a: number, b: number, h: number, need: number[], must: number[] = []): number[] {
+  const minNeed = (p: number, q: number) => {
+    let m = Infinity;
+    const k0 = Math.max(0, Math.floor((p - a) / h)), k1 = Math.min(need.length - 1, Math.ceil((q - a) / h));
+    for (let k = k0; k <= k1; k++) m = Math.min(m, need[k]);
+    return m;
+  };
+  const out = [a];
+  let p = a;
+  while (b - p > 1e-6) {
+    // ta så langt steg som mulig, men aldri lenger enn det tetteste kravet på veien
+    let s = minNeed(p, p);
+    for (let i = 0; i < 6; i++) {
+      const s2 = minNeed(p, p + s);
+      if (s2 >= s) break;
+      s = s2;
+    }
+    let next = Math.min(b, p + s);
+    for (const m of must) if (m > p + 1e-6 && m < next) next = m;
+    out.push(next);
+    p = next;
+  }
+  return out;
 }
 
-/** Trekantene i rutenettet: rute (i, j) blir (a, c, b) og (b, c, d), så normalene peker opp. */
-export function gridIndex(columns: number, rows: number): Uint32Array {
-  const idx = new Uint32Array((columns - 1) * (rows - 1) * 6);
-  let n = 0;
-  for (let j = 0; j < rows - 1; j++) for (let i = 0; i < columns - 1; i++) {
-    const a = j * columns + i, b = a + 1, c = a + columns, d = c + 1;
-    idx[n++] = a; idx[n++] = c; idx[n++] = b;
-    idx[n++] = b; idx[n++] = c; idx[n++] = d;
+/** Høyden prøvd i et rutenett: rad for hver `hz` meter langs bakken, punkt for hver `hx` meter på tvers. */
+function sampleRow(z: number, hx: number): number[] {
+  const out: number[] = [];
+  for (let x = -GROUND_HALF - hx; x <= GROUND_HALF + hx + 1e-9; x += hx) out.push(heightAt(x, z));
+  return out;
+}
+
+/** Hvor mye bakken krummer, ut fra tre prøverader (før, her, etter). Kryssleddet merkes på skrå i trekantene. */
+function bend(prev: number[], here: number[], next: number[], k: number, hx: number, hz: number) {
+  return {
+    xx: Math.abs(here[k + 1] - 2 * here[k] + here[k - 1]) / (hx * hx),
+    zz: Math.abs(next[k] - 2 * here[k] + prev[k]) / (hz * hz),
+    xz: Math.abs(next[k + 1] - next[k - 1] - prev[k + 1] + prev[k - 1]) / (4 * hx * hz),
+  };
+}
+
+/** Radene langs bakken (z). */
+export function groundRows(): number[] {
+  const hz = 0.25, hx = 1;
+  const need: number[] = [];
+  let prev = sampleRow(FINE.zMin - hz, hx), here = sampleRow(FINE.zMin, hx);
+  for (let z = FINE.zMin; z <= FINE.zMax + 1e-9; z += hz) {
+    const next = sampleRow(z + hz, hx);
+    let c = 0;
+    for (let k = 1; k < here.length - 1; k++) {
+      const b = bend(prev, here, next, k, hx, hz);
+      c = Math.max(c, b.zz, b.xz);
+    }
+    need.push(spacingFor(c, G.maxRowSpacing));
+    prev = here; here = next;
   }
-  return idx;
+  // hoppkanten er en knekk (ikke en kurve), så den må ligge akkurat på en rad
+  return place(FINE.zMin, FINE.zMax, hz, need, PARK.kickers.map((k) => k.z));
+}
+
+/** Kravet til avstand på tvers langs én rad, prøvd hver `h` meter. */
+function columnNeed(z: number, h: number): number[] {
+  const prev = sampleRow(z - h, h), here = sampleRow(z, h), next = sampleRow(z + h, h);
+  const need: number[] = [];
+  for (let k = 1; k < here.length - 1; k++) {
+    const b = bend(prev, here, next, k, h, h);
+    need.push(spacingFor(Math.max(b.xx, b.xz), G.maxColumnSpacing));
+  }
+  return need;
+}
+
+export interface GroundMesh {
+  /** x, y, z for hvert punkt. */
+  positions: Float32Array;
+  /** Tre punkter per trekant. Normalene peker opp. */
+  indices: Uint32Array;
+  rows: number;
+}
+
+/** Bygger hele den preparerte bakken: punkter og trekanter. */
+export function buildGroundMesh(): GroundMesh {
+  const zs = groundRows();
+  const h = 0.2;
+  const needs = zs.map((z) => columnNeed(z, h));
+  // hver rad bruker det strengeste kravet av seg selv og naboene, så trekantene mellom radene også holder
+  const cols = zs.map((_, j) => {
+    const own = needs[j], prev = needs[j - 1] ?? own, next = needs[j + 1] ?? own;
+    const need = own.map((v, k) => Math.min(v, prev[k], next[k]));
+    return place(-GROUND_HALF, GROUND_HALF, h, need);
+  });
+
+  const count = cols.reduce((s, c) => s + c.length, 0);
+  const positions = new Float32Array(count * 3);
+  const start: number[] = [];
+  let n = 0;
+  zs.forEach((z, j) => {
+    start.push(n / 3);
+    for (const x of cols[j]) { positions[n++] = x; positions[n++] = heightAt(x, z); positions[n++] = z; }
+  });
+
+  // sy sammen to og to rader: gå bortover begge samtidig og lag en trekant for hvert steg
+  const idx: number[] = [];
+  for (let j = 0; j < zs.length - 1; j++) {
+    const A = cols[j], B = cols[j + 1], a0 = start[j], b0 = start[j + 1];
+    let i = 0, k = 0;
+    while (i < A.length - 1 || k < B.length - 1) {
+      if (k === B.length - 1 || (i < A.length - 1 && A[i + 1] <= B[k + 1])) {
+        idx.push(a0 + i, b0 + k, a0 + i + 1);
+        i++;
+      } else {
+        idx.push(a0 + i, b0 + k, b0 + k + 1);
+        k++;
+      }
+    }
+  }
+  return { positions, indices: new Uint32Array(idx), rows: zs.length };
 }

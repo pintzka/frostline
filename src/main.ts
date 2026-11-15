@@ -12,7 +12,7 @@ import { poseFor, smoothPose } from './character/pose';
 import { createSkiTrails } from './render/trailMesh';
 
 const root = document.getElementById('app')!;
-const { renderer, scene, sun, env } = createScene(root);
+const { renderer, scene, env, sunFollow } = createScene(root);
 const chase = createChaseCamera(innerWidth / innerHeight);
 addEventListener('resize', () => chase.resize(innerWidth / innerHeight));
 const input = createInput(renderer.domElement);
@@ -68,8 +68,7 @@ const loop = createLoop({
     skierModel.setPose(pose);
     trails.update(target.x, target.y, target.z, heading, skier.grounded);
 
-    sun.position.set(target.x + 30, target.y + 60, target.z - 20);
-    sun.target.position.copy(target);
+    sunFollow(target);
 
     // den ekte farten: landingene følger flybanen, så den holder seg når du lander
     const v = speedOf(skier);
