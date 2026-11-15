@@ -100,11 +100,20 @@ export const CONFIG = {
   replayTvSide: 13,
   replayTvAlong: 10,
   replayTvHeight: 2.5,
-  /** TV-kameraet bytter til neste hopp når skiløperen er så langt forbi kanten (m). */
+  /** TV-kameraet bytter til neste hopp når skiløperen er så langt forbi kanten (m) og står på snøen (ikke midt i lufta). */
   replayTvSwitchAfter: 45,
+  /**
+   * TV-kameraet brukes først når skiløperen er nærmere enn replayTvNear (m) før kanten; før det vises bak-kameraet,
+   * så skiløperen ikke er bitteliten langt unna. Kameraet løftes i trinn på replayTvLiftStep (m) til det ser
+   * skiløperen over snøen og hoppet hele veien inn (minst replayTvClear m klaring), høyst replayTvLiftMax over snøen.
+   */
+  replayTvNear: 60,
+  replayTvClear: 0.4,
+  replayTvLiftStep: 0.5,
+  replayTvLiftMax: 20,
   /** TV-kameraet zoomer så skiløperen fyller omtrent så mange meter av bildet i høyden, innenfor min/maks FOV. */
   replayTvFrame: 14,
-  replayTvFovMin: 18,
+  replayTvFovMin: 6,
   replayTvFovMax: 70,
   /** Det høye kameraet: så høyt over (m) og så langt bak (m) skiløperen, hvor fort det følger, og FOV. */
   replayHighUp: 16,

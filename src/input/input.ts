@@ -97,6 +97,9 @@ export function createInput(target: HTMLElement, touch?: TouchSurface) {
   let padTricks: PadTricks = NO_PAD_TRICKS;
   const pauseEdge = createEdge();
   const restartEdge = createEdge();
+  // reprise på gamepad: X starter den (på resultatskjermen), RB bytter kamera. I lufta er de grabs, men da er det ingen reprise.
+  const replayEdge = createEdge(), camEdge = createEdge();
+  let padReplay = false, padCam = false;
   const pauseListeners: (() => void)[] = [];
   let lastFrame = -1;
   function pollPads(now: number) {
@@ -122,6 +125,8 @@ export function createInput(target: HTMLElement, touch?: TouchSurface) {
     // pause sendes én gang per trykk, ikke hele tiden mens knappen holdes
     if (pauseEdge(next.pause)) for (const fn of pauseListeners) fn();
     if (restartEdge(next.restart)) restartPending = true;
+    if (replayEdge(nextTricks.grab === 1)) padReplay = true;
+    if (camEdge(nextTricks.grab === 2)) padCam = true;
     pad = next;
     padTricks = nextTricks;
 
@@ -159,6 +164,9 @@ export function createInput(target: HTMLElement, touch?: TouchSurface) {
       for (const f of grabFingers) f.endRead();
       return state;
     },
+    /** Ble X (reprise) eller RB (bytt kamera i reprisen) trykket på en gamepad siden sist? Gir true én gang per trykk. */
+    takePadReplay(): boolean { const r = padReplay; padReplay = false; return r; },
+    takePadCam(): boolean { const c = padCam; padCam = false; return c; },
     /** Kalles når skiløperen lander: tommel-flippen stopper, og midtpunktet i høyden flyttes til tommelen. */
     landed() { steer.landed(); },
     /** Slipper alle taster og fingre (f.eks. når spillet fortsetter etter pause), så ingenting henger igjen. */

@@ -89,7 +89,8 @@ function replayStep(r: ReplaySession, dt: number) {
   const real = input.read();
   menu.takeClick();
   input.takeRestart();
-  const c = replayUi.takeCam();
+  input.takePadReplay();
+  const c = input.takePadCam() ? 'neste' : replayUi.takeCam();
   if (c === 'neste') nextCam(r, REPLAY_CAMS.length); else if (c !== null) setCam(r, c, REPLAY_CAMS.length);
   if (exitPressed(r, !!real.pop) || replayUi.takeExit()) { endReplay(); return; }
   const g = r.player.game;
@@ -117,7 +118,8 @@ const loop = createLoop({
     if (game.flow.move !== 'none') onMoved(game.flow.move, game);
     hear(game);
     // V eller knappen på resultatskjermen: se runden igjen
-    if (replayUi.takeStart() && canReplay(recorder, game)) {
+    input.takePadCam();
+    if ((replayUi.takeStart() || input.takePadReplay()) && canReplay(recorder, game)) {
       replay = createSession(recorder.rec!, REPLAY_CAMS.length);
       onMoved('restart', replay.player.game);
     }
@@ -138,7 +140,7 @@ const loop = createLoop({
     // den ekte farten: landingene følger flybanen, så den holder seg når du lander
     const v = speedOf(skier);
     const camIn = { x: at.x, y: at.y, z: at.z, vx: skier.vx, vz: skier.vz, heading, speed: v, cut: moved !== 'none' };
-    if (replay) chase.setPose(replayCam.update(REPLAY_CAMS[replay.cam].kind, camIn, frameDt));
+    if (replay) chase.setPose(replayCam.update(REPLAY_CAMS[replay.cam].kind, { ...camIn, grounded: skier.grounded }, frameDt));
     else chase.update(camIn, frameDt);
     hud.update({
       speed: v, distance: skier.z - startZ, airTime: skier.airTime, inAir: !skier.grounded,

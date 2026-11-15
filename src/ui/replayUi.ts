@@ -33,7 +33,7 @@ export function createReplayUi(root: HTMLElement) {
     b.addEventListener('pointerdown', (e) => { e.stopPropagation(); e.preventDefault(); fn(); });
   };
 
-  const start = button('▶ Se reprise (V)', 'position:fixed;left:50%;bottom:14vh;transform:translateX(-50%);z-index:3;display:none;');
+  const start = button('▶ Se reprise (V / X)', 'position:fixed;left:50%;bottom:14vh;transform:translateX(-50%);z-index:3;display:none;');
   press(start, () => { if (available) wantStart = true; });
   root.appendChild(start);
 
@@ -48,7 +48,7 @@ export function createReplayUi(root: HTMLElement) {
   const cam = document.createElement('div');
   const help = document.createElement('div');
   help.style.cssText = 'font-size:14px;opacity:.85;';
-  help.textContent = 'C eller 1–3: bytt kamera · Mellomrom eller Esc: tilbake';
+  help.textContent = 'C eller 1–3 (RB): bytt kamera · Mellomrom eller Esc (A): tilbake';
   label.append(title, cam, help);
   const bar = document.createElement('div');
   bar.style.cssText = 'position:absolute;left:16px;right:16px;bottom:10px;height:4px;border-radius:2px;background:#fff3;overflow:hidden;';

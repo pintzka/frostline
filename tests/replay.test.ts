@@ -5,7 +5,7 @@ import {
   backToResult, canReplay, cloneGame, createRecorder, createSession, exitPressed, nextCam, recordStep, setCam, stepPlayer,
   type Recorder,
 } from '../src/ui/replay';
-import { createReplayCam, REPLAY_CAMS, tvKicker, tvSpot } from '../src/camera/replayCam';
+import { createReplayCam, nextTvKicker, REPLAY_CAMS, sightClear, tvActive, tvKicker, tvSpot } from '../src/camera/replayCam';
 import { PARK, heightAt } from '../src/park/terrain';
 import { spinCoast } from '../src/tricks/rotation';
 import { RAILS } from '../src/physics/rail';
@@ -254,5 +254,49 @@ describe('reprise: kameravinkler', () => {
     expect(back.pz).toBeLessThan(z);
     expect(back.py).toBeGreaterThan(y);
     for (const v of Object.values(back)) expect(Number.isFinite(v)).toBe(true);
+  });
+});
+
+describe('reprise: TV-kameraet under en hel runde (kvalitetskontroll)', () => {
+  it('ser skiløperen (ikke snø eller hopp i veien), bytter ikke hopp i lufta, og skiløperen er stor nok', () => {
+    const cam = createReplayCam();
+    const g = createGame();
+    stepGame(g, idle({ click: true }), dt);
+    let tvFrames = 0, blocked = 0, tiny = 0, airSwitch = 0;
+    let lastSpot: string | null = null;
+    for (let i = 0; g.flow.phase === 'kjorer' && i < 120 * CONFIG.physicsHz; i++) {
+      const s = g.skier;
+      // pop på hvert hopp, så det blir ordentlige luftturer
+      const k = PARK.kickers.find((kk) => s.z > kk.z - 12 && s.z < kk.z - 0.5);
+      stepGame(g, idle({ raw: { ...none, pop: !!k && s.grounded } }), dt);
+      if (i % 4 !== 0) continue;
+      const inp = { x: s.x, y: s.y, z: s.z, vx: s.vx, vz: s.vz, heading: s.heading, speed: 15, grounded: s.grounded };
+      const p = cam.update('tv', inp, 4 * dt);
+      const isTv = PARK.kickers.some((_, j) => { const t = tvSpot(j); return t.x === p.px && t.y === p.py && t.z === p.pz; });
+      if (!isTv) { lastSpot = null; continue; }
+      tvFrames++;
+      const key = `${p.px},${p.py},${p.pz}`;
+      if (lastSpot !== null && key !== lastSpot && !s.grounded) airSwitch++;
+      lastSpot = key;
+      if (!sightClear({ x: p.px, y: p.py, z: p.pz }, { x: s.x, y: s.y + CONFIG.camLookHeight, z: s.z })) blocked++;
+      const dist = Math.hypot(s.x - p.px, s.y - p.py, s.z - p.pz);
+      const share = 1.7 / (2 * dist * Math.tan((p.fov * Math.PI) / 360));
+      if (share < 0.06) tiny++;
+    }
+    expect(tvFrames).toBeGreaterThan(100);
+    expect(blocked / tvFrames).toBeLessThan(0.03);
+    expect(airSwitch).toBe(0);
+    expect(tiny / tvFrames).toBeLessThan(0.1);
+  });
+
+  it('bytter hopp først når skiløperen står på snøen', () => {
+    const k0 = PARK.kickers[0];
+    const past = k0.z + CONFIG.replayTvSwitchAfter + 5;
+    expect(nextTvKicker(0, past, false)).toBe(0);
+    expect(nextTvKicker(0, past, true)).toBe(1);
+    expect(nextTvKicker(-1, past, false)).toBe(1);
+    // langt før hoppet viser TV-vinkelen bak-kameraet
+    expect(tvActive(0, k0.z - CONFIG.replayTvNear - 1)).toBe(false);
+    expect(tvActive(0, k0.z - 10)).toBe(true);
   });
 });

@@ -14,6 +14,6 @@ export const CONTROLS: [string, string][] = [
   ['Pause · lyd · fps', 'P / Esc · M · F'],
   ['Velg bakke (på menyen)', '1 / 2, eller trykk på knappen'],
   ['Reprise (etter målet)', 'V · kamera: C eller 1 / 2 / 3 · tilbake: mellomrom eller Esc'],
-  ['Gamepad', 'stikke, A pop, LT/B brems, X/RB/LB grab, Y ny runde, Start pause'],
+  ['Gamepad', 'stikke, A pop, LT/B brems, X/RB/LB grab, Y ny runde, Start pause · etter målet: X reprise, RB kamera, A tilbake'],
   ['Mobil', 'dra tommelen på venstre side (i lufta: sidelengs spinn, opp/ned flip), POP, BREMS og grabs (NORDLYS / ISBIT / SNØUGLE) til høyre, «Se reprise» etter målet'],
 ];
