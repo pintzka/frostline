@@ -108,6 +108,33 @@ export const CONFIG = {
   trickPivotHeight: 1.0,
   /** Sekunder triksnavnet vises etter landing. */
   trickShowTime: 1.6,
+
+  // --- Konsekvens av landingen (src/tricks/fall.ts) ---
+  /** Slurvete landing: så stor del av farten mistes (0,12 = 12 %), fordelt over så mange sekunder (ikke brått). */
+  sloppySpeedLoss: 0.12,
+  sloppyLossTime: 0.3,
+  /** Slurvete landing: kroppen vakler fra side til side, så mye (rad), så mange ganger per sekund, og dør ut så fort (s). */
+  sloppyWobble: 0.3,
+  sloppyWobbleHz: 2.5,
+  sloppyWobbleDecay: 0.25,
+  /** Fall: sklien i snøen bremses av en del som øker med farten (per s) og en fast del (m/s²). Stopper på ca. 1 s. */
+  fallSlideDrag: 2.5,
+  fallSlideDecel: 4,
+  /** Fall: kroppen velter over på så lang tid (s), så langt (rad, 1,35 ≈ 77°), og ligger så høyt over snøen (m). */
+  fallTipTime: 0.4,
+  fallRoll: 1.35,
+  fallLieHeight: 0.28,
+  /** Fall: kroppen reiser seg fra dette tidspunktet (s etter landing) og bruker så lang tid (s), ferdig før respawn. */
+  fallGetUpStart: 0.65,
+  fallGetUpTime: 0.4,
+  /** Fall: så mange sekunder etter landingen settes du tilbake. Skjermen blekner ut og inn igjen på fallFadeTime (s). */
+  fallRespawnAt: 1.1,
+  fallFadeTime: 0.3,
+  /** Du settes tilbake så mange meter før starten på rampen du falt på, med denne farten (m/s, 10 ≈ 36 km/t). */
+  fallRespawnBeforeRamp: 70,
+  fallRespawnSpeed: 10,
+  /** Fartsmåleren følger den ekte farten mykt (per sekund), så tallet aldri hopper. */
+  hudSpeedFollow: 8,
 } as const;
 
 export type Config = typeof CONFIG;

@@ -43,8 +43,15 @@ export function createPlaceholderSkier() {
      * Spinn og flip fra tricks/rotation.ts (rad). Spinn positiv = mot høyre, flip positiv = framover.
      * Spinnet er rundt den loddrette aksen, flipen rundt kroppens egen sideakse.
      */
-    setTrick(spin: number, flip: number) {
-      pivot.rotation.set(flip, -spin, 0, 'YXZ');
+    setTrick(spin: number, flip: number, roll = 0) {
+      pivot.rotation.set(flip, -spin, roll, 'YXZ');
+    },
+    /**
+     * Fall fra tricks/fall.ts: kroppen velter til siden (roll, rad) og synker ned mot snøen (drop, m).
+     * Brukes sammen med setTrick, som tar imot roll.
+     */
+    setFallDrop(drop: number) {
+      pivot.position.y = CONFIG.trickPivotHeight - drop;
     },
     /**
      * Hopp-bevegelsen fra pose.ts: kroppen går ned (sats/landing) eller strekker seg opp (avspark),

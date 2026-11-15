@@ -49,6 +49,18 @@ Justert 15. november: Daniel valgte et høyere stort hopp. Rampen på det store 
 | Landing | ren hvis vinkelen mot bakken er under 25° og spinnet er innenfor ±30° av en hel eller halv runde (switch) |
 | Poeng og boost | bare for ekte triks: 540 eller mer, en flip eller en grab |
 
+## Landing og fall (fase 2)
+| Landing | Hva skjer |
+|---|---|
+| Ren | ingenting, du kjører videre |
+| Slurvete | du mister ca. 12 % av farten over 0,3 s, og kroppen vakler fra side til side i ca. 0,6 s |
+| Fall | kroppen velter, du sklir og bremser opp i snøen, skjermen blekner, og du settes tilbake |
+
+- Settes tilbake 1,1 s etter landingen, skjermen er klar igjen etter 1,4 s (målet er under 1,5 s).
+- Du settes tilbake 70 m før rampen på hoppet du falt på, midt i hoppet, i 36 km/t. Da rekker du å få opp nesten vanlig fart før kanten.
+- Mens du faller virker ingen taster (heller ikke R). Pop holdt fra fallet teller ikke før du slipper.
+- Tallene ligger i `src/core/config.ts` (`sloppy...` og `fall...`).
+
 ## Poeng
 - Grunnpoeng per halve runde spinn, ekstra for flip, ganget opp av grab og kombinasjon.
 - Ren landing gir full sum, slurvete landing halv sum, fall null.

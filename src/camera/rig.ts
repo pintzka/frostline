@@ -15,6 +15,8 @@ export interface CameraInput {
   /** Retningen skiene peker (rad). */
   heading: number;
   speed: number;
+  /** Sant når skiløperen ble flyttet på ett steg (restart eller satt tilbake etter fall): hopp rett dit. */
+  cut?: boolean;
 }
 
 export interface CameraPose {
@@ -50,7 +52,7 @@ export function createCameraRig() {
   return {
     update(inp: CameraInput, dt: number): CameraPose {
       // første bilde, eller restart (R): hopp rett på plass i stedet for å fly dit
-      const snap = !ready || Math.hypot(inp.x - lastX, inp.z - lastZ) > CONFIG.camSnapDistance;
+      const snap = !ready || !!inp.cut || Math.hypot(inp.x - lastX, inp.z - lastZ) > CONFIG.camSnapDistance;
       lastX = inp.x; lastZ = inp.z;
 
       const wantYaw = travelYaw(inp);
