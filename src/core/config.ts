@@ -74,6 +74,29 @@ export const CONFIG = {
   trailSpacing: 0.25,
   trailMaxPoints: 600,
   skiGap: 0.3,
+
+  // --- Triks i lufta (src/tricks/) ---
+  /** Full spinnfart (grader per sekund) når du holder venstre/høyre i lufta. 540 = et 720 på et medium hopp. */
+  spinSpeedDeg: 540,
+  /** Full flipfart (grader per sekund). 400 = én hel flip per 0,9 s. */
+  flipSpeedDeg: 400,
+  /** Hvor fort rotasjonen bygger seg opp når du holder (per sekund). 10 ≈ 0,1 s til nesten full fart. */
+  spinBuild: 10,
+  flipBuild: 8,
+  /** Hvor fort rotasjonen bremses når du slipper (per sekund). Lavere = den fortsetter lenger. 9 ≈ 60° ekstra. */
+  spinRelease: 9,
+  flipRelease: 8,
+  /** Ren landing: spinnet innenfor så mange grader av en hel eller halv runde, flipen innenfor så mange av stående. */
+  landSpinClean: 30,
+  landFlipClean: 25,
+  /** Så mange grader utenfor ren regnes som slurvete. Enda mer = fall. */
+  landSloppyExtra: 20,
+  /** Hvor fort kroppen retter seg opp etter landing (rad/s i en myk fjær). 10 ≈ 0,4 s. */
+  landSettle: 10,
+  /** Skiløperen roterer rundt dette punktet (m over føttene), ca. midt på kroppen. */
+  trickPivotHeight: 1.0,
+  /** Sekunder triksnavnet vises etter landing. */
+  trickShowTime: 1.6,
 } as const;
 
 export type Config = typeof CONFIG;

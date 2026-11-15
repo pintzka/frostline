@@ -1,0 +1,156 @@
+import { CONFIG } from '../core/config';
+
+/**
+ * Spinn og flips i lufta. Ren logikk uten three.js, så den kan testes.
+ * Arbeidsstrøm 3 (Triks og poeng) eier denne fila.
+ *
+ * Ingen automatisk fullføring: holder du tasten, bygger rotasjonen seg mykt opp. Slipper du,
+ * fortsetter den litt med farten den har og bremses så. Du kan altså rotere for lite eller for mye.
+ * Ved landing sjekkes hvor nær en hel eller halv runde du er, og kroppen retter seg mykt opp.
+ */
+
+export type LandingQuality = 'ren' | 'slurvete' | 'fall';
+
+export interface Landing {
+  quality: LandingQuality;
+  /** Triksnavn, f.eks. «360», «Backflip» eller «540 + Frontflip». Tom hvis det ikke var noe triks. */
+  name: string;
+  /** Hvor mye du faktisk roterte i hoppet (grader). Spinn positiv = mot høyre, flip positiv = framover. */
+  spinDeg: number;
+  flipDeg: number;
+  /** Hvor langt unna en hel eller halv runde (spinn) og stående (flip) du landet (grader). */
+  spinErrDeg: number;
+  flipErrDeg: number;
+}
+
+export interface TrickInput {
+  /** -1 (venstre) til 1 (høyre) */
+  spin: number;
+  /** 1 = frontflip, -1 = backflip */
+  flip: number;
+  /** står skiløperen på snøen etter dette fysikksteget? */
+  grounded: boolean;
+}
+
+export interface TrickState {
+  /** Hvor mye kroppen er rotert rundt egen akse (rad, positiv = mot høyre). Går ikke tilbake til 0 etter en runde. */
+  spin: number;
+  spinRate: number;
+  /** Hvor mye kroppen er rotert framover (rad, positiv = frontflip). */
+  flip: number;
+  flipRate: number;
+  inAir: boolean;
+  /** Stillingen kroppen hadde da hoppet startet (rad). Rotasjonen i hoppet måles fra den. */
+  spinStart: number;
+  flipStart: number;
+  /** Stillingen kroppen retter seg opp mot på bakken (rad). */
+  spinTarget: number;
+  flipTarget: number;
+  lastLanding: Landing | null;
+  /** Sekunder siden siste landing. */
+  landingAge: number;
+}
+
+const DEG = Math.PI / 180;
+const TURN = 2 * Math.PI;
+const HALF = Math.PI;
+
+export function createTricks(): TrickState {
+  return {
+    spin: 0, spinRate: 0, flip: 0, flipRate: 0, inAir: false,
+    spinStart: 0, flipStart: 0, spinTarget: 0, flipTarget: 0,
+    lastLanding: null, landingAge: 99,
+  };
+}
+
+/** Hvor langt (grader) en vinkel er fra nærmeste hele «step» (f.eks. halv runde). */
+function offBy(angle: number, step: number): number {
+  return Math.abs(angle - Math.round(angle / step) * step) / DEG;
+}
+
+const FLIP_WORDS = ['', '', 'Dobbel ', 'Trippel '];
+
+/** Lager navnet på trikset ut fra hvor mye du roterte (rad). */
+export function trickName(spin: number, flip: number): string {
+  const parts: string[] = [];
+  const halves = Math.round(Math.abs(spin) / HALF);
+  if (halves > 0) parts.push(String(halves * 180));
+  const flips = Math.round(Math.abs(flip) / TURN);
+  if (flips > 0) {
+    const kind = flip > 0 ? 'frontflip' : 'backflip';
+    const word = flips < FLIP_WORDS.length ? FLIP_WORDS[flips] : `${flips}x `;
+    const full = word + kind;
+    parts.push(full.charAt(0).toUpperCase() + full.slice(1));
+  }
+  return parts.join(' + ');
+}
+
+/** Ren, slurvete eller fall, ut fra hvor mye du roterte i hoppet (rad). */
+export function judgeLanding(spin: number, flip: number): Landing {
+  const spinErrDeg = offBy(spin, HALF);
+  const flipErrDeg = offBy(flip, TURN);
+  const extra = CONFIG.landSloppyExtra;
+  let quality: LandingQuality = 'fall';
+  if (spinErrDeg <= CONFIG.landSpinClean && flipErrDeg <= CONFIG.landFlipClean) quality = 'ren';
+  else if (spinErrDeg <= CONFIG.landSpinClean + extra && flipErrDeg <= CONFIG.landFlipClean + extra) quality = 'slurvete';
+  return { quality, name: trickName(spin, flip), spinDeg: spin / DEG, flipDeg: flip / DEG, spinErrDeg, flipErrDeg };
+}
+
+/** Farten følger målet mykt: holder du, bygges den opp; slipper du, bremses den. Aldri et hopp i farten. */
+function approach(rate: number, held: number, maxRate: number, build: number, release: number, dt: number): number {
+  const h = Math.max(-1, Math.min(1, held));
+  const want = h * maxRate;
+  const k = h !== 0 ? build : release;
+  return rate + (want - rate) * (1 - Math.exp(-k * dt));
+}
+
+/**
+ * Myk fjær (kritisk dempet), løst nøyaktig for ett steg: glir mot målet uten å riste.
+ * Starter med farten kroppen hadde, så landingen ikke stopper rotasjonen brått.
+ */
+function settle(x: number, v: number, target: number, w: number, dt: number): [number, number] {
+  const x0 = x - target;
+  const e = Math.exp(-w * dt);
+  const nx = (x0 + (v + w * x0) * dt) * e;
+  const nv = (v - (v + w * x0) * w * dt) * e;
+  return [target + nx, nv];
+}
+
+export function stepTricks(t: TrickState, inp: TrickInput, dt: number): void {
+  t.landingAge += dt;
+
+  // avsats: hoppet starter, rotasjonen måles fra stillingen kroppen skulle stå i
+  if (!inp.grounded && !t.inAir) {
+    t.inAir = true;
+    t.spinStart = t.spinTarget;
+    t.flipStart = t.flipTarget;
+  }
+
+  if (t.inAir && inp.grounded) {
+    // landing: sjekk hvor nær du er, og velg nærmeste stilling å rette seg opp mot
+    t.inAir = false;
+    const ds = t.spin - t.spinStart;
+    const df = t.flip - t.flipStart;
+    t.lastLanding = judgeLanding(ds, df);
+    t.landingAge = 0;
+    // spinn: nærmeste halve runde (en halv runde = du kjører baklengs, switch). Flip: nærmeste hele runde.
+    t.spinTarget = t.spinStart + Math.round(ds / HALF) * HALF;
+    t.flipTarget = t.flipStart + Math.round(df / TURN) * TURN;
+  }
+
+  if (t.inAir) {
+    t.spinRate = approach(t.spinRate, inp.spin, CONFIG.spinSpeedDeg * DEG, CONFIG.spinBuild, CONFIG.spinRelease, dt);
+    t.flipRate = approach(t.flipRate, inp.flip, CONFIG.flipSpeedDeg * DEG, CONFIG.flipBuild, CONFIG.flipRelease, dt);
+    t.spin += t.spinRate * dt;
+    t.flip += t.flipRate * dt;
+  } else {
+    // på bakken retter kroppen seg mykt opp (ingen snap), også etter et fall (selve fallet kommer senere)
+    [t.spin, t.spinRate] = settle(t.spin, t.spinRate, t.spinTarget, CONFIG.landSettle, dt);
+    [t.flip, t.flipRate] = settle(t.flip, t.flipRate, t.flipTarget, CONFIG.landSettle, dt);
+  }
+}
+
+/** Kjører skiløperen baklengs (switch)? Sant når kroppen står en halv runde rotert. */
+export function isSwitch(t: TrickState): boolean {
+  return Math.cos(t.spinTarget) < 0;
+}
