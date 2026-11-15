@@ -12,6 +12,8 @@ export interface SkierState {
   heading: number;
   /** Hvor mye skiene står på kant, -1 (venstre) til 1 (høyre). Følger styringen mykt. */
   edge: number;
+  /** Hvor hardt bremsen tar i nå, 0–1. Følger bremsetasten mykt. */
+  brake: number;
   /** Hvor mye skiløperen lener seg inn i svingen (rad). Positiv = mot høyre. */
   lean: number;
   /** Hvor fort leningen endrer seg (rad/s). Gjør at leningen starter rolig i stedet for å rykke. */
@@ -42,7 +44,7 @@ export interface SkierInput {
 
 export function createSkier(): SkierState {
   const z = 5;
-  return { x: 0, y: heightAt(0, z), z, vx: 0, vy: 0, vz: 2, heading: 0, edge: 0, lean: 0, leanRate: 0, grounded: true, airTime: 0,
+  return { x: 0, y: heightAt(0, z), z, vx: 0, vy: 0, vz: 2, heading: 0, edge: 0, brake: 0, lean: 0, leanRate: 0, grounded: true, airTime: 0,
     popCharge: 0, popHeld: false, lastPop: '', popAge: 99, sinceLanding: 99 };
 }
 
@@ -91,6 +93,8 @@ export function stepSkier(s: SkierState, inp: SkierInput, dt: number): void {
 
   // kanten bygges opp og slippes mykt, selv om tastaturet bare er av/på
   s.edge += (inp.steer - s.edge) * (1 - Math.exp(-CONFIG.edgeResponse * dt));
+  // bremsen tas inn og slippes mykt på samme måte, så farten ikke stuper på ett steg
+  s.brake += (inp.brake - s.brake) * (1 - Math.exp(-CONFIG.brakeResponse * dt));
   // i høy fart begrenses svingen av hvor hardt kanten kan presse; i lufta har kanten ingenting å ta i
   const turnRate = s.grounded ? Math.min(CONFIG.turnRate, CONFIG.carveAccel / Math.max(speedOf(s), 1e-3)) : 0;
   s.heading += -s.edge * turnRate * dt;
@@ -153,7 +157,7 @@ export function stepSkier(s: SkierState, inp: SkierInput, dt: number): void {
     // friksjon + luftmotstand + skrens + brems kan bare stoppe deg, aldri dytte deg bakover
     const v = speedOf(s);
     if (v > 0) {
-      const drag = CONFIG.dragCoef * v * v + CONFIG.snowFriction * g + CONFIG.skidFriction * side + inp.brake * CONFIG.brakeDecel;
+      const drag = CONFIG.dragCoef * v * v + CONFIG.snowFriction * g + CONFIG.skidFriction * side + s.brake * CONFIG.brakeDecel;
       const k = Math.max(0, v - drag * dt) / v;
       s.vx *= k; s.vy *= k; s.vz *= k;
     }

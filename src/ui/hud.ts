@@ -75,8 +75,8 @@ export function createHud(root: HTMLElement) {
       fill.style.background = h.popCharge >= 1 ? '#7fe3ff' : '#fff';
 
       // vises i litt over et sekund og blekner bort
-      const show = h.lastPop === 'perfekt' && h.popAge < 1.2;
-      flash.style.opacity = show ? String(Math.min(1, (1.2 - h.popAge) * 2)) : '0';
+      const show = h.lastPop === 'perfekt' && h.popAge < CONFIG.popFlashTime;
+      flash.style.opacity = show ? String(Math.min(1, (CONFIG.popFlashTime - h.popAge) * 2)) : '0';
 
       const t = landingText(h.landing);
       const left = CONFIG.trickShowTime - h.landingAge;

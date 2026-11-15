@@ -23,8 +23,20 @@ export interface Pose {
   skiLift: number;
 }
 
+import { CONFIG } from '../core/config';
+
 const clamp01 = (t: number) => Math.min(1, Math.max(0, t));
 const ease = (t: number) => { const u = clamp01(t); return u * u * (3 - 2 * u); };
+
+/**
+ * Ett steg med en myk fjær (kritisk dempet): x følger target uten å skyte over, med farten v.
+ * Løst nøyaktig for steget, så den er stabil og lik også ved lav bildefrekvens. Gir [ny x, ny fart].
+ */
+export function springStep(x: number, v: number, target: number, w: number, dt: number): [number, number] {
+  const x0 = x - target;
+  const e = Math.exp(-w * dt);
+  return [target + (x0 + (v + w * x0) * dt) * e, (v - (v + w * x0) * w * dt) * e];
+}
 
 /**
  * Glatter ut overgangene (avspark, landing), så kroppen aldri rykker fra ett bilde til det neste.
@@ -32,38 +44,33 @@ const ease = (t: number) => { const u = clamp01(t); return u * u * (3 - 2 * u); 
  * vel holder farten til hvert tall mellom bildene.
  */
 export function smoothPose(prev: Pose & { vel?: Pose }, target: Pose, dt: number): Pose & { vel: Pose } {
-  const w = 22; // hvor raskt (rad/s): ca. 0,15 s for å nå målet
   const v = prev.vel ?? { drop: 0, pitch: 0, skiLift: 0 };
   const out = { drop: 0, pitch: 0, skiLift: 0, vel: { drop: 0, pitch: 0, skiLift: 0 } };
   for (const key of ['drop', 'pitch', 'skiLift'] as const) {
-    // løst nøyaktig for ett steg, så den er stabil også ved lav bildefrekvens
-    const x0 = prev[key] - target[key], v0 = v[key];
-    const e = Math.exp(-w * dt);
-    const x = (x0 + (v0 + w * x0) * dt) * e;
-    out.vel[key] = (v0 - (v0 + w * x0) * w * dt) * e;
-    out[key] = target[key] + x;
+    [out[key], out.vel[key]] = springStep(prev[key], v[key], target[key], CONFIG.pose.speed, dt);
   }
   return out;
 }
 
 export function poseFor(s: PoseInput): Pose {
+  const P = CONFIG.pose;
   if (s.grounded) {
     // sats mens pop lades
-    let drop = 0.22 * s.popCharge;
-    let pitch = 0.3 * s.popCharge;
-    // fjæring rett etter landing: ned med en gang, tilbake opp på 0,35 s
-    const land = 1 - ease(s.sinceLanding / 0.35);
-    drop = Math.max(drop, 0.18 * land);
-    pitch = Math.max(pitch, 0.2 * land);
+    let drop = P.crouchDrop * s.popCharge;
+    let pitch = P.crouchPitch * s.popCharge;
+    // fjæring rett etter landing: ned med en gang, tilbake opp på landTime
+    const land = 1 - ease(s.sinceLanding / P.landTime);
+    drop = Math.max(drop, P.landDrop * land);
+    pitch = Math.max(pitch, P.landPitch * land);
     return { drop, pitch, skiLift: 0 };
   }
 
-  // avspark: strekker seg opp de første 0,15 s, går så over i en rolig stilling
-  const kick = 1 - ease((s.airTime - 0.08) / 0.15);
-  const drop = -0.14 * kick + 0.04 * (1 - kick);
+  // avspark: strekker seg opp en kort stund, går så over i en rolig stilling
+  const kick = 1 - ease((s.airTime - P.kickStart) / P.kickTime);
+  const drop = -P.kickStretch * kick + P.airDrop * (1 - kick);
   // skiene opp under kroppen etter avsparket, og ned igjen når snøen nærmer seg
-  const tuckIn = ease((s.airTime - 0.08) / 0.2);
-  const tuckOut = ease((s.heightAboveSnow - 0.1) / 0.7);
-  const skiLift = 0.3 * tuckIn * tuckOut;
-  return { drop, pitch: 0.12 * tuckIn * tuckOut, skiLift };
+  const tuckIn = ease((s.airTime - P.kickStart) / P.tuckTime);
+  const tuckOut = ease((s.heightAboveSnow - P.tuckLowHeight) / P.tuckFadeHeight);
+  const skiLift = P.tuckLift * tuckIn * tuckOut;
+  return { drop, pitch: P.tuckPitch * tuckIn * tuckOut, skiLift };
 }

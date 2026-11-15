@@ -5,9 +5,9 @@ import { heightAt } from '../park/terrain';
  * Kamerariggens logikk, uten three.js, så den kan testes.
  * Arbeidsstrøm 2 (Kamera og input) eier denne fila.
  *
- * Kameraet sitter alltid camDistance bak skiløperen (ingen gummistrikk som
- * strekker seg i høy fart). Bare retningen, høyden og synsfeltet glir mykt,
- * og glidningen er lik uansett bildefrekvens.
+ * Kameraet sitter alltid camDistance bak og camHeight over skiløperen (ingen gummistrikk som
+ * strekker seg i høy fart), og løftes bare når snøen bak krever det. Retningen, høyden og
+ * synsfeltet glir mykt, og glidningen er lik uansett bildefrekvens.
  */
 export interface CameraInput {
   x: number; y: number; z: number;
@@ -29,20 +29,33 @@ function follow(rate: number, dt: number) {
   return 1 - Math.exp(-rate * dt);
 }
 
-/** Retningen skiløperen faktisk beveger seg. I lav fart brukes skienes retning. */
+/** Korteste vinkel fra a til b (rad), mellom -π og π. */
+function angleDiff(a: number, b: number) {
+  return Math.atan2(Math.sin(b - a), Math.cos(b - a));
+}
+
+/**
+ * Retningen skiløperen faktisk beveger seg. I lav fart brukes skienes retning.
+ * Mellom de to blandes vinklene (ikke pilene), så retningen glir jevnt selv når de peker hver sin vei.
+ */
 function travelYaw(inp: CameraInput): number {
   const hs = Math.hypot(inp.vx, inp.vz);
+  if (hs === 0) return inp.heading;
   const min = CONFIG.camDirMinSpeed;
   const w = Math.min(1, Math.max(0, (hs - min) / min));
-  const dx = (1 - w) * Math.sin(inp.heading) + (hs > 0 ? (w * inp.vx) / hs : 0);
-  const dz = (1 - w) * Math.cos(inp.heading) + (hs > 0 ? (w * inp.vz) / hs : 0);
-  return Math.atan2(dx, dz);
+  return inp.heading + w * angleDiff(inp.heading, Math.atan2(inp.vx, inp.vz));
+}
+
+/** Myk utgave av max(a, b): ingen knekk der den bytter fra den ene til den andre. */
+function softMax(a: number, b: number, k: number) {
+  return (a + b + Math.sqrt((a - b) * (a - b) + k * k)) / 2;
 }
 
 export function createCameraRig() {
   let ready = false;
   let yaw = 0;
-  let lift: number = CONFIG.camHeight;
+  // hvor høyt snøen bak tvinger kameraet over skiløperen (m); stiger med en gang, synker mykt
+  let snowLift = -Infinity;
   let fov: number = CONFIG.camFovBase;
   let lastX = 0, lastZ = 0;
   const pose: CameraPose = { px: 0, py: 0, pz: 0, lx: 0, ly: 0, lz: 0, fov };
@@ -56,18 +69,21 @@ export function createCameraRig() {
       const wantYaw = travelYaw(inp);
       if (snap) yaw = wantYaw;
       else {
-        const d = Math.atan2(Math.sin(wantYaw - yaw), Math.cos(wantYaw - yaw));
-        yaw += d * follow(CONFIG.camYawFollow, dt);
+        // følg mykt, men aldri raskere enn camMaxYawRate, så kameraet ikke slenger rundt
+        const step = angleDiff(yaw, wantYaw) * follow(CONFIG.camYawFollow, dt);
+        const cap = CONFIG.camMaxYawRate * dt;
+        yaw += Math.max(-cap, Math.min(cap, step));
       }
 
       pose.px = inp.x - Math.sin(yaw) * CONFIG.camDistance;
       pose.pz = inp.z - Math.cos(yaw) * CONFIG.camDistance;
 
-      // høyden måles over snøen bak skiløperen og glir mykt over kuler
-      const snow = heightAt(pose.px, pose.pz);
-      const wantLift = Math.max(snow, inp.y) + CONFIG.camHeight - inp.y;
-      lift = snap ? wantLift : lift + (wantLift - lift) * follow(CONFIG.camHeightFollow, dt);
-      pose.py = Math.max(inp.y + lift, snow + CONFIG.camMinClearance);
+      // høyden måles over skiløperen. Ligger snøen bak høyere (oppoverbakke, bratt landing),
+      // løftes kameraet akkurat så mye som trengs, med en myk overgang i stedet for en klamp som knekker
+      const wantSnow = heightAt(pose.px, pose.pz) + CONFIG.camSnowClearance - inp.y;
+      if (snap || wantSnow > snowLift) snowLift = wantSnow;
+      else snowLift += (wantSnow - snowLift) * follow(CONFIG.camHeightFollow, dt);
+      pose.py = inp.y + softMax(CONFIG.camHeight, snowLift, CONFIG.camHeightBlend);
 
       pose.lx = inp.x + Math.sin(yaw) * CONFIG.camLookAhead;
       pose.ly = inp.y + CONFIG.camLookHeight;
