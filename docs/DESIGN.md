@@ -96,6 +96,17 @@ Poeng for ett triks = (spinn + flip + grab) × grab-gangetall × perfekt pop × 
 - Eksempler: 540 = 400, 720 = 800, 1080 = 2 200. 720 + Backflip + Isbit holdt 1 s med perfekt pop = (800 + 700 + 300) × 1,6 × 1,2 ≈ 3 460.
 - Når runden starter på nytt (R eller nederst i bakken), huskes beste runde i HUD-en.
 
+## Rails og bokser (første versjon)
+Tallene står i `src/core/config.ts` (`rail...`), logikken i `src/physics/rail.ts`, poengene i `src/tricks/score.ts`.
+
+- **Komme på:** kjør rett opp rampen i starten, eller pop opp på railen (lad og slipp mellomrom). Du låses på når skiene treffer toppen på vei ned, høyst 0,45 m fra midten (boks: 0,8 m).
+- **Stil:** lander du med skiene langs railen (forlengs eller baklengs) er det **50-50**. Står du på tvers (spinn ca. 90° i lufta) er det **Boardslide**.
+- **Skjevt:** innenfor 20° fra langs/på tvers er rent. 20–40° er skjevt: du starter ustø og får halve poeng. Mer enn 40° (eller en flip som ikke er rundt): du faller av med en gang.
+- **Balanse:** holder du styring til én side, faller du av etter ca. 0,7 s. Slipp, så retter du deg opp igjen. Kroppen lener seg og en prikk i HUD-en viser balansen (gul, så rød nær kanten).
+- **Fart:** tyngdekraften drar deg nedover railen, friksjon (50-50 0,2, boardslide 0,28) og luft bremser. I 20 m/s mister du ca. 1 m/s per halve sekund på en 50-50.
+- **Av:** pop på railen hopper av (og du kan spinne). Ved slutten flyr du videre. Fra boardslide vris kroppen av seg selv tilbake langs fallinja hvis du ikke spinner selv, så du lander rent.
+- **Poeng:** 50-50 300 per sekund, boardslide 450 per sekund, under 0,3 s gir 0. Railen er et ekte triks i komboen (øker x0,25 hvis du var ren, gjentakelse gir mindre). Poengene gis når du kommer av railen. Faller du av, er det et vanlig fall (0 poeng, kombo tapt).
+
 ## Kamera
 - Lavt og nært bak skiløperen (5–6 m bak, 2–3 m over skiløperen). Ligger snøen bak høyere (bratt landing), løftes kameraet akkurat så mye som trengs.
 - FOV øker med farten (62° til 78°).

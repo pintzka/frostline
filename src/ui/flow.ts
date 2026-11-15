@@ -1,5 +1,5 @@
 import { CONFIG } from '../core/config';
-import { canRestart, createGame as createCoreGame, restartGame, stepGame as stepCoreGame, type Game as CoreGame, type Move } from '../core/game';
+import { canRestart, snowSkier, createGame as createCoreGame, restartGame, stepGame as stepCoreGame, type Game as CoreGame, type Move } from '../core/game';
 import { reachedEnd, speedOf, type SkierState } from '../physics/skier';
 import type { RawControls } from '../tricks/controls';
 import { isFalling } from '../tricks/fall';
@@ -92,9 +92,12 @@ function newRun(g: Game, bySpace: boolean): void {
   g.flow.move = 'restart';
 }
 
-/** Skiløperen slik lyden skal høre den: på startskjermen står den stille (ingen vind eller snø-sus). */
+/**
+ * Skiløperen slik lyden skal høre den: på startskjermen står den stille (ingen vind eller snø-sus),
+ * og på en rail er ikke skiene i snøen (core/game.ts snowSkier).
+ */
 export function soundSkier(g: Game): SkierState {
-  return g.flow.phase === 'start' ? { ...g.skier, vx: 0, vy: 0, vz: 0, edge: 0, brake: 0 } : g.skier;
+  return g.flow.phase === 'start' ? { ...g.skier, vx: 0, vy: 0, vz: 0, edge: 0, brake: 0 } : snowSkier(g);
 }
 
 /**
@@ -153,9 +156,9 @@ export function stepGame(g: Game, inp: GameInput, dt: number): FlowEvent {
   recordStats(f.stats, {
     dt, speed: speedOf(g.skier), inAir: !g.skier.grounded, airTime: g.skier.airTime, scored: g.score.last,
   });
-  // i mål først når du står på snøen og ikke faller: krysser du mållinja i lufta, teller landingen
-  // (med poeng, eller fall og respawn) før resultatet, så tabellen stemmer med det som skjedde
-  if (reachedEnd(g.skier) && g.skier.grounded && !isFalling(g.fall)) {
+  // i mål først når du står på snøen og ikke faller: krysser du mållinja i lufta eller på en rail, teller
+  // landingen (med poeng, eller fall og respawn) før resultatet, så tabellen stemmer med det som skjedde
+  if (reachedEnd(g.skier) && g.skier.grounded && !g.rail.on && !isFalling(g.fall)) {
     f.phase = 'resultat'; f.phaseAge = 0; f.resultArmed = false;
     return 'mål';
   }

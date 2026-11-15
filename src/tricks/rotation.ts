@@ -44,6 +44,11 @@ export interface JumpExtras {
   airTime?: number;
   /** grabben holdes fortsatt idet skiene treffer snøen */
   stillGrabbing?: boolean;
+  /**
+   * Hvor skjevt kroppen sto da hoppet startet (rad), f.eks. en kvart runde etter en boardslide.
+   * Landingen sjekkes ut fra hvordan kroppen faktisk står, så 90° ut av en boardslide er rent.
+   */
+  spinOffset?: number;
 }
 
 export interface TrickInput {
@@ -84,6 +89,8 @@ export interface TrickState {
   jumpFromSwitch: boolean;
   /** Sekunder i lufta i hoppet som pågår (eller det siste). */
   airTime: number;
+  /** Etter en boardslide: kroppen vris av seg selv tilbake langs fallinja i lufta, til du spinner selv. */
+  turnOut: boolean;
 }
 
 const DEG = Math.PI / 180;
@@ -95,7 +102,7 @@ export function createTricks(): TrickState {
     spin: 0, spinRate: 0, flip: 0, flipRate: 0, inAir: false,
     spinStart: 0, flipStart: 0, spinTarget: 0, flipTarget: 0,
     lastLanding: null, landingAge: 99, justLanded: false,
-    grabs: createGrabs(), jumpPerfectPop: false, jumpFromSwitch: false, airTime: 0,
+    grabs: createGrabs(), jumpPerfectPop: false, jumpFromSwitch: false, airTime: 0, turnOut: false,
   };
 }
 
@@ -134,7 +141,7 @@ export function trickName(spin: number, flip: number, grab: GrabKind = 0): strin
 
 /** Ren, slurvete eller fall, ut fra hvor mye du roterte i hoppet (rad). */
 export function judgeLanding(spin: number, flip: number, extras: JumpExtras = {}): Landing {
-  const spinErrDeg = offBy(spin, HALF);
+  const spinErrDeg = offBy(spin + (extras.spinOffset ?? 0), HALF);
   const flipErrDeg = offBy(flip, TURN);
   const extra = CONFIG.landSloppyExtra;
   let quality: LandingQuality = 'fall';
@@ -208,14 +215,18 @@ export function stepTricks(t: TrickState, inp: TrickInput, dt: number): void {
     const ds = t.spin - t.spinStart;
     const df = t.flip - t.flipStart;
     const g = countedGrab(t.grabs);
+    // vanligvis 0; etter en boardslide startet hoppet med kroppen en kvart runde på tvers
+    const base = Math.round(t.spinStart / HALF) * HALF;
+    const off = Math.abs(t.spinStart - base) > 1e-6 ? t.spinStart - base : 0;
     t.lastLanding = judgeLanding(ds, df, {
       grab: g, grabTime: g ? t.grabs.bestTime : 0, perfectPop: t.jumpPerfectPop, fromSwitch: t.jumpFromSwitch,
-      airTime: t.airTime, stillGrabbing: t.grabs.held !== 0,
+      airTime: t.airTime, stillGrabbing: t.grabs.held !== 0, spinOffset: off,
     });
     t.landingAge = 0;
     t.justLanded = true;
     // spinn: nærmeste halve runde (en halv runde = du kjører baklengs, switch). Flip: nærmeste hele runde.
-    t.spinTarget = t.spinStart + Math.round(ds / HALF) * HALF;
+    t.spinTarget = off === 0 ? t.spinStart + Math.round(ds / HALF) * HALF : base + Math.round((ds + off) / HALF) * HALF;
+    t.turnOut = false;
     t.flipTarget = t.flipStart + Math.round(df / TURN) * TURN;
   }
 
@@ -224,9 +235,15 @@ export function stepTricks(t: TrickState, inp: TrickInput, dt: number): void {
 
   if (t.inAir) {
     t.airTime += dt;
-    t.spinRate = approach(t.spinRate, inp.spin, CONFIG.spinSpeedDeg * DEG, CONFIG.spinBuild, CONFIG.spinCoastDeg, dt);
+    if (inp.spin !== 0) t.turnOut = false;
     t.flipRate = approach(t.flipRate, inp.flip, CONFIG.flipSpeedDeg * DEG, CONFIG.flipBuild, CONFIG.flipCoastDeg, dt);
-    t.spin += t.spinRate * dt;
+    if (t.turnOut) {
+      // ut av en boardslide uten å spinne selv: kroppen vris mykt tilbake langs fallinja
+      [t.spin, t.spinRate] = settle(t.spin, t.spinRate, turnOutTarget(t.spin), CONFIG.railTurnOut, dt);
+    } else {
+      t.spinRate = approach(t.spinRate, inp.spin, CONFIG.spinSpeedDeg * DEG, CONFIG.spinBuild, CONFIG.spinCoastDeg, dt);
+      t.spin += t.spinRate * dt;
+    }
     t.flip += t.flipRate * dt;
   } else {
     // skiene biter i snøen: rotasjonsfarten tas hardt ned rett etter landing (mykt avtagende),
@@ -243,4 +260,52 @@ export function stepTricks(t: TrickState, inp: TrickInput, dt: number): void {
 /** Kjører skiløperen baklengs (switch)? Sant når kroppen står en halv runde rotert. */
 export function isSwitch(t: TrickState): boolean {
   return Math.cos(t.spinTarget) < 0;
+}
+
+/** Nærmeste stilling langs fallinja (hel eller halv runde). Står du midt imellom, velges forlengs. */
+function turnOutTarget(spin: number): number {
+  const a = Math.floor(spin / HALF) * HALF, b = a + HALF;
+  const da = spin - a, db = b - spin;
+  if (Math.abs(da - db) < 20 * DEG) return Math.cos(a) > 0 ? a : b;
+  return da < db ? a : b;
+}
+
+/**
+ * Skiene vris for å peke langs railen. Kroppen skal stå stille i verden, så spinnet vris like mye
+ * motsatt vei (kroppens retning er heading − spinn). Da snur ikke kroppen seg brått.
+ */
+export function shiftSpin(t: TrickState, headingShift: number): void {
+  t.spin += headingShift; t.spinStart += headingShift; t.spinTarget += headingShift;
+}
+
+/** Hvordan du landet på en rail. */
+export interface RailLanding {
+  quality: LandingQuality;
+  /** På tvers (boardslide) eller langs (50-50)? */
+  across: boolean;
+  /** Hvor skjevt (grader), med fortegn: hvilken side du lener mot. */
+  errDeg: number;
+}
+
+/**
+ * Lander på en rail (eller kjører opp på den). Kroppen kan stå langs railen (50-50, forlengs eller baklengs)
+ * eller på tvers (boardslide). Kroppen retter seg mykt inn mot nærmeste kvarte runde.
+ * Gir ikke poeng for hoppet opp; railen gir poeng når du er ferdig med den.
+ */
+export function landOnRail(t: TrickState): RailLanding {
+  const QUARTER = HALF / 2;
+  const q = Math.round(t.spin / QUARTER);
+  const errDeg = (t.spin - q * QUARTER) / DEG;
+  const flipErr = offBy(t.flip - t.flipStart, TURN);
+  let quality: LandingQuality = 'ren';
+  if (Math.abs(errDeg) >= CONFIG.railLandFall || flipErr > CONFIG.landFlipClean + CONFIG.landSloppyExtra) quality = 'fall';
+  else if (Math.abs(errDeg) > CONFIG.railLandClean || flipErr > CONFIG.landFlipClean) quality = 'slurvete';
+  if (quality !== 'fall') {
+    t.inAir = false;
+    t.landingAge = 0;
+    t.turnOut = false;
+    t.spinTarget = q * QUARTER;
+    t.flipTarget = t.flipStart + Math.round((t.flip - t.flipStart) / TURN) * TURN;
+  }
+  return { quality, across: Math.abs(q) % 2 === 1, errDeg };
 }

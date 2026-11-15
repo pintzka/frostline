@@ -164,3 +164,48 @@ export function stepScore(s: ScoreState, grounded: boolean, dt: number): void {
     if (s.comboIdle > CONFIG.comboTimeout) { s.comboCount = 0; s.comboIdle = 0; }
   }
 }
+
+/** Et ferdig stykke på en rail eller boks. */
+export interface RailRun {
+  /** «50-50» eller «Boardslide». */
+  name: string;
+  /** Boardslide (på tvers) gir mer poeng per sekund. */
+  across: boolean;
+  /** Sekunder på railen. */
+  time: number;
+  /** Landet du skjevt på railen? Da gir den halve poeng og bygger ikke komboen. */
+  sloppy: boolean;
+}
+
+/** 1.25 → «1,3 s» */
+export function railTimeText(time: number): string {
+  return `${time.toFixed(1).replace('.', ',')} s`;
+}
+
+/**
+ * Kalles når du er ferdig med en rail (hoppet av eller kom til slutten). Railen er et ekte triks i komboen:
+ * poeng per sekund × landing × gjentakelse × kombo. Faller du av railen, er det et vanlig fall i stedet.
+ */
+export function scoreRail(s: ScoreState, r: RailRun): TrickResult {
+  const name = `${r.name} ${railTimeText(r.time)}`;
+  const quality = r.sloppy ? 'slurvete' : 'ren';
+  const base = { name, quality, points: 0, combo: 1, repeat: 1, perfectPop: false, tooSmall: false, smallJump: false, comboLost: false, landedGrabbing: false } as const;
+  if (r.time < CONFIG.railMinTime) {
+    s.last = { ...base, tooSmall: true };
+    s.lastAge = 0;
+    return s.last;
+  }
+  const key = `rail|${r.across ? 'board' : '5050'}`;
+  const repeat = repeatShare(s, key);
+  s.recent.push(key);
+  if (s.recent.length > CONFIG.repeatMemory) s.recent.shift();
+  const combo = comboMult(s);
+  const perSec = r.across ? CONFIG.railPointsBoard : CONFIG.railPoints5050;
+  const points = round10(perSec * r.time * (r.sloppy ? CONFIG.sloppyShare : 1) * repeat * combo);
+  s.total += points;
+  s.comboIdle = 0;
+  if (!r.sloppy) s.comboCount++;
+  s.last = { ...base, points, combo, repeat };
+  s.lastAge = 0;
+  return s.last;
+}

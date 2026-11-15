@@ -35,6 +35,26 @@ export interface Kicker {
   respawnSpeed?: number;
 }
 
+/**
+ * En rail eller boks: et rett stykke du glir på, med en myk rampe opp fra snøen i starten.
+ * Den følger bakken, med samme høyde over snøen hele veien.
+ */
+export interface Rail {
+  name: string;
+  /** "rail" (smalt rør) eller "box" (bred boks). */
+  kind: 'rail' | 'box';
+  /** Hvor starten (bunnen av rampen) står, i meter nedover bakken. */
+  z: number;
+  /** Hvor langt fra midten av bakken starten står (m). Positivt = til høyre når du kjører ned. */
+  x: number;
+  /** Hvor lang den er, med rampen (m). */
+  length: number;
+  /** Hvor høyt over snøen toppen er (m). */
+  height: number;
+  /** Hvor mye den skrår (grader). 0 = rett ned bakken, positivt = mot høyre. */
+  angleDeg?: number;
+}
+
 /** Hele parken slik den står i JSON-fila. */
 export interface ParkData {
   /** Navnet på parken. */
@@ -56,6 +76,8 @@ export interface ParkData {
   landing: { knuckle: number; steep: number; runout: number };
   /** Hoppene, ovenfra og ned. */
   kickers: Kicker[];
+  /** Rails og bokser (kan sløyfes). */
+  rails?: Rail[];
 }
 
 /** Hvor du settes tilbake etter et fall på landingen til hoppet: meter før rampen og fart (m/s). */
@@ -107,6 +129,13 @@ const KICKER_FIELDS: Shape = {
 };
 /** Felt et hopp kan ha, men ikke må ha. */
 const KICKER_OPTIONAL: Shape = { respawnBeforeRamp: 'number', respawnSpeed: 'number' };
+const RAIL_FIELDS: Shape = {
+  name: 'string', kind: 'string', z: 'number', x: 'number', length: 'number', height: 'number',
+};
+/** Felt en rail kan ha, men ikke må ha. */
+const RAIL_OPTIONAL: Shape = { angleDeg: 'number' };
+/** Felt parken kan ha, men ikke må ha (nybegynnerparken har ingen rails). */
+const PARK_OPTIONAL: Shape = { rails: 'array' };
 const TYPE_NAMES = { string: 'tekst', number: 'et tall', object: 'en gruppe { }', array: 'en liste [ ]' };
 
 function isObject(v: unknown): v is Record<string, unknown> {
@@ -156,7 +185,7 @@ function steepEnd(k: Kicker, p: ParkData): number {
 export function validatePark(data: unknown): string[] {
   const errors: string[] = [];
   if (!isObject(data)) return ['Parken må være en gruppe { } med felt som "name", "width" og "kickers".'];
-  if (!checkShape(data, PARK_FIELDS, 'Parken', errors)) return errors;
+  if (!checkShape(data, PARK_FIELDS, 'Parken', errors, PARK_OPTIONAL)) return errors;
   for (const group of Object.keys(GROUP_FIELDS)) {
     checkShape(data[group] as Record<string, unknown>, GROUP_FIELDS[group], `"${group}"`, errors);
   }
@@ -164,6 +193,10 @@ export function validatePark(data: unknown): string[] {
   list.forEach((k, i) => {
     if (!isObject(k)) errors.push(`Hopp nr. ${i + 1}: må være en gruppe { }.`);
     else checkShape(k, KICKER_FIELDS, `Hopp nr. ${i + 1}${typeof k.name === 'string' ? ` («${k.name}»)` : ''}`, errors, KICKER_OPTIONAL);
+  });
+  ((data.rails ?? []) as unknown[]).forEach((r, i) => {
+    if (!isObject(r)) errors.push(`Rail nr. ${i + 1}: må være en gruppe { }.`);
+    else checkShape(r, RAIL_FIELDS, `Rail nr. ${i + 1}${typeof r.name === 'string' ? ` («${r.name}»)` : ''}`, errors, RAIL_OPTIONAL);
   });
   // Ingen vits i å regne på tallene før alle felt finnes.
   if (errors.length > 0) return errors;
@@ -253,7 +286,72 @@ export function validatePark(data: unknown): string[] {
       }
     }
   });
+  checkRails(p, errors);
   return errors;
+}
+
+/** Hvor railen slutter (x, z), og hvor langt til siden den når på det meste. */
+export function railEnd(r: Rail): { x: number; z: number } {
+  const a = (r.angleDeg ?? 0) * DEG;
+  return { x: r.x + r.length * Math.sin(a), z: r.z + r.length * Math.cos(a) };
+}
+
+/** Grenser for rails (se docs/PARK.md). */
+const RAIL_LIMITS = { height: [0.2, 1.2], angleDeg: 30, maxLength: 80, minTop: 4, kickerGap: 2, railGap: 3 };
+
+/** Sjekker rails og bokser: innenfor bakken, ikke på hoppene og ikke oppå hverandre. */
+function checkRails(p: ParkData, errors: string[]): void {
+  const rails = p.rails ?? [];
+  const names = new Set<string>();
+  const ramp = CONFIG.railRampLength;
+  const span = (r: Rail) => {
+    const e = railEnd(r);
+    return { z0: Math.min(r.z, e.z), z1: Math.max(r.z, e.z), x0: Math.min(r.x, e.x), x1: Math.max(r.x, e.x) };
+  };
+  rails.forEach((r, i) => {
+    const who = `Railen «${r.name}»`;
+    if (names.has(r.name)) errors.push(`To rails heter «${r.name}». Gi dem forskjellige navn.`);
+    names.add(r.name);
+    if (r.kind !== 'rail' && r.kind !== 'box') errors.push(`${who}: "kind" er «${r.kind}». Den må være "rail" eller "box".`);
+    const [hMin, hMax] = RAIL_LIMITS.height;
+    if (r.height < hMin || r.height > hMax) errors.push(`${who}: "height" er ${r.height} m. Den må være mellom ${hMin} og ${hMax} m.`);
+    if (r.length < ramp + RAIL_LIMITS.minTop || r.length > RAIL_LIMITS.maxLength) {
+      errors.push(`${who}: "length" er ${r.length} m. Den må være mellom ${ramp + RAIL_LIMITS.minTop} m (rampen er ${ramp} m) og ${RAIL_LIMITS.maxLength} m.`);
+    }
+    const a = r.angleDeg ?? 0;
+    if (Math.abs(a) > RAIL_LIMITS.angleDeg) errors.push(`${who}: "angleDeg" er ${a}°. Den kan skrå høyst ${RAIL_LIMITS.angleDeg}° til hver side.`);
+    const s = span(r);
+    const inside = p.width * p.edge.start - 1;
+    if (Math.max(Math.abs(s.x0), Math.abs(s.x1)) > inside) {
+      errors.push(`${who}: går ut til ${Math.max(Math.abs(s.x0), Math.abs(s.x1)).toFixed(1)} m fra midten, men må holde seg innenfor ${inside.toFixed(0)} m (før bollen mot kanten).`);
+    }
+    if (s.z0 < FIRST_RAMP_MIN_Z) errors.push(`${who}: starter ved ${s.z0} m, før skiløperen har fått fart. Den må starte etter ${FIRST_RAMP_MIN_Z} m.`);
+    const stop = p.length - CONFIG.runEndMargin - 10;
+    if (s.z1 > stop) errors.push(`${who}: slutter ved ${s.z1.toFixed(1)} m, men må slutte før ${stop} m.`);
+    // ikke på hoppene: ikke på rampen, platået eller landingen, og ikke over kanten inn til landingen (der bøyer bakken seg)
+    const gap = RAIL_LIMITS.kickerGap;
+    for (const k of p.kickers) {
+      const band = k.width / 2 + k.sideWidth + gap;
+      const z0 = k.z - rampLength(k) - gap, z1 = k.z + steepEnd(k, p) + gap;
+      const nearX = s.x0 < band && s.x1 > -band;
+      if (nearX && s.z1 > z0 && s.z0 < z1) {
+        errors.push(`${who} står på hoppet «${k.name}» (${z0.toFixed(0)}–${z1.toFixed(0)} m, ${band.toFixed(0)} m til hver side). Flytt den lenger ut til siden eller mellom hoppene.`);
+        continue;
+      }
+      const k0 = k.z + k.landingStart - gap, k1 = k.z + k.landingStart + p.landing.knuckle + gap;
+      if (s.z1 > k0 && s.z0 < k1) {
+        errors.push(`${who} krysser kanten inn til landingen på «${k.name}» (${k0.toFixed(0)}–${k1.toFixed(0)} m), der bakken bøyer seg. Flytt den opp eller ned.`);
+      }
+    }
+    // ikke oppå eller helt inntil en annen rail
+    for (let j = 0; j < i; j++) {
+      const o = span(rails[j]);
+      const g = RAIL_LIMITS.railGap;
+      if (s.z1 > o.z0 && s.z0 < o.z1 && s.x1 + g > o.x0 && s.x0 - g < o.x1) {
+        errors.push(`${who} står for nær «${rails[j].name}». Det må være minst ${g} m mellom dem.`);
+      }
+    }
+  });
 }
 
 /** Sjekker parken og gir den tilbake med riktige typer. Kaster en feil med alle meldingene hvis noe er galt. */

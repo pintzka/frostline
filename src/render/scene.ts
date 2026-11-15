@@ -4,6 +4,7 @@ import { createEnvironment, HAZE } from './environment';
 import { snapShadowTarget, type Vec3 } from './envMath';
 import { LOOK } from './look';
 import { useRadialFog } from './radialFog';
+import { createRailMeshes } from './rails';
 
 /**
  * Scene, lys og testbakken, med miljøet rundt (environment.ts). Arbeidsstrøm 6 (Grafikk og effekter) eier denne fila.
@@ -50,6 +51,9 @@ export function createScene(root: HTMLElement) {
   const ground = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0xdde3ea, map: tex, roughness: 0.9 }));
   ground.receiveShadow = true;
   scene.add(ground);
+
+  // rails og bokser fra parkfila
+  scene.add(createRailMeshes());
 
   // himmel, fjell, skog og lykter rundt bakken
   const env = createEnvironment(scene, sun.position.clone().normalize());

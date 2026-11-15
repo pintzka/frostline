@@ -1,7 +1,8 @@
 import { CONFIG } from './core/config';
 import { createLoop } from './core/loop';
-import { skisOnSnow, type Move } from './core/game';
+import { skisOnSnow, snowSkier, type Move } from './core/game';
 import { speedOf } from './physics/skier';
+import { railStyleName } from './physics/rail';
 import { createInput } from './input/input';
 import { createChaseCamera } from './camera/chase';
 import { createScene } from './render/scene';
@@ -65,7 +66,7 @@ const loop = createLoop({
     const { skier, tricks } = game;
     const { at, heading, normal } = view.update(game, prev, prevTricks, alpha, frameDt);
     trails.update(at.x, at.y, at.z, heading, skisOnSnow(game), moved);
-    spray.update(skier, at, heading, skier.brake, normal, frameDt, chase.camera, renderer);
+    spray.update(snowSkier(game), at, heading, skier.brake, normal, frameDt, chase.camera, renderer);
     sunFollow(at);
 
     // den ekte farten: landingene følger flybanen, så den holder seg når du lander
@@ -76,6 +77,7 @@ const loop = createLoop({
       popCharge: skier.popCharge, lastPop: skier.lastPop, popAge: skier.popAge,
       fade: fadeAmount(game.fall),
       score: game.score, best: game.best, controls: input.device(), grab: tricks.grabs.held, grabTime: tricks.grabs.holdTime,
+      rail: game.rail.on ? { name: railStyleName(game.rail.style), time: game.rail.time, balance: game.rail.balance } : null,
     }, frameDt);
     hud.setOpacity(menu.update(game.flow, frameDt));
     moved = 'none';
