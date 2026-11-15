@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { CONFIG } from '../src/core/config';
 import { createSkier, stepSkier, type SkierState } from '../src/physics/skier';
-import { heightAt } from '../src/park/terrain';
+import { heightAt, PARK } from '../src/park/terrain';
 import { clamp01, detectEvents, landingLevel, popLevel, skidAmount, soundLevels, type SoundInput } from '../src/audio/mix';
 import { createAudio } from '../src/audio/engine';
 
@@ -66,7 +66,7 @@ describe('lydnivåer', () => {
       }
     }
     for (const v of odd) {
-      for (const x of [landingLevel(v), popLevel(v, true), popLevel(v, false), clamp01(v)]) {
+      for (const x of [landingLevel(v, v), landingLevel(v, 1), landingLevel(1, v), popLevel(v, true), popLevel(v, false), clamp01(v)]) {
         expect(Number.isFinite(x)).toBe(true);
         expect(x).toBeGreaterThanOrEqual(0);
         expect(x).toBeLessThanOrEqual(1);
@@ -86,16 +86,54 @@ describe('lydnivåer', () => {
 });
 
 describe('landing og pop', () => {
-  it('hardere landing gir kraftigere dump', () => {
-    // ingen fart inn i bakken = ingen lyd
-    let last = landingLevel(0);
-    expect(last).toBe(0);
-    for (const impact of [0.3, 1.5, 3, 5, 7, 9]) {
-      const l = landingLevel(impact);
+  it('lengre lufttid og hardere støt gir kraftigere dump', () => {
+    // ingen lufttid = ingen lyd
+    expect(landingLevel(0, 0)).toBe(0);
+    let last = 0;
+    for (const air of [0.1, 0.3, 0.7, 1.2, 2, 2.5, 3]) {
+      const l = landingLevel(air, 1);
       expect(l).toBeGreaterThan(last);
       last = l;
     }
-    expect(landingLevel(20)).toBe(1);
+    expect(landingLevel(1, 6)).toBeGreaterThan(landingLevel(1, 2));
+    expect(landingLevel(4, 20)).toBe(1);
+  });
+
+  it('kuler i bakken (bittelitt lufttid) er nesten stille', () => {
+    expect(landingLevel(0.05, 2)).toBeLessThan(0.05);
+  });
+
+  it('rekkefølgen i ekte kjøring: ollie < lite < medium < stort < stort med pop', () => {
+    // ollie på flat bakke, fullt ladet
+    const s = moving(15);
+    let ollie = 0;
+    for (let i = 0; i < 2 * CONFIG.physicsHz; i++) {
+      const prev = { ...s };
+      stepSkier(s, { steer: 0, brake: 0, pop: i < 0.6 * CONFIG.physicsHz }, dt);
+      ollie = Math.max(ollie, detectEvents(prev, s).landing ?? 0);
+    }
+    // hele bakken: uten pop, og med perfekt pop (slipp like før kanten)
+    const ride = (lead: number | null) => {
+      const r = createSkier();
+      const best = new Map<string, number>();
+      for (let i = 0; i < 80 * CONFIG.physicsHz && r.z < PARK.length - 45; i++) {
+        const next = PARK.kickers.find((k) => k.z - r.z > -1 && k.z - r.z < 60);
+        const timeToLip = next ? (next.z - r.z) / Math.max(1, r.vz) : Infinity;
+        const pop = lead !== null && next !== undefined && r.grounded && timeToLip > lead;
+        const prev = { ...r };
+        stepSkier(r, { steer: 0, brake: 0, pop }, dt);
+        const l = detectEvents(prev, r).landing;
+        const k = PARK.kickers.find((k) => r.z > k.z && r.z < k.z + 100);
+        if (l !== null && k) best.set(k.name, Math.max(best.get(k.name) ?? 0, l));
+      }
+      return best;
+    };
+    const plain = ride(null);
+    const popped = ride(0.05);
+    const order = [ollie, plain.get('Lite')!, plain.get('Medium')!, plain.get('Stort')!, popped.get('Stort')!];
+    for (let i = 1; i < order.length; i++) expect(order[i]).toBeGreaterThan(order[i - 1] + 0.05);
+    expect(ollie).toBeLessThan(0.35);
+    expect(popped.get('Stort')!).toBeGreaterThan(0.8);
   });
 
   it('pop er sterkere med full lading, og litt sterkere når den er perfekt', () => {
@@ -115,7 +153,7 @@ describe('landing og pop', () => {
     }
     expect(pops).toBe(1);
     expect(landings).toBe(1);
-    expect(landing).toBeGreaterThan(0.15);
+    expect(landing).toBeGreaterThan(0.1);
   });
 
   it('et høyt fall gir hardere landing enn et lite hopp', () => {

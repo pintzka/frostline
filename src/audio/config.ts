@@ -30,11 +30,20 @@ export const AUDIO = {
   scrapeCurve: 0.7,
   scrapeSkidShare: 0.6,
 
-  /** Landing: under landMinImpact (m/s rett inn i bakken) høres nesten ingenting, full ved landFullImpact. */
+  /**
+   * Landing: styrken bygger mest på lufttid (stort hopp = tungt dump, selv om landingen er myk),
+   * og litt på støtet (farten rett inn i bakken, m/s). Lufttid fra landAirStart til landAirFull (s).
+   */
+  landAirStart: 0.15,
+  landAirFull: 3,
+  landAirShare: 0.7,
   landMinImpact: 0.8,
   landFullImpact: 9,
-  /** Et vanlig lite hopp gir minst så mye dump. Under landMinImpact tones det ned mot stille. */
-  landFloor: 0.15,
+  landImpactShare: 0.2,
+  /** Grunnstyrke for en ekte landing. */
+  landFloor: 0.1,
+  /** Kortere lufttid enn dette (s) er bare en kul i bakken, og tones ned mot stille. */
+  landBumpAir: 0.25,
 
   /** Pop: styrke ved kort trykk og full lading, og ekstra for perfekt pop. */
   popMin: 0.35,

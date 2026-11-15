@@ -78,12 +78,20 @@ export function skidAmount(s: Pick<SkierState, 'vx' | 'vz' | 'heading'>): number
   return clamp01(side);
 }
 
-/** Landing: hvor kraftig dumpet er (0–1), ut fra farten rett inn i bakken (m/s). */
-export function landingLevel(impact: number): number {
-  if (!(impact > 0)) return 0;
+/**
+ * Landing: hvor kraftig dumpet er (0–1).
+ * Bygger mest på lufttiden (s), så et stort hopp lander med tyngde selv når landingen er myk,
+ * og litt på støtet (farten rett inn i bakken, m/s).
+ */
+export function landingLevel(airTime: number, impact: number): number {
+  const air = Number.isFinite(airTime) ? Math.max(0, airTime) : 0;
+  const hit = Number.isFinite(impact) ? Math.max(0, impact) : 0;
+  const level = AUDIO.landFloor
+    + AUDIO.landAirShare * ramp(air, AUDIO.landAirStart, AUDIO.landAirFull)
+    + AUDIO.landImpactShare * smooth(ramp(hit, AUDIO.landMinImpact, AUDIO.landFullImpact));
   // bittesmå luftturer (kuler i bakken) er nesten stille, ellers dunker det hele tiden
-  if (impact < AUDIO.landMinImpact) return clamp01((AUDIO.landFloor * impact) / AUDIO.landMinImpact);
-  return clamp01(AUDIO.landFloor + (1 - AUDIO.landFloor) * smooth(ramp(impact, AUDIO.landMinImpact, AUDIO.landFullImpact)));
+  const bump = smooth(ramp(air, 0, AUDIO.landBumpAir));
+  return clamp01(level * bump);
 }
 
 /** Pop: hvor sterk avspark-lyden er (0–1), ut fra lading og om den var perfekt. */
@@ -109,7 +117,7 @@ export function detectEvents(prev: SkierState, cur: SkierState): SoundEvents {
   if (!prev.grounded && cur.grounded) {
     const [nx, ny, nz] = normalAt(cur.x, cur.z);
     const impact = -(prev.vx * nx + prev.vy * ny + prev.vz * nz);
-    landing = landingLevel(impact);
+    landing = landingLevel(prev.airTime, impact);
   }
   return { pop, landing };
 }
