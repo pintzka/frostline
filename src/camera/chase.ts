@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { CONFIG } from '../core/config';
-import { createCameraRig, type CameraInput } from './rig';
+import { createCameraRig, type CameraInput, type CameraPose } from './rig';
 
 /**
  * Følgekamera: lavt og nært bak skiløperen, FOV øker med farten.
@@ -15,6 +15,12 @@ export function createChaseCamera(aspect: number) {
     camera: cam,
     update(inp: CameraInput, dt: number) {
       const p = rig.update(inp, dt);
+      cam.position.set(p.px, p.py, p.pz);
+      cam.lookAt(p.lx, p.ly, p.lz);
+      if (Math.abs(cam.fov - p.fov) > 0.01) { cam.fov = p.fov; cam.updateProjectionMatrix(); }
+    },
+    /** Setter kameraet direkte (brukes av reprisen, som regner ut sine egne vinkler i replayCam.ts). */
+    setPose(p: CameraPose) {
       cam.position.set(p.px, p.py, p.pz);
       cam.lookAt(p.lx, p.ly, p.lz);
       if (Math.abs(cam.fov - p.fov) > 0.01) { cam.fov = p.fov; cam.updateProjectionMatrix(); }
