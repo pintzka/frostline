@@ -82,6 +82,8 @@ export function createSpray(opts: { seed?: number; groundAt?: (x: number, z: num
 
   let count = 0;
   let emitted = 0;
+  // kvalitetsnivået: hvor stor del av sprutet som lages (0–1), og taket som følger av det
+  let amount = 1, limit: number = max;
   // brøkdeler av partikler som ikke ble sendt ut ennå, så mengden blir lik uansett fps
   let carveDebt = 0, brakeDebt = 0;
   let brakeLevel = 0;
@@ -129,7 +131,7 @@ export function createSpray(opts: { seed?: number; groundAt?: (x: number, z: num
 
   /** Lager én partikkel. preAge: hvor langt inn i bildet den egentlig ble laget (s). */
   function emit(kind: Kind, x: number, y: number, z: number, vx: number, vy: number, vz: number, preAge: number) {
-    if (count >= max) return;
+    if (count >= limit) return;
     const look = CONFIG.sprayLooks[kind];
     const i = count++;
     const j = i * 3;
@@ -161,6 +163,12 @@ export function createSpray(opts: { seed?: number; groundAt?: (x: number, z: num
     get count() { return count; },
     /** Hvor mange partikler som er laget totalt (for tester). */
     get emitted() { return emitted; },
+
+    /** Kvalitetsnivået: 1 = alt sprut, 0,4 = 40 % av partiklene og et lavere tak. De som lever, får leve ut. */
+    setAmount(a: number) {
+      amount = Math.max(0, Math.min(1, a));
+      limit = Math.round(max * amount);
+    },
 
     update(f: SprayFrame) {
       const dt = Math.max(0, f.dt);
@@ -194,8 +202,8 @@ export function createSpray(opts: { seed?: number; groundAt?: (x: number, z: num
 
       // 3) jevn sprut fra skiene, bare på bakken
       if (f.grounded) {
-        carveDebt += carveRate(f.edge, speed) * dt;
-        brakeDebt += brakeRate(brakeAvg, speed) * dt;
+        carveDebt += carveRate(f.edge, speed) * amount * dt;
+        brakeDebt += brakeRate(brakeAvg, speed) * amount * dt;
       } else {
         carveDebt = 0; brakeDebt = 0;
       }
@@ -249,7 +257,7 @@ export function createSpray(opts: { seed?: number; groundAt?: (x: number, z: num
       if (!f.grounded) { airVx = f.vx; airVy = f.vy; airVz = f.vz; sawAir = true; }
       if (f.sinceLanding < lastSince && f.grounded && sawAir && f.airTime >= CONFIG.sprayLandMinAir) {
         const impact = -(airVx * f.nx + airVy * f.ny + airVz * f.nz);
-        const n = landingCount(impact, speed);
+        const n = Math.round(landingCount(impact, speed) * amount);
         const LS = CONFIG.sprayLandStrength;
         const strength = Math.min(LS.max, LS.base + impact * LS.perImpact);
         const vyg = slopeVy(f) * inh;
@@ -269,7 +277,7 @@ export function createSpray(opts: { seed?: number; groundAt?: (x: number, z: num
       // 5) pop: litt fokk bak skiene der du sparket fra
       if (f.popAge < lastPopAge) {
         const vyg = slopeVy(f) * inh;
-        const n = Math.round(CONFIG.sprayPopCount * (f.lastPop === 'perfekt' ? CONFIG.sprayPopPerfect : 1));
+        const n = Math.round(CONFIG.sprayPopCount * (f.lastPop === 'perfekt' ? CONFIG.sprayPopPerfect : 1) * amount);
         const jit = SP.pop.jitter;
         for (let k = 0; k < n; k++) {
           const along = -half * range(SP.pop.along);

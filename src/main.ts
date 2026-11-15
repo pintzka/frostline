@@ -15,14 +15,17 @@ import { createPauseUi } from './ui/pause';
 import { createMenu } from './ui/menu';
 import { createGame, stepGame } from './ui/flow';
 import { createAudio } from './audio/engine';
+import { createQualityUi } from './ui/qualityUi';
 
 const root = document.getElementById('app')!;
-const { renderer, scene, env, sunFollow } = createScene(root);
+// grafikknivået (Lav / Middels / Høy / Auto) og FPS-måleren, valgt på startskjermen og i pausen
+const quality = createQualityUi(root);
+const { renderer, scene, env, sunFollow, applyQuality } = createScene(root, quality.settings);
 const chase = createChaseCamera(innerWidth / innerHeight);
 addEventListener('resize', () => chase.resize(innerWidth / innerHeight));
 const hud = createHud(root);
 const input = createInput(renderer.domElement, createTouchControls(root));
-const menu = createMenu(root);
+const menu = createMenu(root, quality.picker());
 const audio = createAudio();
 
 const view = createSkierView(scene);
@@ -60,6 +63,10 @@ const loop = createLoop({
   },
   render(alpha, frameDt) {
     const { skier, tricks } = game;
+    // nivåbytter som gir et hakk venter til pause, startskjerm eller resultat
+    const q = quality.frame(frameDt);
+    applyQuality(q, loop.isPaused() || game.flow.phase !== 'kjorer');
+    spray.setAmount(q.spray);
     const { at, heading, normal } = view.update(game, prev, prevTricks, alpha, frameDt);
     trails.update(at.x, at.y, at.z, heading, skisOnSnow(game), moved);
     spray.update(skier, at, heading, skier.brake, normal, frameDt, chase.camera, renderer);
@@ -90,4 +97,4 @@ const pausable = {
   toggle() { if (loop.isPaused()) pausable.resume(); else pausable.pause(); return loop.isPaused(); },
   isPaused: () => loop.isPaused(),
 };
-input.onPause(createPauseUi(root, pausable).toggle);
+input.onPause(createPauseUi(root, pausable, quality.picker()).toggle);

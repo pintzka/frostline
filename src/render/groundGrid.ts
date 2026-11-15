@@ -17,10 +17,10 @@ export const FINE = { zMin: -20, zMax: 600 };
 
 const G = LOOK.ground;
 
-/** Avstanden mellom punktene som holder avviket under toleransen der bakken krummer så mye. */
-function spacingFor(curvature: number, max: number): number {
+/** Avstanden mellom punktene som holder avviket under toleransen (m) der bakken krummer så mye. */
+function spacingFor(curvature: number, max: number, tolerance: number): number {
   if (curvature < 1e-9) return max;
-  return Math.min(max, Math.max(G.minSpacing, Math.sqrt((8 * G.tolerance) / curvature)));
+  return Math.min(max, Math.max(G.minSpacing, Math.sqrt((8 * tolerance) / curvature)));
 }
 
 /**
@@ -68,8 +68,8 @@ function bend(prev: number[], here: number[], next: number[], k: number, hx: num
   };
 }
 
-/** Radene langs bakken (z). */
-export function groundRows(): number[] {
+/** Radene langs bakken (z). tolerance: største tillatte avvik (m); lavere kvalitet tåler litt mer. */
+export function groundRows(tolerance: number = G.tolerance): number[] {
   const hz = 0.25, hx = 1;
   const need: number[] = [];
   let prev = sampleRow(FINE.zMin - hz, hx), here = sampleRow(FINE.zMin, hx);
@@ -81,7 +81,7 @@ export function groundRows(): number[] {
       // krumningen langs bakken og på skrå legges sammen: trekantene går på skrå over begge
       c = Math.max(c, b.zz + b.xz);
     }
-    need.push(spacingFor(c, G.maxRowSpacing));
+    need.push(spacingFor(c, G.maxRowSpacing, tolerance));
     prev = here; here = next;
   }
   // hoppkanten er en knekk (ikke en kurve), så den må ligge akkurat på en rad
@@ -89,12 +89,12 @@ export function groundRows(): number[] {
 }
 
 /** Kravet til avstand på tvers langs én rad, prøvd hver `h` meter. */
-function columnNeed(z: number, h: number): number[] {
+function columnNeed(z: number, h: number, tolerance: number): number[] {
   const prev = sampleRow(z - h, h), here = sampleRow(z, h), next = sampleRow(z + h, h);
   const need: number[] = [];
   for (let k = 1; k < here.length - 1; k++) {
     const b = bend(prev, here, next, k, h, h);
-    need.push(spacingFor(Math.max(b.xx, b.xz), G.maxColumnSpacing));
+    need.push(spacingFor(Math.max(b.xx, b.xz), G.maxColumnSpacing, tolerance));
   }
   return need;
 }
@@ -107,11 +107,11 @@ export interface GroundMesh {
   rows: number;
 }
 
-/** Bygger hele den preparerte bakken: punkter og trekanter. */
-export function buildGroundMesh(): GroundMesh {
-  const zs = groundRows();
+/** Bygger hele den preparerte bakken: punkter og trekanter. Større toleranse gir færre trekanter. */
+export function buildGroundMesh(tolerance: number = G.tolerance): GroundMesh {
+  const zs = groundRows(tolerance);
   const h = 0.2;
-  const needs = zs.map((z) => columnNeed(z, h));
+  const needs = zs.map((z) => columnNeed(z, h, tolerance));
   // hver rad bruker det strengeste kravet av seg selv og naboene, så trekantene mellom radene også holder
   const cols = zs.map((_, j) => {
     const own = needs[j], prev = needs[j - 1] ?? own, next = needs[j + 1] ?? own;

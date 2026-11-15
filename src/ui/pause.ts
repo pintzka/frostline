@@ -9,7 +9,8 @@ export interface Pausable {
   isPaused(): boolean;
 }
 
-export function createPauseUi(root: HTMLElement, game: Pausable) {
+/** extra: noe som skal stå på pauseskjermen, f.eks. grafikkvalget. */
+export function createPauseUi(root: HTMLElement, game: Pausable, extra?: HTMLElement) {
   const button = document.createElement('button');
   button.type = 'button';
   button.style.cssText =
@@ -22,6 +23,7 @@ export function createPauseUi(root: HTMLElement, game: Pausable) {
     'position:fixed;inset:0;z-index:1;display:none;align-items:center;justify-content:center;flex-direction:column;gap:8px;' +
     'background:#0d162099;color:#fff;font:600 32px system-ui,sans-serif;text-shadow:0 1px 3px #0008;';
   overlay.innerHTML = '<div>Pause</div><div style="font:16px system-ui,sans-serif;opacity:.85">Trykk P, Esc eller Fortsett</div>';
+  if (extra) { extra.style.marginTop = '14px'; overlay.appendChild(extra); }
   root.appendChild(overlay);
 
   const show = () => {

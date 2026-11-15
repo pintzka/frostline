@@ -117,6 +117,8 @@ export function createSnowSpray(scene: THREE.Scene) {
   const attrs = [[pos, 3], [size, 1], [alpha, 1], [seed, 1]] as const;
   type V3 = { x: number; y: number; z: number };
   return {
+    /** Kvalitetsnivået: hvor stor del av sprutet som lages (0–1). */
+    setAmount(a: number) { spray.setAmount(a); },
     /** at: der skiløperen tegnes nå. normal: bakkens normal under skiene. */
     update(s: Skier, at: V3, heading: number, brake: number, normal: V3, dt: number,
       camera: THREE.PerspectiveCamera, renderer: THREE.WebGLRenderer) {

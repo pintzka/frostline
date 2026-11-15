@@ -10,7 +10,7 @@ export const CONTROLS: [string, string][] = [
   ['Frontflip / backflip', '↑ / W · ↓ / S'],
   ['Grab i lufta', 'hold J / K / L (slipp før landing)'],
   ['Start på nytt', 'R'],
-  ['Pause · lyd', 'P / Esc · M'],
+  ['Pause · lyd · fps', 'P / Esc · M · F'],
   ['Gamepad', 'stikke, A pop, LT/B brems, X/RB/LB grab, Y ny runde, Start pause'],
   ['Mobil', 'dra tommelen på venstre side, POP og BREMS til høyre'],
 ];

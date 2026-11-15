@@ -3,6 +3,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { FINE } from './groundGrid';
 import { glowStrength, hiddenByFog, ringCenter, type Vec3 } from './envMath';
 import { LOOK } from './look';
+import { forestCount, spreadOrder } from './quality';
 import { forestChunks, GROUND_HALF, groundAt, planMarkers, planTrees, ridgeProfile, WORLD } from './sceneryLayout';
 
 /**
@@ -34,6 +35,8 @@ export function createEnvironment(scene: THREE.Scene, sunDir: THREE.Vector3) {
   // fast punkt i verden (starten) som den nærmeste fjellringen glir rundt
   const anchor: Vec3 = [0, 0, 0];
   const c: Vec3 = [0, 0, 0];
+  // synsavstanden (tåka) fra kvalitetsnivået
+  let far: number = LOOK.fog.far;
 
   return {
     /** Himmel og fjell flytter seg med kameraet, så de alltid er langt unna og aldri kan nås. */
@@ -44,9 +47,16 @@ export function createEnvironment(scene: THREE.Scene, sunDir: THREE.Vector3) {
       // den nærmeste ringen står litt fast i verden, så den glir sakte forbi (dybde)
       for (const m of mountains) m.mesh.position.set(...ringCenter(c, anchor, m.parallax));
       // skog-biter som er helt i tåka trenger ikke tegnes (de er uansett bare tåkefarge)
-      for (const f of forest) f.mesh.visible = !hiddenByFog(c, f.min, f.max);
+      for (const f of forest) f.mesh.visible = f.mesh.count > 0 && !hiddenByFog(c, f.min, f.max, far);
       // lyktegløden blekner med avstanden, så den ikke lyser gjennom tett dis
-      for (const g of markers.glows) g.sprite.material.opacity = LOOK.glow.opacity * glowStrength(g.at.distanceTo(cam));
+      for (const g of markers.glows) g.sprite.material.opacity = LOOK.glow.opacity * glowStrength(g.at.distanceTo(cam), far);
+    },
+
+    /** Kvalitetsnivået: hvor stor del av skogen som tegnes (0–1), og hvor langt tåka slipper deg å se (m). */
+    setQuality(forestDensity: number, fogFar: number) {
+      far = fogFar;
+      // trærne ligger i blandet rekkefølge, så de første n er spredt utover hele biten
+      for (const f of forest) f.mesh.count = forestCount(f.total, forestDensity);
     },
   };
 }
@@ -264,9 +274,10 @@ function createForest() {
   const m = new THREE.Matrix4(), q = new THREE.Quaternion(), p = new THREE.Vector3(), s = new THREE.Vector3();
   const Y = new THREE.Vector3(0, 1, 0);
   const tint = new THREE.Color();
-  return forestChunks(planTrees()).map((chunk) => {
+  return forestChunks(planTrees()).map((chunk, k) => {
     const mesh = new THREE.InstancedMesh(geo, mat, chunk.trees.length);
-    chunk.trees.forEach((t, i) => {
+    // fast blandet rekkefølge, så lavere skogtetthet tynner jevnt (quality.ts)
+    spreadOrder(chunk.trees, LOOK.forest.seed + k).forEach((t, i) => {
       p.set(t.x, t.y, t.z);
       q.setFromAxisAngle(Y, t.turn);
       s.set(t.height * t.girth, t.height, t.height * t.girth);
@@ -276,7 +287,7 @@ function createForest() {
       mesh.setColorAt(i, tint);
     });
     mesh.computeBoundingSphere();
-    return { mesh, min: chunk.min, max: chunk.max };
+    return { mesh, min: chunk.min, max: chunk.max, total: chunk.trees.length };
   });
 }
 

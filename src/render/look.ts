@@ -42,4 +42,27 @@ export const LOOK = {
 
   /** Gløden rundt lyktene: størrelse (m), styrke, og at den blekner bort litt lenger ute enn tåka. */
   glow: { size: 2.6, opacity: 0.7, fadeEndFactor: 1.15 },
+
+  /**
+   * Kvalitetsnivåene (logikken ligger i quality.ts). Høy er slik spillet så ut før nivåene kom.
+   * pixelRatio: høyeste oppløsning i forhold til skjermen. shadowMapSize: 0 = ingen skygger.
+   * antialias: myke kanter (gjelder bare nivået spillet startet på, den kan ikke byttes uten å laste siden på nytt).
+   * forest: hvor stor del av trærne som tegnes. fogFar: synsavstand (m). spray: hvor mye snøsprut (0–1).
+   * groundTolerance: største avvik i den preparerte bakken (m); større gir færre trekanter.
+   */
+  quality: {
+    levels: {
+      lav: { pixelRatio: 1, shadowMapSize: 0, antialias: false, forest: 0.45, fogFar: 190, spray: 0.4, groundTolerance: 0.016 },
+      middels: { pixelRatio: 1.5, shadowMapSize: 1024, antialias: true, forest: 0.75, fogFar: 240, spray: 0.7, groundTolerance: 0.011 },
+      hoy: { pixelRatio: 2, shadowMapSize: 2048, antialias: true, forest: 1, fogFar: 280, spray: 1, groundTolerance: 0.011 },
+    },
+    /**
+     * Auto: starter på Middels på mobil og Høy på PC. Er snittet under minFps i slowFor sekunder,
+     * går den ett nivå ned. Over okFps nullstilles tellingen (mellom de to står den stille).
+     * Etter et bytte eller en pause ventes det settle sekunder før det måles igjen. Den går aldri opp av seg selv.
+     */
+    auto: { mobile: 'middels', desktop: 'hoy', minFps: 45, okFps: 50, slowFor: 4, settle: 3 },
+    /** FPS-måleren viser snittet over så mange sekunder, så tallet står rolig. */
+    fpsWindow: 1,
+  },
 } as const;
