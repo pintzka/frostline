@@ -14,6 +14,7 @@ import { createSkiTrails } from './render/trailMesh';
 import { createGame, skisOnSnow, stepGame, type Move } from './core/game';
 import { fadeAmount, fallBody, landingWobble } from './tricks/fall';
 import { isSwitch } from './tricks/rotation';
+import { createSnowSpray } from './render/sprayMesh';
 
 const root = document.getElementById('app')!;
 const { renderer, scene, env, sunFollow } = createScene(root);
@@ -26,6 +27,7 @@ const skierModel = createPlaceholderSkier();
 const mesh = skierModel.root;
 scene.add(mesh);
 const trails = createSkiTrails(scene);
+const spray = createSnowSpray(scene);
 
 const game = createGame();
 let prev = { ...game.skier };
@@ -96,6 +98,8 @@ const loop = createLoop({
     skierModel.setGrab(tricks.grabs.blend, pose.skiLift);
     skierModel.setPose({ ...pose, pitch: pose.pitch + body.pitch + wobble.pitch });
     trails.update(target.x, target.y, target.z, heading, skisOnSnow(game), moved);
+    const [snx, sny, snz] = normalAt(target.x, target.z);
+    spray.update(skier, target, heading, skier.brake, { x: snx, y: sny, z: snz }, frameDt, chase.camera, renderer);
 
     sunFollow(target);
 
