@@ -82,6 +82,27 @@ export const CONFIG = {
   camMaxYawRate: 2,
   /** Hopper skiløperen lenger enn dette på ett bilde (restart), flytter kameraet seg rett dit. */
   camSnapDistance: 20,
+
+  // --- Reprise av siste runde (src/ui/replay.ts, src/camera/replayCam.ts) ---
+  /** Lengste runde (s) som tas opp. Varer runden lenger, blir det ingen reprise (sparer minne). */
+  replayMaxTime: 600,
+  /** Så lenge (s) reprisen fortsetter etter målet, mens skiløperen bremser inn. */
+  replayTail: 1.5,
+  /** TV-kameraet: står så langt til siden for hoppet (m), så langt etter kanten (m) og så høyt over snøen (m). */
+  replayTvSide: 13,
+  replayTvAlong: 10,
+  replayTvHeight: 2.5,
+  /** TV-kameraet bytter til neste hopp når skiløperen er så langt forbi kanten (m). */
+  replayTvSwitchAfter: 45,
+  /** TV-kameraet zoomer så skiløperen fyller omtrent så mange meter av bildet i høyden, innenfor min/maks FOV. */
+  replayTvFrame: 14,
+  replayTvFovMin: 18,
+  replayTvFovMax: 70,
+  /** Det høye kameraet: så høyt over (m) og så langt bak (m) skiløperen, hvor fort det følger, og FOV. */
+  replayHighUp: 16,
+  replayHighBack: 12,
+  replayHighFollow: 3,
+  replayHighFov: 55,
   /**
    * Kroppens vinkel: hvor fort den følger snøen (rad/s i en myk fjær), og hvor høyt over snøen (m)
    * den begynner å tippe fra loddrett over mot snøen den skal lande på. Tippingen starter først når du
