@@ -1,0 +1,15 @@
+{
+  "name": "Nybegynner",
+  "width": 80,
+  "length": 560,
+  "waves": { "height": 0.35, "along": 0.05, "across": 0.08 },
+  "edge": { "start": 0.3, "strength": 0.02 },
+  "deck": { "height": 0.85, "drop": 1, "sideDrop": 10 },
+  "landing": { "knuckle": 6, "steep": 32, "runout": 75 },
+  "kickers": [
+    { "name": "Mini 1", "z": 110, "lipDeg": 9, "radius": 55, "width": 10, "sideWidth": 3, "landingStart": 11, "landingDeg": 9, "respawnBeforeRamp": 60, "respawnSpeed": 17 },
+    { "name": "Mini 2", "z": 210, "lipDeg": 8, "radius": 80, "width": 10, "sideWidth": 3, "landingStart": 10, "landingDeg": 9, "respawnBeforeRamp": 35, "respawnSpeed": 24 },
+    { "name": "Mini 3", "z": 310, "lipDeg": 8, "radius": 80, "width": 10, "sideWidth": 3, "landingStart": 10, "landingDeg": 9, "respawnBeforeRamp": 35, "respawnSpeed": 24 },
+    { "name": "Mini 4", "z": 420, "lipDeg": 8, "radius": 80, "width": 10, "sideWidth": 3, "landingStart": 10, "landingDeg": 7, "respawnBeforeRamp": 40, "respawnSpeed": 24 }
+  ]
+}
