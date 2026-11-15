@@ -29,6 +29,10 @@ export interface Landing {
   perfectPop: boolean;
   /** Startet hoppet baklengs (switch)? */
   fromSwitch: boolean;
+  /** Sekunder i lufta i hoppet. */
+  airTime: number;
+  /** Holdt du fortsatt grabben da du landet? Da blir landingen slurvete. */
+  landedGrabbing: boolean;
 }
 
 /** Det som skjedde i hoppet i tillegg til rotasjonen. */
@@ -37,6 +41,9 @@ export interface JumpExtras {
   grabTime?: number;
   perfectPop?: boolean;
   fromSwitch?: boolean;
+  airTime?: number;
+  /** grabben holdes fortsatt idet skiene treffer snøen */
+  stillGrabbing?: boolean;
 }
 
 export interface TrickInput {
@@ -75,6 +82,8 @@ export interface TrickState {
   /** Om hoppet som pågår startet med perfekt pop, og om det startet baklengs. */
   jumpPerfectPop: boolean;
   jumpFromSwitch: boolean;
+  /** Sekunder i lufta i hoppet som pågår (eller det siste). */
+  airTime: number;
 }
 
 const DEG = Math.PI / 180;
@@ -86,7 +95,7 @@ export function createTricks(): TrickState {
     spin: 0, spinRate: 0, flip: 0, flipRate: 0, inAir: false,
     spinStart: 0, flipStart: 0, spinTarget: 0, flipTarget: 0,
     lastLanding: null, landingAge: 99, justLanded: false,
-    grabs: createGrabs(), jumpPerfectPop: false, jumpFromSwitch: false,
+    grabs: createGrabs(), jumpPerfectPop: false, jumpFromSwitch: false, airTime: 0,
   };
 }
 
@@ -97,15 +106,22 @@ function offBy(angle: number, step: number): number {
 
 const FLIP_WORDS = ['', '', 'Dobbel ', 'Trippel '];
 
+// en rotasjon teller bare når den er nesten hel: innenfor det som fortsatt er en slurvete landing
+/** Hvor mange halve runder spinn som teller (spin i rad). Brukes både til navn og poeng. */
+export function countHalves(spin: number): number {
+  return Math.floor((Math.abs(spin) + (CONFIG.landSpinClean + CONFIG.landSloppyExtra) * DEG) / HALF);
+}
+/** Hvor mange hele flips som teller (flip i rad). */
+export function countFlips(flip: number): number {
+  return Math.floor((Math.abs(flip) + (CONFIG.landFlipClean + CONFIG.landSloppyExtra) * DEG) / TURN);
+}
+
 /** Lager navnet på trikset ut fra hvor mye du roterte (rad). */
 export function trickName(spin: number, flip: number, grab: GrabKind = 0): string {
   const parts: string[] = [];
-  // en rotasjon teller bare når den er nesten hel: innenfor det som fortsatt er en slurvete landing
-  const spinTol = (CONFIG.landSpinClean + CONFIG.landSloppyExtra) * DEG;
-  const flipTol = (CONFIG.landFlipClean + CONFIG.landSloppyExtra) * DEG;
-  const halves = Math.floor((Math.abs(spin) + spinTol) / HALF);
+  const halves = countHalves(spin);
   if (halves > 0) parts.push(String(halves * 180));
-  const flips = Math.floor((Math.abs(flip) + flipTol) / TURN);
+  const flips = countFlips(flip);
   if (flips > 0) {
     const kind = flip > 0 ? 'frontflip' : 'backflip';
     const word = flips < FLIP_WORDS.length ? FLIP_WORDS[flips] : `${flips}x `;
@@ -125,9 +141,13 @@ export function judgeLanding(spin: number, flip: number, extras: JumpExtras = {}
   if (spinErrDeg <= CONFIG.landSpinClean && flipErrDeg <= CONFIG.landFlipClean) quality = 'ren';
   else if (spinErrDeg <= CONFIG.landSpinClean + extra && flipErrDeg <= CONFIG.landFlipClean + extra) quality = 'slurvete';
   const grab = extras.grab ?? 0;
+  // lander du mens du fortsatt holder en grab som teller, blir landingen slurvete (du rakk ikke å slippe)
+  const landedGrabbing = !!extras.stillGrabbing && grab !== 0 && quality !== 'fall';
+  if (landedGrabbing) quality = 'slurvete';
   return {
     quality, name: trickName(spin, flip, grab), spinDeg: spin / DEG, flipDeg: flip / DEG, spinErrDeg, flipErrDeg,
     grab, grabTime: extras.grabTime ?? 0, perfectPop: !!extras.perfectPop, fromSwitch: !!extras.fromSwitch,
+    airTime: extras.airTime ?? 0, landedGrabbing,
   };
 }
 
@@ -178,6 +198,7 @@ export function stepTricks(t: TrickState, inp: TrickInput, dt: number): void {
     t.flipStart = t.flipTarget;
     t.jumpPerfectPop = !!inp.perfectPop;
     t.jumpFromSwitch = isSwitch(t);
+    t.airTime = 0;
     resetGrabJump(t.grabs);
   }
 
@@ -189,6 +210,7 @@ export function stepTricks(t: TrickState, inp: TrickInput, dt: number): void {
     const g = countedGrab(t.grabs);
     t.lastLanding = judgeLanding(ds, df, {
       grab: g, grabTime: g ? t.grabs.bestTime : 0, perfectPop: t.jumpPerfectPop, fromSwitch: t.jumpFromSwitch,
+      airTime: t.airTime, stillGrabbing: t.grabs.held !== 0,
     });
     t.landingAge = 0;
     t.justLanded = true;
@@ -201,6 +223,7 @@ export function stepTricks(t: TrickState, inp: TrickInput, dt: number): void {
   stepGrabs(t.grabs, inp.grab ?? 0, t.inAir, dt);
 
   if (t.inAir) {
+    t.airTime += dt;
     t.spinRate = approach(t.spinRate, inp.spin, CONFIG.spinSpeedDeg * DEG, CONFIG.spinBuild, CONFIG.spinCoastDeg, dt);
     t.flipRate = approach(t.flipRate, inp.flip, CONFIG.flipSpeedDeg * DEG, CONFIG.flipBuild, CONFIG.flipCoastDeg, dt);
     t.spin += t.spinRate * dt;

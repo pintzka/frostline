@@ -29,12 +29,13 @@ export interface GrabState {
   /** Den lengste grabben i dette hoppet, og hvor lenge den ble holdt. */
   best: GrabKind;
   bestTime: number;
-  /** Hvor mye kroppen er bøyd mot hver grab (0–1). Glir mykt, så figuren aldri hopper. */
+  /** Hvor mye kroppen er bøyd mot hver grab (0–1), og hvor fort bøyen endrer seg. Glir mykt, så figuren aldri rykker. */
   blend: [number, number, number];
+  blendVel: [number, number, number];
 }
 
 export function createGrabs(): GrabState {
-  return { held: 0, holdTime: 0, best: 0, bestTime: 0, blend: [0, 0, 0] };
+  return { held: 0, holdTime: 0, best: 0, bestTime: 0, blend: [0, 0, 0], blendVel: [0, 0, 0] };
 }
 
 /** Nytt hopp: glem grabbene fra forrige hopp. */
@@ -50,10 +51,13 @@ export function stepGrabs(g: GrabState, want: GrabKind, inAir: boolean, dt: numb
     g.holdTime += dt;
     if (g.holdTime > g.bestTime) { g.best = kind; g.bestTime = g.holdTime; }
   }
+  // myk fjær (kritisk dempet), samme som kroppen i pose.ts: starter rolig, glir på plass og skyter ikke over
+  const w = CONFIG.grabSpring;
+  const e = Math.exp(-w * dt);
   for (let i = 0; i < 3; i++) {
-    const on = kind === i + 1;
-    const k = on ? CONFIG.grabBlendIn : CONFIG.grabBlendOut;
-    g.blend[i] += ((on ? 1 : 0) - g.blend[i]) * (1 - Math.exp(-k * dt));
+    const x0 = g.blend[i] - (kind === i + 1 ? 1 : 0), v0 = g.blendVel[i];
+    g.blend[i] = (kind === i + 1 ? 1 : 0) + (x0 + (v0 + w * x0) * dt) * e;
+    g.blendVel[i] = (v0 - (v0 + w * x0) * w * dt) * e;
   }
 }
 

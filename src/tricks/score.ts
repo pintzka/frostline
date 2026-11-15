@@ -1,14 +1,17 @@
 import { CONFIG } from '../core/config';
-import type { Landing } from './rotation';
+import { countFlips, countHalves, type Landing } from './rotation';
 
 /**
  * Poeng og kombo. Ren logikk uten three.js og DOM, og helt deterministisk.
  * Arbeidsstrøm 3 (Triks og poeng) eier denne fila. Tallene står i src/core/config.ts.
  *
- * Poeng for ett triks = (spinn + flip + grab) × grab-gangetall × perfekt pop
- *   × landing (ren 1, slurvete 0,5, fall 0) × gjentakelse (samme triks på rad gir mindre) × kombo.
+ * Poeng for ett triks = (spinn + flip + grab) × grab-gangetall × perfekt pop × switch
+ *   × landing (ren 1, slurvete 0,5, fall 0) × gjentakelse × kombo.
  * Bare ekte triks gir poeng: 540 eller mer, minst én flip, eller en grab som teller.
+ * Småhopp (en pop på flaten) gir bare litt, og bygger ikke komboen.
  */
+
+const DEG = Math.PI / 180;
 
 /** Tall i tabellen, og tabellens siste verdi pluss «extra» for hvert steg over. */
 function fromTable(table: readonly number[], n: number, extra: number): number {
@@ -16,12 +19,18 @@ function fromTable(table: readonly number[], n: number, extra: number): number {
   return table[table.length - 1] + (n - table.length + 1) * extra;
 }
 
-export function spinHalves(l: Landing): number { return Math.round(Math.abs(l.spinDeg) / 180); }
-export function flipCount(l: Landing): number { return Math.round(Math.abs(l.flipDeg) / 360); }
+/** Samme telling som triksnavnet, så navn og poeng alltid stemmer. */
+export function spinHalves(l: Landing): number { return countHalves(l.spinDeg * DEG); }
+export function flipCount(l: Landing): number { return countFlips(l.flipDeg * DEG); }
 
 /** Er dette et ekte triks som gir poeng (540+, en flip eller en grab)? */
 export function isRealTrick(l: Landing): boolean {
   return spinHalves(l) >= 3 || flipCount(l) >= 1 || l.grab !== 0;
+}
+
+/** Et småhopp er for kort i lufta til å være et ekte hopp, f.eks. en pop på flaten. */
+export function isSmallJump(l: Landing): boolean {
+  return l.airTime < CONFIG.trickMinAir;
 }
 
 /** Grab-gangetallet: starter på 1,25 når grabben teller og vokser jo lenger du holder. */
@@ -31,20 +40,22 @@ export function grabMult(l: Landing): number {
   return Math.min(CONFIG.grabMaxMult, CONFIG.grabStartMult + extra);
 }
 
-/** Hva trikset er verdt før landing, gjentakelse og kombo. Gir 0 hvis det ikke er et ekte triks. */
+/** Hva trikset er verdt før landing, småhopp, gjentakelse og kombo. Gir 0 hvis det ikke er et ekte triks. */
 export function trickValue(l: Landing): number {
   if (!isRealTrick(l)) return 0;
   const base = fromTable(CONFIG.spinPoints, spinHalves(l), CONFIG.spinPointsExtra)
     + fromTable(CONFIG.flipPoints, flipCount(l), CONFIG.flipPointsExtra)
     + (l.grab ? CONFIG.grabPoints : 0);
-  return base * grabMult(l) * (l.perfectPop ? CONFIG.popPerfectMult : 1);
+  return base * grabMult(l) * (l.perfectPop ? CONFIG.popPerfectMult : 1) * (l.fromSwitch ? CONFIG.switchBonus : 1);
 }
 
-/** Hva som teller som «samme triks»: like mange runder samme vei, samme flip, samme grab og samme stilling (switch). */
+/**
+ * Hva som teller som «samme triks»: like mange halve runder, samme flip og samme grab.
+ * Spinnretning og switch gjør det ikke til et nytt triks (switch gir i stedet en liten bonus).
+ */
 export function trickKey(l: Landing): string {
-  const spinDir = spinHalves(l) === 0 ? 0 : Math.sign(l.spinDeg);
   const flipDir = flipCount(l) === 0 ? 0 : Math.sign(l.flipDeg);
-  return `${spinHalves(l)}:${spinDir}|${flipCount(l)}:${flipDir}|${l.grab}|${l.fromSwitch ? 's' : 'n'}`;
+  return `${spinHalves(l)}|${flipCount(l)}:${flipDir}|${l.grab}`;
 }
 
 /** Det som vises på skjermen etter et triks. */
@@ -55,11 +66,17 @@ export interface TrickResult {
   points: number;
   /** Kombo-gangetallet som ble brukt. */
   combo: number;
-  /** Andelen du fikk fordi trikset var likt det forrige (1 = full verdi). */
+  /** Andelen du fikk fordi trikset var gjort nylig (1 = full verdi). */
   repeat: number;
   perfectPop: boolean;
   /** Sant når trikset var for lite til å gi poeng (f.eks. et 360 uten grab). */
   tooSmall: boolean;
+  /** Sant når hoppet var et småhopp (pop på flaten). */
+  smallJump: boolean;
+  /** Sant når du falt og mistet en kombo over x1. */
+  comboLost: boolean;
+  /** Sant når du landet mens du fortsatt holdt grabben. */
+  landedGrabbing: boolean;
 }
 
 export interface ScoreState {
@@ -68,16 +85,15 @@ export interface ScoreState {
   comboCount: number;
   /** Sekunder på snøen siden siste ekte triks. */
   comboIdle: number;
-  /** Forrige ekte triks, og hvor mange ganger på rad det er gjentatt. */
-  lastKey: string;
-  repeatStreak: number;
+  /** De siste ekte triksene (nyeste sist), for å gi mindre for gjentakelse. */
+  recent: string[];
   /** Siste triks som skal vises, og hvor mange sekunder siden. */
   last: TrickResult | null;
   lastAge: number;
 }
 
 export function createScore(): ScoreState {
-  return { total: 0, comboCount: 0, comboIdle: 0, lastKey: '', repeatStreak: 0, last: null, lastAge: 99 };
+  return { total: 0, comboCount: 0, comboIdle: 0, recent: [], last: null, lastAge: 99 };
 }
 
 /** Kombo-gangetallet neste triks får: 1, 1,25, 1,5 ... opp til maks. */
@@ -85,45 +101,59 @@ export function comboMult(s: ScoreState): number {
   return Math.min(CONFIG.comboMax, 1 + CONFIG.comboStep * s.comboCount);
 }
 
+/** Andelen et triks får når det finnes så mange ganger blant de siste triksene. */
+export function repeatShare(s: ScoreState, key: string): number {
+  const times = s.recent.filter((k) => k === key).length;
+  return Math.max(CONFIG.repeatMin, CONFIG.repeatFactor ** times);
+}
+
 /** Runder av til nærmeste 10, så tallene blir lette å lese. */
 const round10 = (x: number) => Math.round(x / 10) * 10;
+
+function show(s: ScoreState, l: Landing, r: Partial<TrickResult>): TrickResult {
+  s.last = {
+    name: l.name, quality: l.quality, points: 0, combo: 1, repeat: 1, perfectPop: l.perfectPop,
+    tooSmall: false, smallJump: false, comboLost: false, landedGrabbing: l.landedGrabbing, ...r,
+  };
+  s.lastAge = 0;
+  return s.last;
+}
 
 /** Kalles én gang når skiløperen lander. Gir poeng og oppdaterer komboen. */
 export function scoreLanding(s: ScoreState, l: Landing): TrickResult | null {
   const real = isRealTrick(l);
 
   if (l.quality === 'fall') {
-    // fall: null poeng og komboen er borte
+    // fall: null poeng og komboen er borte. Vises alltid, så du ser hvorfor komboen forsvant.
+    const comboLost = s.comboCount > 0;
     s.comboCount = 0;
     s.comboIdle = 0;
-    if (!real && l.name === '') return null;
-    s.last = { name: l.name, quality: 'fall', points: 0, combo: 1, repeat: 1, perfectPop: l.perfectPop, tooSmall: false };
-    s.lastAge = 0;
-    return s.last;
+    return show(s, l, { comboLost });
   }
-  // et lite hopp uten ekte triks endrer ingenting (heller ikke komboen). Har det et navn (180, 360), vises det uten poeng.
-  if (!real) {
-    if (l.name === '') return null;
-    s.last = { name: l.name, quality: l.quality, points: 0, combo: 1, repeat: 1, perfectPop: l.perfectPop, tooSmall: true };
-    s.lastAge = 0;
-    return s.last;
+  // et hopp uten ekte triks endrer ingenting (heller ikke komboen). Har det et navn (180, 360), vises det uten poeng.
+  if (!real) return l.name === '' ? null : show(s, l, { tooSmall: true });
+
+  const share = l.quality === 'ren' ? 1 : CONFIG.sloppyShare;
+
+  if (isSmallJump(l)) {
+    // småhopp: litt poeng, men ingen kombo, og det huskes ikke som et triks
+    const points = round10(trickValue(l) * share * CONFIG.smallJumpShare);
+    s.total += points;
+    return show(s, l, { points, smallJump: true });
   }
 
   const key = trickKey(l);
-  s.repeatStreak = key === s.lastKey ? s.repeatStreak + 1 : 0;
-  s.lastKey = key;
-  const repeat = Math.max(CONFIG.repeatMin, CONFIG.repeatFactor ** s.repeatStreak);
+  const repeat = repeatShare(s, key);
+  s.recent.push(key);
+  if (s.recent.length > CONFIG.repeatMemory) s.recent.shift();
   const combo = comboMult(s);
-  const share = l.quality === 'ren' ? 1 : CONFIG.sloppyShare;
   const points = round10(trickValue(l) * share * repeat * combo);
 
   s.total += points;
   s.comboIdle = 0;
   // bare ren landing bygger komboen videre; slurvete beholder den som den er
   if (l.quality === 'ren') s.comboCount++;
-  s.last = { name: l.name, quality: l.quality, points, combo, repeat, perfectPop: l.perfectPop, tooSmall: false };
-  s.lastAge = 0;
-  return s.last;
+  return show(s, l, { points, combo, repeat });
 }
 
 /** Ett steg. Lang tid på snøen uten nytt ekte triks nullstiller komboen. */

@@ -52,20 +52,37 @@ export function formatMult(m: number): string {
 
 /** Teksten etter et triks med poeng: «720 + Backflip + Nordlys · 4 200» og en linje under. */
 export function resultText(r: TrickResult): { title: string; sub: string } {
+  // et fall vises alltid, også uten triksnavn, så du ser hvorfor komboen forsvant
+  if (r.quality === 'fall') {
+    if (r.name === '') return { title: 'Fall', sub: r.comboLost ? 'Kombo tapt' : '' };
+    return { title: r.name, sub: r.comboLost ? 'Fall · kombo tapt' : 'Fall' };
+  }
   const title = r.points > 0 ? `${r.name} · ${formatPoints(r.points)}` : r.name;
   const parts: string[] = [LANDING_TEXT[r.quality]];
+  if (r.landedGrabbing) parts.push('slipp grabben før landing');
   if (r.tooSmall) parts.push('for lite for poeng');
+  if (r.smallJump) parts.push('lite hopp');
   if (r.points > 0 && r.combo > 1) parts.push(`kombo ${formatMult(r.combo)}`);
   if (r.points > 0 && r.repeat < 1) parts.push(`gjentatt ${Math.round(r.repeat * 100)} %`);
   return { title, sub: parts.join(' · ') };
 }
 
-/** Myk inn og ut: 0 → 1 de første 0,2 s, og ned til 0 det siste halve sekundet. */
+/** Myk inn og ut: 0 → 1 de første hudFadeIn sekundene, og ned til 0 de siste hudFadeOut sekundene. */
 export function fadeInOut(age: number, showTime: number): number {
   if (age < 0 || age >= showTime) return 0;
-  const inn = Math.min(1, age / 0.2);
-  const out = Math.min(1, (showTime - age) * 2);
+  const inn = Math.min(1, age / CONFIG.hudFadeIn);
+  const out = Math.min(1, (showTime - age) / CONFIG.hudFadeOut);
   return Math.min(inn * inn * (3 - 2 * inn), out);
+}
+
+/**
+ * Tallet som vises for totalen: teller seg mykt opp til riktig tall i stedet for å hoppe.
+ * Går totalen ned (ny runde), settes det rett dit uten synlig nedtelling.
+ */
+export function countUp(shown: number, total: number, dt: number): number {
+  if (total < shown) return total;
+  const next = shown + (total - shown) * (1 - Math.exp(-CONFIG.hudCountUp * dt));
+  return total - next < 1 ? total : next;
 }
 
 export function createHud(root: HTMLElement) {
@@ -117,6 +134,7 @@ export function createHud(root: HTMLElement) {
   scoreBox.append(total, bestEl, combo);
   root.appendChild(scoreBox);
   let shownTotal = 0;
+  let trickAlpha = 0;
   let lastTime = performance.now();
   /** sekunder siden forrige bilde (for den myke opptellingen) */
   const frameDt = () => { const now = performance.now(); const d = Math.min(0.1, (now - lastTime) / 1000); lastTime = now; return d; };
@@ -145,22 +163,23 @@ export function createHud(root: HTMLElement) {
       const show = h.lastPop === 'perfekt' && h.popAge < 1.2;
       flash.style.opacity = show ? String(Math.min(1, (1.2 - h.popAge) * 2)) : '0';
 
-      // triksnavn og poeng: glir inn ovenfra og blekner mykt bort (ingen blinking)
+      const dt = frameDt();
+      // triksnavn og poeng: glir inn ovenfra og blekner mykt bort (ingen blinking).
+      // Forsvinner trikset plutselig (ny runde), blekner teksten som står der bort i stedet for å bli borte på ett bilde
       const r = h.score.last;
-      const a = r ? fadeInOut(h.score.lastAge, CONFIG.trickShowTime) : 0;
+      const a = r ? fadeInOut(h.score.lastAge, CONFIG.trickShowTime) : Math.max(0, trickAlpha - dt / CONFIG.hudFadeOut);
+      trickAlpha = a;
       if (r && a > 0) {
         const t = resultText(r);
         if (trickName.textContent !== t.title) trickName.textContent = t.title;
         if (trickSub.textContent !== t.sub) trickSub.textContent = t.sub;
         trickSub.style.color = LANDING_COLOR[r.quality];
-        const slide = Math.max(0, 1 - h.score.lastAge / 0.25);
-        trick.style.transform = `translateY(${(-10 * slide * slide).toFixed(1)}px)`;
+        const slide = Math.max(0, 1 - h.score.lastAge / CONFIG.hudSlideTime);
+        trick.style.transform = `translateY(${(-CONFIG.hudSlidePx * slide * slide).toFixed(1)}px)`;
       }
       trick.style.opacity = a.toFixed(3);
 
-      // totalen teller seg mykt opp til riktig tall i stedet for å hoppe
-      shownTotal += (h.score.total - shownTotal) * (1 - Math.exp(-8 * frameDt()));
-      if (Math.abs(h.score.total - shownTotal) < 1) shownTotal = h.score.total;
+      shownTotal = countUp(shownTotal, h.score.total, dt);
       total.textContent = formatPoints(shownTotal);
       bestEl.textContent = h.best > 0 ? `Beste runde ${formatPoints(h.best)}` : '';
       const m = comboMult(h.score);

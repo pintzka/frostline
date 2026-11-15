@@ -69,7 +69,7 @@ const loop = createLoop({
     // på bakken styrer tastene skiene, i lufta spinner og flipper de
     const c = splitControls(input.read(), skier.grounded, latch, dt);
     stepSkier(skier, c.skier, dt);
-    const perfectPop = skier.lastPop === 'perfekt' && skier.popAge < 0.05;
+    const perfectPop = skier.lastPop === 'perfekt' && skier.popAge < CONFIG.popTakeoffWindow;
     stepTricks(tricks, { spin: c.spin, flip: c.flip, grab: c.grab, grounded: skier.grounded, perfectPop }, dt);
     // poeng og kombo: regnes ut én gang når du lander
     if (tricks.justLanded && tricks.lastLanding) scoreLanding(score, tricks.lastLanding);

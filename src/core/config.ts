@@ -108,13 +108,21 @@ export const CONFIG = {
   trickPivotHeight: 1.0,
   /** Sekunder triksnavnet og poengene vises etter landing. */
   trickShowTime: 2.2,
+  /** Et hopp som starter innen så mange sekunder etter en perfekt pop, regnes som perfekt pop. */
+  popTakeoffWindow: 0.05,
+  /** HUD: triksteksten kommer inn på hudFadeIn s, glir ned hudSlidePx piksler på hudSlideTime s, og blekner bort på hudFadeOut s. */
+  hudFadeIn: 0.2,
+  hudFadeOut: 0.5,
+  hudSlideTime: 0.25,
+  hudSlidePx: 10,
+  /** Hvor fort totalen teller seg opp (per sekund). */
+  hudCountUp: 8,
 
   // --- Grabs (src/tricks/grabs.ts) ---
   /** En grab må holdes minst så lenge (s) i lufta for å telle. */
   grabMinHold: 0.3,
-  /** Hvor fort kroppen bøyer seg mot skiene når du holder grab, og retter seg når du slipper (per sekund). */
-  grabBlendIn: 12,
-  grabBlendOut: 9,
+  /** Hvor fort kroppen bøyer seg mot skiene og retter seg opp igjen (rad/s i en myk fjær). 12 ≈ 0,4 s, starter rolig. */
+  grabSpring: 12,
 
   // --- Poeng (src/tricks/score.ts). Se tabellen i docs/DESIGN.md ---
   /** Grunnpoeng for spinn, etter antall halve runder: 0, 180, 360, 540, 720, 900, 1080, 1260, 1440, 1620. */
@@ -130,13 +138,26 @@ export const CONFIG = {
   /** Gangetallet vokser så mye per sekund du holder grabben etter 0,3 s, opp til grabMaxMult. */
   grabMultPerSec: 0.5,
   grabMaxMult: 2,
+  /**
+   * Småhopp: et hopp med kortere lufttid enn dette (s) er en pop på flaten, ikke et ekte hopp.
+   * En pop på flaten gir 0,7 s, det lille hoppet 1,2 s. Triks på småhopp gir bare smallJumpShare
+   * av poengene og påvirker ikke komboen.
+   */
+  trickMinAir: 0.9,
+  smallJumpShare: 0.05,
   /** Perfekt pop ganger trikset med så mye. */
   popPerfectMult: 1.2,
   /** Slurvete landing gir denne andelen, fall gir null. */
   sloppyShare: 0.5,
-  /** Samme triks igjen på rad: ganges med dette for hver gang (0,6 = 60 %, 36 %, ...), men aldri under repeatMin. */
+  /**
+   * Gjentakelse: de repeatMemory siste triksene huskes. For hver gang trikset finnes der, ganges det med
+   * repeatFactor (0,6 = 60 %, 36 % ...), men aldri under repeatMin. Retning og switch gjør det ikke til et nytt triks.
+   */
   repeatFactor: 0.6,
   repeatMin: 0.2,
+  repeatMemory: 4,
+  /** Liten bonus for å hoppe baklengs (switch). */
+  switchBonus: 1.1,
   /** Kombo: hvert ekte triks med ren landing øker gangetallet så mye, opp til comboMax. */
   comboStep: 0.25,
   comboMax: 4,

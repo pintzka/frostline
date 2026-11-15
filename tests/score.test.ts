@@ -8,8 +8,8 @@ import { createLatch, splitControls } from '../src/tricks/controls';
 const dt = 1 / CONFIG.physicsHz;
 const DEG = Math.PI / 180;
 
-/** En landing med så mange grader spinn og flip (helt rent hvis tallene er hele/halve runder). */
-const land = (spinDeg: number, flipDeg = 0, extras: JumpExtras = {}) => judgeLanding(spinDeg * DEG, flipDeg * DEG, extras);
+/** En landing med så mange grader spinn og flip (helt rent hvis tallene er hele/halve runder), fra et ekte hopp (1,5 s i lufta). */
+const land = (spinDeg: number, flipDeg = 0, extras: JumpExtras = {}) => judgeLanding(spinDeg * DEG, flipDeg * DEG, { airTime: 1.5, ...extras });
 
 /** Flyr ett hopp i trikslogikken: holder grab i så mange sekunder og lander. */
 function jumpWithGrab(t: TrickState, grab: GrabKind, holdSeconds: number, airSeconds = 1.2) {
@@ -45,19 +45,26 @@ describe('grabs', () => {
     expect(countedGrab(g)).toBe(3);
   });
 
-  it('kroppen bøyer seg mykt: ingen hopp i figuren, heller ikke ved landing', () => {
+  it('kroppen bøyer seg mykt: starter rolig og rykker aldri, heller ikke ved landing (60 bilder/s)', () => {
     const t = createTricks();
-    let prev = [...t.grabs.blend];
-    let biggest = 0;
+    const frames: number[][] = [];
     for (let i = 0; i < 480; i++) {
       const grounded = i > 300;
       stepTricks(t, { spin: 0, flip: 0, grounded, grab: i > 20 && i < 200 ? 1 : i >= 200 ? 3 : 0 }, dt);
-      t.grabs.blend.forEach((b, k) => { biggest = Math.max(biggest, Math.abs(b - prev[k])); });
-      prev = [...t.grabs.blend];
+      if (i % 4 === 0) frames.push([...t.grabs.blend]);
     }
-    // under 6 % av hele bøyen per fysikksteg (1/240 s)
-    expect(biggest).toBeLessThan(0.06);
-    expect(Math.max(...t.grabs.blend)).toBeLessThan(0.01);
+    let biggest = 0, first = 0;
+    for (let f = 1; f < frames.length; f++) {
+      const d = Math.max(...frames[f].map((b, k) => Math.abs(b - frames[f - 1][k])));
+      biggest = Math.max(biggest, d);
+      if (f === 6) first = d; // første bilde etter at J trykkes (steg 21–24)
+    }
+    // første bilde: under 3 % av bøyen. Aldri mer enn 8 % per bilde (armen i Nordlys: 1,25 rad × 8 % ≈ 6°)
+    expect(first).toBeLessThan(0.03);
+    expect(biggest).toBeLessThan(0.08);
+    expect(1.25 * biggest / DEG).toBeLessThan(6);
+    expect(Math.max(...t.grabs.blend)).toBeLessThan(0.02);
+    expect(Math.min(...t.grabs.blend)).toBeGreaterThan(-0.02); // skyter ikke over
   });
 
   it('J/K/L går bare til grab i lufta, ikke på bakken', () => {
@@ -136,24 +143,65 @@ describe('landing, gjentakelse og kombo', () => {
     expect(s.comboCount).toBe(1);
   });
 
-  it('samme triks igjen på rad gir mindre, et nytt triks gir full verdi igjen', () => {
+  it('samme triks igjen gir mindre, et nytt triks gir full verdi', () => {
     const s = createScore();
-    // stå litt mellom hvert triks er ikke nødvendig; komboen holdes like (vi nullstiller den for å se bare gjentakelsen)
-    const run = (deg: number) => { s.comboCount = 0; return scoreLanding(s, land(deg))!; };
+    // komboen nullstilles hver gang, så vi ser bare gjentakelsen
+    const run = (deg: number, flip = 0, extras: JumpExtras = {}) => { s.comboCount = 0; return scoreLanding(s, land(deg, flip, extras))!; };
     const first = run(720), second = run(720), third = run(720);
     expect(second.points).toBeLessThan(first.points * 0.7);
     expect(third.points).toBeLessThan(second.points);
-    expect(run(-720).repeat).toBe(1); // andre veien er et nytt triks
-    expect(run(720).repeat).toBe(1);
-    for (let i = 0; i < 10; i++) run(720);
-    expect(s.last!.repeat).toBeGreaterThanOrEqual(CONFIG.repeatMin);
-    expect(s.last!.points).toBeGreaterThan(0);
+    expect(run(0, -360).repeat).toBe(1); // backflip er et nytt triks
   });
 
-  it('switch er et annet triks enn vanlig', () => {
+  it('samme 540 seks ganger gir stadig mindre, men aldri under minimum', () => {
+    const s = createScore();
+    const shares = [0, 1, 2, 3, 4, 5].map(() => { s.comboCount = 0; return scoreLanding(s, land(540))!.repeat; });
+    expect(shares[0]).toBe(1);
+    for (let i = 1; i < shares.length; i++) expect(shares[i]).toBeLessThan(shares[i - 1] + 1e-9);
+    expect(shares[5]).toBeLessThan(0.3);
+    expect(shares[5]).toBeGreaterThanOrEqual(CONFIG.repeatMin);
+  });
+
+  it('A-B-A-B straffes også (de siste triksene huskes, ikke bare det forrige)', () => {
+    const s = createScore();
+    const run = (deg: number) => { s.comboCount = 0; return scoreLanding(s, land(deg))!; };
+    run(540); run(720);
+    expect(run(540).repeat).toBeLessThan(1);
+    expect(run(720).repeat).toBeLessThan(1);
+  });
+
+  it('andre spinnretning eller switch er ikke et nytt triks, men switch gir en liten bonus', () => {
+    const s = createScore();
+    const run = (deg: number, extras: JumpExtras = {}) => { s.comboCount = 0; return scoreLanding(s, land(deg, 0, extras))!; };
+    run(540);
+    expect(run(-540).repeat).toBeLessThan(1);
+    expect(run(540, { fromSwitch: true }).repeat).toBeLessThan(1);
+    expect(trickValue(land(540, 0, { fromSwitch: true }))).toBeCloseTo(trickValue(land(540)) * CONFIG.switchBonus, 6);
+  });
+
+  it('småhopp på flaten gir bare litt og bygger ikke komboen', () => {
     const s = createScore();
     scoreLanding(s, land(540));
-    expect(scoreLanding(s, land(540, 0, { fromSwitch: true }))!.repeat).toBe(1);
+    const small = scoreLanding(s, land(0, 0, { grab: 2, grabTime: 0.5, airTime: 0.7 }))!;
+    expect(small.smallJump).toBe(true);
+    expect(small.points).toBeLessThan(0.1 * trickValue(land(0, 0, { grab: 2, grabTime: 0.5 })));
+    expect(comboMult(s)).toBe(1.25);
+  });
+
+  it('pop-spam med grabs på flaten lønner seg mye mindre enn ekte hopp', () => {
+    // 40 pops på flaten (0,7 s i lufta) med J/K/L om hverandre, mot tre ekte hopp med 540 + Isbit
+    const spam = createScore();
+    for (let i = 0; i < 40; i++) {
+      scoreLanding(spam, land(0, 0, { grab: ((i % 3) + 1) as GrabKind, grabTime: 0.4, airTime: 0.7 }));
+      stepScore(spam, true, 0.25);
+    }
+    const jumps = createScore();
+    for (const air of [1.2, 2.0, 2.5]) {
+      scoreLanding(jumps, land(540, 0, { grab: 2, grabTime: air - 0.6, airTime: air }));
+      stepScore(jumps, true, 5);
+    }
+    expect(comboMult(spam)).toBe(1);
+    expect(jumps.total).toBeGreaterThan(2 * spam.total);
   });
 
   it('kombo bygges med +0,25x for hvert ekte triks med ren landing', () => {
@@ -171,6 +219,25 @@ describe('landing, gjentakelse og kombo', () => {
     scoreLanding(s, land(540));
     scoreLanding(s, land(760));
     expect(comboMult(s)).toBe(1.25);
+  });
+
+  it('et fall vises alltid, også uten triksnavn, og sier fra når komboen ble tapt', async () => {
+    const { resultText } = await import('../src/ui/hud');
+    const s = createScore();
+    const plain = scoreLanding(s, land(90))!;
+    expect(resultText(plain)).toEqual({ title: 'Fall', sub: '' });
+    scoreLanding(s, land(540));
+    const lost = scoreLanding(s, land(90))!;
+    expect(resultText(lost)).toEqual({ title: 'Fall', sub: 'Kombo tapt' });
+  });
+
+  it('lander du mens du holder grabben, blir landingen slurvete (halve poeng)', () => {
+    const held = land(720, 0, { grab: 1, grabTime: 1, stillGrabbing: true });
+    expect(held.quality).toBe('slurvete');
+    expect(held.landedGrabbing).toBe(true);
+    expect(land(720, 0, { grab: 1, grabTime: 1 }).quality).toBe('ren');
+    // en kort tast-trykk (grab som ikke teller) gir ingen straff
+    expect(land(0, 0, { stillGrabbing: true }).quality).toBe('ren');
   });
 
   it('fall nullstiller komboen, men poengene du har fått beholdes', () => {
@@ -232,6 +299,17 @@ describe('poeng i HUD', () => {
     expect(resultText(scoreLanding(createScore(), land(360))!).sub).toBe('Ren landing · for lite for poeng');
   });
 
+  it('totalen teller mykt opp, men hopper rett til 0 ved ny runde', async () => {
+    const { countUp } = await import('../src/ui/hud');
+    let shown = 0;
+    shown = countUp(shown, 4200, 1 / 60);
+    expect(shown).toBeGreaterThan(0);
+    expect(shown).toBeLessThan(1000);
+    for (let i = 0; i < 120; i++) shown = countUp(shown, 4200, 1 / 60);
+    expect(shown).toBe(4200);
+    expect(countUp(19000, 0, 1 / 60)).toBe(0);
+  });
+
   it('teksten kommer inn og blekner mykt, uten hopp', async () => {
     const { fadeInOut } = await import('../src/ui/hud');
     const show = CONFIG.trickShowTime;
@@ -256,7 +334,8 @@ describe('grab på det medium hoppet (ekte fysikk)', () => {
     let result = null;
     for (let i = 0; i < 60 * CONFIG.physicsHz && !result; i++) {
       const near = s.z > k.z - 5 && s.z < k.z + 80;
-      const c = splitControls({ steer: 0, brake: 0, flip: 0, grab: near ? 2 : 0 }, s.grounded, latch, dt);
+      // hold K de første 0,8 s i lufta, slipp før landing
+      const c = splitControls({ steer: 0, brake: 0, flip: 0, grab: near && s.airTime < 0.8 ? 2 : 0 }, s.grounded, latch, dt);
       stepSkier(s, c.skier, dt);
       stepTricks(t, { spin: c.spin, flip: c.flip, grab: c.grab, grounded: s.grounded }, dt);
       if (t.justLanded && t.lastLanding && near && t.lastLanding.grab) result = scoreLanding(score, t.lastLanding);
@@ -265,5 +344,36 @@ describe('grab på det medium hoppet (ekte fysikk)', () => {
     expect(result!.name).toBe('Isbit');
     expect(result!.quality).toBe('ren');
     expect(result!.points).toBeGreaterThan(CONFIG.grabPoints * CONFIG.grabStartMult);
+  });
+});
+
+describe('hele runden med ekte fysikk: pop-spam mot ekte hopp', () => {
+  /** Kjører hele bakken. spam = pop hvert 0,95 s på bakken; grab J/K/L om hverandre i lufta, sluppet før landing. */
+  async function ride(spam: boolean) {
+    const { createSkier, stepSkier, reachedEnd } = await import('../src/physics/skier');
+    const s = createSkier();
+    const t = createTricks();
+    const score = createScore();
+    const latch = createLatch();
+    let jumps = 0, time = 0;
+    for (let i = 0; i < 120 * CONFIG.physicsHz && !reachedEnd(s); i++) {
+      time += dt;
+      const pop = spam && time % 0.95 < 0.5;
+      const grab = (!s.grounded && s.airTime > 0.05 && s.airTime < 0.8 ? (jumps % 3) + 1 : 0) as GrabKind;
+      const c = splitControls({ steer: 0, brake: 0, flip: 0, pop, grab }, s.grounded, latch, dt);
+      stepSkier(s, c.skier, dt);
+      stepTricks(t, { spin: c.spin, flip: c.flip, grab: c.grab, grounded: s.grounded, perfectPop: s.lastPop === 'perfekt' && s.popAge < CONFIG.popTakeoffWindow }, dt);
+      if (t.justLanded && t.lastLanding) { scoreLanding(score, t.lastLanding); jumps++; }
+      stepScore(score, s.grounded, dt);
+    }
+    return score;
+  }
+
+  it('spam på flaten gir lite ekstra: hoppene er det som teller', async () => {
+    const jumpsOnly = await ride(false);
+    const spam = await ride(true);
+    expect(jumpsOnly.total).toBeGreaterThan(0);
+    // spam-boten tar også grabs på hoppene, så den får litt mer, men ikke mye
+    expect(spam.total).toBeLessThan(jumpsOnly.total * 1.5);
   });
 });
