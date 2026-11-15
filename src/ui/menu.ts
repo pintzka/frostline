@@ -77,12 +77,13 @@ export function createMenu(root: HTMLElement, extra?: HTMLElement) {
 
   // startskjerm: spillet synes svakt bak
   const start = overlay(root, 'radial-gradient(ellipse at center,#0d1620aa,#0d1620dd)');
+  const startPrompt = text('Trykk mellomrom eller klikk for å kjøre', `font:700 22px ${FONT};margin-top:8px;text-align:center;`);
   start.append(
     text('FROSTLINE', `font:800 clamp(44px,12vw,88px)/1 ${FONT};letter-spacing:.12em;`),
     parkPicker(),
     table(CONTROLS, 16),
     ...(extra ? [extra] : []),
-    text('Trykk mellomrom eller klikk for å kjøre', `font:700 22px ${FONT};margin-top:8px;text-align:center;`),
+    startPrompt,
   );
   start.addEventListener('pointerdown', click);
 
@@ -112,6 +113,10 @@ export function createMenu(root: HTMLElement, extra?: HTMLElement) {
   return {
     /** Sant én gang etter et klikk eller trykk på en meny. */
     takeClick(): boolean { const c = clicked; clicked = false; return c; },
+
+    /** Legger noe til på startskjermen og resultatskjermen, rett over teksten om å kjøre (f.eks. utfordringene). */
+    addToStart(el: HTMLElement) { start.insertBefore(el, startPrompt); },
+    addToResult(el: HTMLElement) { result.insertBefore(el, prompt); },
 
     onEvent(ev: FlowEvent, game: Game) {
       const flow = game.flow;

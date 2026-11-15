@@ -17,6 +17,10 @@ import { createMenu } from './ui/menu';
 import { createGame, resumeGame, soundSkier, stepGame } from './ui/flow';
 import { createAudio } from './audio/engine';
 import { createQualityUi } from './ui/qualityUi';
+import { createChallengesUi } from './ui/challengesUi';
+import { CURRENT_CHALLENGES } from './challenges/index';
+import { CURRENT_PARK_ID } from './park/parks';
+import { PARK } from './park/terrain';
 
 const root = document.getElementById('app')!;
 // grafikknivået (Lav / Middels / Høy / Auto) og FPS-måleren, valgt på startskjermen og i pausen
@@ -28,6 +32,7 @@ const hud = createHud(root);
 const input = createInput(renderer.domElement, createTouchControls(root));
 const menu = createMenu(root, quality.picker());
 const audio = createAudio();
+const challenges = createChallengesUi(root, menu, CURRENT_PARK_ID, PARK, CURRENT_CHALLENGES);
 
 const view = createSkierView(scene);
 const trails = createSkiTrails(scene);
@@ -51,6 +56,7 @@ const loop = createLoop({
     // R (eller Y på gamepad) gir ny runde med en gang; mellomrom eller klikk starter fra start- og resultatskjermen
     const ev = stepGame(game, { raw: input.read(), click: menu.takeClick(), restart: input.takeRestart() }, dt);
     if (ev) menu.onEvent(ev, game);
+    challenges.step(game, ev);
     const m = game.flow.move;
     if (m !== 'none') {
       // flyttet langt: ingen utjevning mellom gammel og ny plass. Ny runde er viktigst (den tømmer også sporet)
@@ -86,7 +92,9 @@ const loop = createLoop({
       score: game.score, best: game.best, controls: input.device(), grab: tricks.grabs.held, grabTime: tricks.grabs.holdTime,
       rail: game.rail.on ? { name: railStyleName(game.rail.style), time: game.rail.time, balance: game.rail.balance } : null,
     }, frameDt);
-    hud.setOpacity(menu.update(game.flow, frameDt));
+    const hudOpacity = menu.update(game.flow, frameDt);
+    hud.setOpacity(hudOpacity);
+    challenges.update(frameDt, hudOpacity);
     moved = 'none';
     skyTime += frameDt;
     env.follow(chase.camera.position, skyTime);
