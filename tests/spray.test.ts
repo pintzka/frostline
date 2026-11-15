@@ -7,7 +7,7 @@ function frame(over: Partial<SprayFrame> = {}): SprayFrame {
   return {
     dt: 1 / 60, x: 0, y: 0, z: 0, heading: 0, vx: 0, vy: 0, vz: 15,
     edge: 0, brake: 0, grounded: true, sinceLanding: 99, popAge: 99, airTime: 0,
-    nx: 0, ny: 1, nz: 0, ...over,
+    nx: 0, ny: 1, nz: 0, lastPop: '', camX: 0, camY: 50, camZ: 0, ...over,
   };
 }
 
@@ -83,6 +83,18 @@ describe('snøsprut: hvor mye', () => {
     expect(s.emitted).toBe(0);
   });
 
+  it('perfekt pop gir mer fokk enn vanlig pop', () => {
+    const pop = (lastPop: SprayFrame['lastPop']) => {
+      const s = createSpray({ seed: 2, groundAt: () => 0 });
+      s.update(frame({ popAge: 5, lastPop }));
+      s.update(frame({ popAge: 0.004, grounded: false, lastPop }));
+      return s.emitted;
+    };
+    expect(pop('pop')).toBe(CONFIG.sprayPopCount);
+    expect(pop('perfekt')).toBe(Math.round(CONFIG.sprayPopCount * CONFIG.sprayPopPerfect));
+    expect(pop('perfekt')).toBeGreaterThan(pop('pop'));
+  });
+
   it('pop gir litt fokk fra avsparket', () => {
     const s = createSpray({ seed: 2, groundAt: () => 0 });
     s.update(frame({ popAge: 5 }));
@@ -141,13 +153,29 @@ describe('snøsprut: hvordan den ser ut', () => {
     }
   });
 
-  it('snøen faller og blir liggende på snøen, ikke under den', () => {
+  it('snøen faller og blir liggende oppå snøen, løftet nok til at den ikke kuttes av bakken', () => {
     const s = createSpray({ seed: 9, groundAt: () => 0 });
     for (let i = 0; i < 20; i++) s.update(frame({ brake: 1, z: i * 0.25 }));
     for (let i = 0; i < 40; i++) {
       s.update(frame({ z: 5 + i * 0.25 }));
-      for (let k = 0; k < s.count; k++) expect(s.positions[k * 3 + 1]).toBeGreaterThanOrEqual(0);
+      for (let k = 0; k < s.count; k++) {
+        expect(s.positions[k * 3 + 1]).toBeGreaterThanOrEqual(CONFIG.sprayGroundLift * s.sizes[k] - 1e-6);
+      }
     }
+  });
+
+  it('partikler helt inntil kameraet tones bort, så de ikke dekker skjermen', () => {
+    const s = createSpray({ seed: 4, groundAt: () => 0 });
+    // kameraet står midt i landingspuffen
+    s.update(frame({ grounded: false, vy: -5, vz: 0, airTime: 0.8, sinceLanding: 1, camY: 0.5 }));
+    s.update(frame({ grounded: true, vz: 0, airTime: 0.8, sinceLanding: 0.004, camY: 0.5 }));
+    for (let i = 0; i < 30; i++) s.update(frame({ z: i * 0.01, vz: 0, camY: 0.5, camZ: i * 0.01 }));
+    let near = 0;
+    for (let i = 0; i < s.count; i++) {
+      const d = Math.hypot(s.positions[i * 3], s.positions[i * 3 + 1] - 0.5, s.positions[i * 3 + 2] - 0.29);
+      if (d < CONFIG.sprayNearFade[0]) { near++; expect(s.alphas[i]).toBe(0); }
+    }
+    expect(near).toBeGreaterThan(0);
   });
 
   it('ingen partikler blir lagt igjen der du startet etter en restart', () => {

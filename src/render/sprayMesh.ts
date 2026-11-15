@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { CONFIG } from '../core/config';
 import { heightAt } from '../park/terrain';
 import { createSpray, type SprayFrame } from './spray';
 
@@ -12,13 +13,15 @@ const VERT = /* glsl */ `
   attribute float alpha;
   attribute float seed;
   uniform float scale;
+  uniform float maxPx;
   varying float vAlpha;
   varying float vSeed;
   void main() {
     vec4 mv = modelViewMatrix * vec4(position, 1.0);
     gl_Position = projectionMatrix * mv;
-    // størrelsen er i meter: jo lenger unna, jo mindre på skjermen
-    gl_PointSize = min(size * scale / max(0.2, -mv.z), 400.0);
+    // størrelsen er i meter: jo lenger unna, jo mindre på skjermen.
+    // Usynlige partikler får størrelse 0, så skjermkortet slipper å tegne dem.
+    gl_PointSize = alpha < 0.004 ? 0.0 : min(size * scale / max(0.2, -mv.z), maxPx);
     vAlpha = alpha;
     vSeed = seed;
   }
@@ -95,8 +98,9 @@ export function createSnowSpray(scene: THREE.Scene) {
     uniforms: {
       map: { value: puffTexture() },
       scale: { value: 1 },
-      light: { value: new THREE.Color(0xf4f8ff) },
-      shade: { value: new THREE.Color(0x9fb6d2) },
+      maxPx: { value: CONFIG.sprayMaxPx },
+      light: { value: new THREE.Color(CONFIG.sprayColorLight) },
+      shade: { value: new THREE.Color(CONFIG.sprayColorShade) },
     },
     transparent: true, depthWrite: false,
   });
@@ -108,8 +112,9 @@ export function createSnowSpray(scene: THREE.Scene) {
   const buf = new THREE.Vector2();
   // ett gjenbrukt objekt, så det ikke lages noe nytt hvert bilde
   const f: SprayFrame = { dt: 0, x: 0, y: 0, z: 0, heading: 0, vx: 0, vy: 0, vz: 0, edge: 0, brake: 0,
-    grounded: true, sinceLanding: 99, popAge: 99, airTime: 0, nx: 0, ny: 1, nz: 0 };
-  type Skier = Pick<SprayFrame, 'vx' | 'vy' | 'vz' | 'edge' | 'grounded' | 'sinceLanding' | 'popAge' | 'airTime'>;
+    grounded: true, sinceLanding: 99, popAge: 99, airTime: 0, nx: 0, ny: 1, nz: 0, lastPop: '', camX: 0, camY: 0, camZ: 0 };
+  type Skier = Pick<SprayFrame, 'vx' | 'vy' | 'vz' | 'edge' | 'grounded' | 'sinceLanding' | 'popAge' | 'airTime' | 'lastPop'>;
+  const attrs = [[pos, 3], [size, 1], [alpha, 1], [seed, 1]] as const;
   type V3 = { x: number; y: number; z: number };
   return {
     /** at: der skiløperen tegnes nå. normal: bakkens normal under skiene. */
@@ -117,14 +122,25 @@ export function createSnowSpray(scene: THREE.Scene) {
       camera: THREE.PerspectiveCamera, renderer: THREE.WebGLRenderer) {
       f.dt = dt; f.x = at.x; f.y = at.y; f.z = at.z; f.heading = heading; f.brake = brake;
       f.vx = s.vx; f.vy = s.vy; f.vz = s.vz; f.edge = s.edge; f.grounded = s.grounded;
-      f.sinceLanding = s.sinceLanding; f.popAge = s.popAge; f.airTime = s.airTime;
+      f.sinceLanding = s.sinceLanding; f.popAge = s.popAge; f.airTime = s.airTime; f.lastPop = s.lastPop;
       f.nx = normal.x; f.ny = normal.y; f.nz = normal.z;
+      f.camX = camera.position.x; f.camY = camera.position.y; f.camZ = camera.position.z;
       spray.update(f);
       // meter til piksler: skjermhøyden delt på hvor mye kameraet ser
       renderer.getDrawingBufferSize(buf);
       mat.uniforms.scale.value = buf.y / (2 * Math.tan((camera.fov * Math.PI) / 360));
-      pos.needsUpdate = size.needsUpdate = alpha.needsUpdate = seed.needsUpdate = true;
-      geo.setDrawRange(0, spray.count);
+      // taket er i CSS-piksler, så puffene er like store på vanlig skjerm, retina og mobil
+      mat.uniforms.maxPx.value = CONFIG.sprayMaxPx * renderer.getPixelRatio();
+      const n = spray.count;
+      geo.setDrawRange(0, n);
+      // last bare opp de partiklene som lever, og ingenting når det ikke spruter
+      if (n > 0) {
+        for (const [a, k] of attrs) {
+          a.clearUpdateRanges();
+          a.addUpdateRange(0, n * k);
+          a.needsUpdate = true;
+        }
+      }
     },
   };
 }

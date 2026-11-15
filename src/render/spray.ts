@@ -23,6 +23,10 @@ export interface SprayFrame {
   airTime: number;
   /** Bakkens normal under skiløperen. */
   nx: number; ny: number; nz: number;
+  /** Siste pop: '' (ingen), 'pop' eller 'perfekt'. */
+  lastPop: '' | 'pop' | 'perfekt';
+  /** Hvor kameraet står, så sprut helt inntil det kan tones bort. */
+  camX: number; camY: number; camZ: number;
 }
 
 type Kind = keyof typeof CONFIG.sprayLooks;
@@ -95,17 +99,32 @@ export function createSpray(opts: { seed?: number; groundAt?: (x: number, z: num
     positions[j] += vel[j] * dt;
     positions[j + 1] += vel[j + 1] * dt;
     positions[j + 2] += vel[j + 2] * dt;
-    if (ground) {
-      const g = ground(positions[j], positions[j + 2]);
-      if (positions[j + 1] < g) {
-        // landet på snøen: blir liggende og glir litt ut
-        positions[j + 1] = g;
-        vel[j + 1] = 0;
-        const f = Math.exp(-8 * dt);
-        vel[j] *= f; vel[j + 2] *= f;
-      }
-    }
     age[i] += dt;
+    if (onGround(i)) {
+      // landet på snøen: blir liggende og glir litt ut
+      vel[j + 1] = 0;
+      const f = Math.exp(-CONFIG.spraySettleDrag * dt);
+      vel[j] *= f; vel[j + 2] *= f;
+    }
+  }
+
+  /** Hvor stor partikkelen er nå (m): vokser fort først, så roligere. */
+  function sizeOf(i: number) {
+    const t = Math.min(1, age[i] / life[i]);
+    return size0[i] * (1 + (grow[i] - 1) * (1 - (1 - t) * (1 - t)));
+  }
+
+  /**
+   * Holder partikkelen oppå snøen. Den løftes litt etter størrelsen, ellers kutter bakken
+   * den nederste halvdelen av sky-bildet med en skarp strek. Sant hvis den ligger på bakken.
+   */
+  function onGround(i: number) {
+    if (!ground) return false;
+    const j = i * 3;
+    const floor = ground(positions[j], positions[j + 2]) + CONFIG.sprayGroundLift * sizeOf(i);
+    if (positions[j + 1] >= floor) return false;
+    positions[j + 1] = floor;
+    return true;
   }
 
   /** Lager én partikkel. preAge: hvor langt inn i bildet den egentlig ble laget (s). */
@@ -122,7 +141,7 @@ export function createSpray(opts: { seed?: number; groundAt?: (x: number, z: num
     grow[i] = look.grow;
     seeds[i] = rnd();
     emitted++;
-    if (preAge > 0) move(i, preAge);
+    if (preAge > 0) move(i, preAge); else onGround(i);
   }
 
   /** Hvor fort bakken synker under skiløperen (m/s), så puffen følger helningen og ikke svever opp fra den. */
@@ -133,7 +152,7 @@ export function createSpray(opts: { seed?: number; groundAt?: (x: number, z: num
   }
 
   function groundY(x: number, z: number, fallback: number) {
-    return (ground ? ground(x, z) : fallback) + 0.05;
+    return (ground ? ground(x, z) : fallback) + CONFIG.spraySpawnLift;
   }
 
   return {
@@ -183,22 +202,27 @@ export function createSpray(opts: { seed?: number; groundAt?: (x: number, z: num
       const inh = CONFIG.sprayInherit;
       const sf = smooth(CONFIG.sprayMinSpeed, CONFIG.sprayFullSpeed, speed);
       const half = CONFIG.skiLength / 2;
+      const SP = CONFIG.spraySpread;
 
       while (carveDebt >= 1) {
         carveDebt -= 1;
         // spredt utover hele bildet, langs veien skiløperen kjørte
         const u = rnd();
         const out = f.edge < 0 ? -1 : 1;
-        const along = half * (-0.7 + 0.9 * rnd());
-        const side = out * (CONFIG.skiGap / 2 + 0.1 + 0.15 * rnd());
+        const along = half * range(SP.carve.along);
+        const side = out * (CONFIG.skiGap / 2 + range(SP.carve.side));
         const x = lastX + (f.x - lastX) * u + fx * along + sx * side;
         const z = lastZ + (f.z - lastZ) * u + fz * along + sz * side;
-        const t = CONFIG.sprayLooks.carve.throw * (0.4 + 0.6 * sf) * (0.6 + 0.6 * rnd());
-        const back = -1.2 * rnd();
+        // i lav fart kastes snøen kortere
+        const slow = SP.carve.slowThrow;
+        const t = CONFIG.sprayLooks.carve.throw * (slow + (1 - slow) * sf) * range(SP.carve.throwMul);
+        const back = -SP.carve.back * rnd();
+        const [u0, u1] = SP.carve.up;
+        const jit = SP.carve.jitter;
         emit('carve', x, groundY(x, z, f.y), z,
-          f.vx * inh + sx * out * t + fx * back + (rnd() - 0.5) * 0.8,
-          f.vy * inh + 0.8 + 2.2 * sf * rnd(),
-          f.vz * inh + sz * out * t + fz * back + (rnd() - 0.5) * 0.8,
+          f.vx * inh + sx * out * t + fx * back + (rnd() - 0.5) * jit,
+          f.vy * inh + u0 + (u1 - u0) * sf * rnd(),
+          f.vz * inh + sz * out * t + fz * back + (rnd() - 0.5) * jit,
           (1 - u) * dt);
       }
 
@@ -207,16 +231,17 @@ export function createSpray(opts: { seed?: number; groundAt?: (x: number, z: num
         // plog: halene skyves ut til begge sider, snøen kastes fram og ut
         const u = rnd();
         const out = rnd() < 0.5 ? -1 : 1;
-        const along = half * (-0.8 + 1.4 * rnd());
-        const side = out * (CONFIG.skiGap / 2 + 0.15 * rnd());
+        const along = half * range(SP.brake.along);
+        const side = out * (CONFIG.skiGap / 2 + range(SP.brake.side));
         const x = lastX + (f.x - lastX) * u + fx * along + sx * side;
         const z = lastZ + (f.z - lastZ) * u + fz * along + sz * side;
-        const t = CONFIG.sprayLooks.brake.throw * (0.4 + 0.8 * rnd());
-        const fwd = 0.5 + 1.5 * rnd();
+        const t = CONFIG.sprayLooks.brake.throw * range(SP.brake.throwMul);
+        const fwd = range(SP.brake.forward);
+        const bi = inh + SP.brake.extraInherit;
         emit('brake', x, groundY(x, z, f.y), z,
-          f.vx * (inh + 0.2) + sx * out * t + fx * fwd,
-          f.vy * inh + 0.8 + 1.8 * rnd(),
-          f.vz * (inh + 0.2) + sz * out * t + fz * fwd,
+          f.vx * bi + sx * out * t + fx * fwd,
+          f.vy * inh + range(SP.brake.up),
+          f.vz * bi + sz * out * t + fz * fwd,
           (1 - u) * dt);
       }
 
@@ -225,16 +250,18 @@ export function createSpray(opts: { seed?: number; groundAt?: (x: number, z: num
       if (f.sinceLanding < lastSince && f.grounded && sawAir && f.airTime >= CONFIG.sprayLandMinAir) {
         const impact = -(airVx * f.nx + airVy * f.ny + airVz * f.nz);
         const n = landingCount(impact, speed);
-        const strength = Math.min(1.5, 0.4 + impact / 6);
+        const LS = CONFIG.sprayLandStrength;
+        const strength = Math.min(LS.max, LS.base + impact * LS.perImpact);
         const vyg = slopeVy(f) * inh;
         for (let k = 0; k < n; k++) {
           const a = rnd() * Math.PI * 2;
-          const r = 0.2 + 0.6 * rnd();
+          const r = range(SP.land.radius);
           const cx = Math.cos(a), cz = Math.sin(a);
           const x = f.x + cx * r, z = f.z + cz * r;
-          const t = CONFIG.sprayLooks.land.throw * strength * (0.4 + 0.8 * rnd());
+          const t = CONFIG.sprayLooks.land.throw * strength * range(SP.land.throwMul);
+          const [u0, u1] = SP.land.up;
           emit('land', x, groundY(x, z, f.y), z,
-            f.vx * inh + cx * t, vyg + 0.5 + 2 * strength * rnd(), f.vz * inh + cz * t, rnd() * dt);
+            f.vx * inh + cx * t, vyg + u0 + (u1 - u0) * strength * rnd(), f.vz * inh + cz * t, rnd() * dt);
         }
       }
       if (f.grounded) sawAir = false;
@@ -242,13 +269,15 @@ export function createSpray(opts: { seed?: number; groundAt?: (x: number, z: num
       // 5) pop: litt fokk bak skiene der du sparket fra
       if (f.popAge < lastPopAge) {
         const vyg = slopeVy(f) * inh;
-        for (let k = 0; k < CONFIG.sprayPopCount; k++) {
-          const along = -half * (0.4 + 0.6 * rnd());
-          const side = (rnd() - 0.5) * (CONFIG.skiGap + 0.3);
+        const n = Math.round(CONFIG.sprayPopCount * (f.lastPop === 'perfekt' ? CONFIG.sprayPopPerfect : 1));
+        const jit = SP.pop.jitter;
+        for (let k = 0; k < n; k++) {
+          const along = -half * range(SP.pop.along);
+          const side = (rnd() - 0.5) * (CONFIG.skiGap + SP.pop.side);
           const x = f.x + fx * along + sx * side, z = f.z + fz * along + sz * side;
-          const t = CONFIG.sprayLooks.pop.throw * (0.5 + 0.8 * rnd());
+          const t = CONFIG.sprayLooks.pop.throw * range(SP.pop.throwMul);
           emit('pop', x, groundY(x, z, f.y), z,
-            f.vx * inh - fx * t + (rnd() - 0.5), vyg + 0.3 + 1.0 * rnd(), f.vz * inh - fz * t + (rnd() - 0.5), rnd() * dt);
+            f.vx * inh - fx * t + (rnd() - 0.5) * jit, vyg + range(SP.pop.up), f.vz * inh - fz * t + (rnd() - 0.5) * jit, rnd() * dt);
         }
       }
 
@@ -256,14 +285,17 @@ export function createSpray(opts: { seed?: number; groundAt?: (x: number, z: num
       lastPopAge = f.popAge;
       lastX = f.x; lastZ = f.z;
 
-      // 6) størrelse og synlighet for tegningen: tones inn, vokser og blekner mykt bort
+      // 6) størrelse og synlighet for tegningen: tones inn, vokser og blekner mykt bort,
+      //    og tones bort helt inntil kameraet, så en puff ikke dekker hele skjermen
+      const [n0, n1] = CONFIG.sprayNearFade;
       for (let i = 0; i < count; i++) {
         const t = age[i] / life[i];
-        const fadeIn = Math.min(1, age[i] / (0.15 * life[i]));
-        const fadeOut = 1 - smooth(0.3, 1, t);
-        alphas[i] = CONFIG.sprayOpacity * fadeIn * fadeOut;
-        const g = 1 - (1 - t) * (1 - t);
-        sizes[i] = size0[i] * (1 + (grow[i] - 1) * g);
+        const fadeIn = Math.min(1, age[i] / (CONFIG.sprayFadeIn * life[i]));
+        const fadeOut = 1 - smooth(CONFIG.sprayFadeOut, 1, t);
+        const j = i * 3;
+        const d = Math.hypot(positions[j] - f.camX, positions[j + 1] - f.camY, positions[j + 2] - f.camZ);
+        alphas[i] = CONFIG.sprayOpacity * fadeIn * fadeOut * smooth(n0, n1, d);
+        sizes[i] = sizeOf(i);
       }
     },
   };

@@ -78,7 +78,7 @@ export const CONFIG = {
    * Snøsprut. Mengder er partikler per sekund (sprut) eller per hendelse (puff).
    * Alt i en fast buffer på sprayMax partikler; er den full, venter ny sprut til gamle forsvinner.
    */
-  sprayMax: 1600,
+  sprayMax: 800,
   /** Carving: partikler/s ved full kant i full fart. Fra sprayMinSpeed til sprayFullSpeed (m/s) øker sprut mykt. */
   sprayCarveRate: 240,
   sprayMinSpeed: 3,
@@ -87,15 +87,18 @@ export const CONFIG = {
   sprayBrakeRate: 520,
   sprayBrakeFullSpeed: 12,
   sprayBrakeResponse: 6,
+  /** Landing: hvor kraftig puffen kastes ut: grunn + per m/s slag, men høyst maks. */
+  sprayLandStrength: { base: 0.4, perImpact: 1 / 6, max: 1.5 },
   /** Landing: partikler per m/s du treffer bakken med, pluss litt per m/s fart, og høyst så mange. */
   sprayLandPerImpact: 45,
   sprayLandPerSpeed: 3,
-  sprayLandMax: 320,
+  sprayLandMax: 200,
   /** Korte hopp over småkuler gir ingen puff: lufttid under dette (s) eller slag under dette (m/s) teller ikke. */
   sprayLandMinAir: 0.15,
   sprayLandMinImpact: 0.8,
-  /** Pop: så mange partikler i fokket fra avsparket (perfekt pop gir litt mer). */
+  /** Pop: så mange partikler i fokket fra avsparket, og så mange ganger mer ved perfekt pop. */
   sprayPopCount: 40,
+  sprayPopPerfect: 1.5,
   /** Lett snø: egen tyngdekraft (m/s²) og luftbrems (per sekund). Faller da høyst ca. 2,4 m/s. */
   sprayGravity: 6,
   sprayDrag: 2.5,
@@ -103,6 +106,22 @@ export const CONFIG = {
   sprayInherit: 0.55,
   /** Hvor sterk sprutene er (0–1) når de er tettest. */
   sprayOpacity: 0.6,
+  /** Hvor stor del av levetiden spruten bruker på å tones inn, og hvor i levetiden den begynner å blekne (0–1). */
+  sprayFadeIn: 0.15,
+  sprayFadeOut: 0.3,
+  /** Snø som har landet glir ut og stopper med denne bremsen (per sekund). */
+  spraySettleDrag: 8,
+  /** Ny sprut starter så høyt over snøen (m). */
+  spraySpawnLift: 0.05,
+  /** Snø som ligger på bakken løftes så mange ganger sin egen størrelse, så bakken ikke kutter den med en skarp strek. */
+  sprayGroundLift: 0.3,
+  /** Sprut nærmere kameraet enn [fra, til] (m) tones bort, så den ikke dekker hele skjermen. */
+  sprayNearFade: [0.8, 1.5],
+  /** Største størrelse på skjermen (CSS-piksler, likt på vanlig skjerm, retina og mobil). */
+  sprayMaxPx: 220,
+  /** Fargen på snøen der lyset treffer, og i skyggen. */
+  sprayColorLight: 0xf4f8ff,
+  sprayColorShade: 0x9fb6d2,
   /**
    * Hvordan hver type sprut ser ut: levetid (s, fra–til), størrelse når den kommer (m, fra–til),
    * hvor mange ganger større den blir før den er borte, og hvor fort den kastes ut (m/s).
@@ -110,8 +129,18 @@ export const CONFIG = {
   sprayLooks: {
     carve: { life: [0.5, 1.0], size: [0.10, 0.24], grow: 2.4, throw: 3.5 },
     brake: { life: [0.7, 1.4], size: [0.16, 0.36], grow: 2.8, throw: 2.8 },
-    land: { life: [0.8, 1.5], size: [0.22, 0.45], grow: 3.0, throw: 3.2 },
+    land: { life: [0.8, 1.5], size: [0.20, 0.40], grow: 2.4, throw: 3.2 },
     pop: { life: [0.4, 0.8], size: [0.10, 0.22], grow: 2.4, throw: 1.6 },
+  },
+  /**
+   * Hvor spruten starter og hvor den kastes. along: langs skiene (andel av halve skilengden, minus = bak).
+   * side: ut fra skiene (m). up: fart oppover (m/s). throwMul: ganges med throw. jitter: litt tilfeldig fart (m/s).
+   */
+  spraySpread: {
+    carve: { along: [-0.7, 0.2], side: [0.1, 0.25], up: [0.8, 3.0], throwMul: [0.6, 1.2], slowThrow: 0.4, back: 1.2, jitter: 0.8 },
+    brake: { along: [-0.8, 0.6], side: [0, 0.15], up: [0.8, 2.6], throwMul: [0.4, 1.2], forward: [0.5, 2.0], extraInherit: 0.2 },
+    land: { radius: [0.2, 0.8], up: [0.5, 2.5], throwMul: [0.4, 1.2] },
+    pop: { along: [0.4, 1.0], side: 0.3, up: [0.3, 1.3], throwMul: [0.5, 1.3], jitter: 1 },
   },
 } as const;
 
