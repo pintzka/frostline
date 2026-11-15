@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { sideAngle, validatePark } from '../src/park/format';
+import { respawnOf, sideAngle, validatePark } from '../src/park/format';
+import { CONFIG } from '../src/core/config';
 import { createTerrain, heightAt, normalAt, PARK } from '../src/park/terrain';
 import testbakke from '../src/park/parks/testbakke.json';
 import * as legacy from './legacyTerrain';
@@ -44,7 +45,8 @@ describe('parkformat: testbakken fra JSON', () => {
   it('har de samme tallene for hoppene som før', () => {
     expect(PARK.width).toBe(legacy.PARK.width);
     expect(PARK.length).toBe(legacy.PARK.length);
-    expect(PARK.kickers.map(({ sideWidth: _, ...k }) => k)).toEqual(legacy.PARK.kickers);
+    // sideWidth og respawn-tallene er nye felt (ikke formen på hoppet), resten skal være likt
+    expect(PARK.kickers.map(({ sideWidth: _, respawnBefore: _b, respawnSpeed: _s, ...k }) => k)).toEqual(legacy.PARK.kickers);
     expect({ height: PARK.deck.height, drop: PARK.deck.drop }).toEqual(legacy.DECK);
     expect(PARK.landing).toEqual(legacy.LANDING);
   });
@@ -140,5 +142,24 @@ describe('parkformat: validering', () => {
   });
   it('en park uten hopp er gyldig', () => {
     expect(errorsFor((p) => (p.kickers = []))).toEqual([]);
+  });
+
+  it('et 4. hopp uten respawn-tall er gyldig og får standardverdier (ikke NaN)', () => {
+    const p = copy();
+    p.length = 800;
+    p.kickers.push({ name: 'Ekstra', z: 600, lipDeg: 21, radius: 75, width: 10, sideWidth: 20, landingStart: 37, landingDeg: 15 });
+    expect(validatePark(p)).toEqual([]);
+    const back = respawnOf(p.kickers[3]);
+    expect(back).toEqual({ before: CONFIG.fallRespawnBeforeDefault, speed: CONFIG.fallRespawnSpeedDefault });
+    expect(Number.isFinite(back.before) && Number.isFinite(back.speed)).toBe(true);
+  });
+
+  it('respawn-tall som ikke gir mening', () => {
+    has(errorsFor((p) => (p.kickers[1].respawnSpeed = 0)), 'respawnSpeed');
+    has(errorsFor((p) => (p.kickers[1].respawnSpeed = 99)), 'respawnSpeed');
+    has(errorsFor((p) => (p.kickers[1].respawnBefore = -5)), 'respawnBefore');
+    has(errorsFor((p) => (p.kickers[1].respawnSpeed = 'fort')), 'respawnSpeed');
+    // så langt tilbake at du havner oppe på hoppet over
+    has(errorsFor((p) => (p.kickers[1].respawnBefore = 80)), 'oppe på «Lite»');
   });
 });

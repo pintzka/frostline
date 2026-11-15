@@ -49,6 +49,8 @@ Helningen på bakken (18°) står i `src/core/config.ts` (`slopeDeg`), ikke i pa
 | `sideWidth` | Hvor bred den myke skråningen ned på hver side av hoppet er (m). Større = slakere sider som du kan kjøre på. |
 | `landingStart` | Hvor langt etter kanten landingen begynner (m). Lengre hopp trenger større tall. |
 | `landingDeg` | Hvor mye brattere enn bakken landingen er (grader). |
+| `respawnBefore` | Valgfritt. Faller du på landingen, settes du så mange meter før rampen (m). Standard 75. |
+| `respawnSpeed` | Valgfritt. Farten du settes tilbake med (m/s). Velg den så farten på kanten blir som i en vanlig kjøring. Standard 11. |
 
 ## Lage et nytt hopp
 
@@ -68,6 +70,8 @@ Tallene for dagens hopp er ikke gjettet. De er funnet ved å teste mange kombina
 | `width` | 8–14 | minst 2 |
 | `sideWidth` | ca. 3–3,5 × kanthøyden (Lite 4, Medium 20, Stort 22) | sidene kan være høyst 35° bratte; feilmeldingen sier hvor bred den må være. `width` + 2 · `sideWidth` må få plass i bakken |
 | `landingStart` | 19–45 | må være større enn `deck.drop` |
+| `respawnBefore` | 60–100 (Lite 100, Medium 75, Stort 60) | større enn 0, og du må ikke havne oppe på hoppet over |
+| `respawnSpeed` | 10–14 (Lite 14, Medium 11, Stort 10) | over 0 og høyst 30 m/s |
 
 Tommelfingerregel: øker du `lipDeg`, flyr du lenger, så `landingStart` må også øke. Gjør du hoppet høyere, må også `sideWidth` øke.
 
@@ -84,6 +88,7 @@ Testene `offcenter.test.ts` (kjøre på sidene av hoppene) og `wall.test.ts` (kj
 - Landingen starter etter platåkanten, og er ferdig før kjøringen stopper.
 - Sidene på hoppene er ikke brattere enn 35°.
 - Ingen hopp (med sider) er bredere enn bakken, og ingen har samme navn.
+- Respawn-tallene (hvis de finnes) gir mening, og stedet du settes tilbake etter et fall er ikke oppe på hoppet over.
 
 **Test alltid med `npm run check` etter en endring.** Testene sjekker også at du får riktig høyde og myk landing. Hvis du endrer dagens hopp, vil noen av de testene (for eksempel `air.test.ts` og `pop.test.ts`) kanskje feile, fordi de passer på at hoppene føles som du valgte. Da kan du spille og se om det nye er bedre, og så oppdatere testene.
 

@@ -8,6 +8,7 @@ import { smoothSpeed } from '../src/ui/hud';
 import { createFall, fadeAmount, fallBody, fallTotalTime, isFalling, landingWobble, respawnSpot, startFall } from '../src/tricks/fall';
 import { createTricks, spinCoast } from '../src/tricks/rotation';
 import { heightAt, LANDING, normalAt, PARK, rampLength } from '../src/park/terrain';
+import { respawnOf } from '../src/park/format';
 import type { RawControls } from '../src/tricks/controls';
 
 const dt = 1 / CONFIG.physicsHz;
@@ -71,7 +72,7 @@ describe('fall', () => {
     expect(s.x).toBe(0);
     expect(s.grounded).toBe(true);
     expect(s.y).toBeCloseTo(heightAt(s.x, s.z), 6);
-    expect(speedOf(s)).toBeCloseTo(CONFIG.fallRespawnSpeed[1], 3);
+    expect(speedOf(s)).toBeCloseTo(respawnOf(medium).speed, 3);
     expect(cut.game.fall.respawnZ).toBe(s.z);
   });
 
@@ -293,8 +294,8 @@ describe('hvor du settes tilbake', () => {
   const normal = flights(createGame(), PARK.length);
 
   it('fall på landingen: før rampen på samme hopp, med samme fart på kanten som en vanlig kjøring (innen 3 %) og landing under 10°', () => {
-    expect(CONFIG.fallRespawnBeforeRamp.length).toBe(PARK.kickers.length);
-    expect(CONFIG.fallRespawnSpeed.length).toBe(PARK.kickers.length);
+    // tallene står i park-fila for hvert hopp (ikke standardverdiene)
+    for (const k of PARK.kickers) expect(k.respawnBefore !== undefined && k.respawnSpeed !== undefined).toBe(true);
     PARK.kickers.forEach((k) => {
       const g = respawnAt(0, k.z + 40, k.z + 0.5);
       expect(g.skier.z).toBeLessThan(k.z - rampLength(k) - 20);

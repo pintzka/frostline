@@ -1,5 +1,6 @@
 import { CONFIG } from '../core/config';
 import { heightAt, LANDING, normalAt, PARK, rampLength } from '../park/terrain';
+import { respawnOf } from '../park/format';
 import { placeSkier, type SkierState } from '../physics/skier';
 import type { TrickState } from './rotation';
 
@@ -66,7 +67,8 @@ export function respawnSpot(fallX: number, fallZ: number, takeoffZ: number): { x
   const i = PARK.kickers.findIndex((k) => Math.abs(takeoffZ - k.z) <= CONFIG.fallTakeoffWindow && fallZ > k.z);
   if (i >= 0) {
     const k = PARK.kickers[i];
-    return { x: 0, z: Math.max(CONFIG.startZ, k.z - rampLength(k) - CONFIG.fallRespawnBeforeRamp[i]), speed: CONFIG.fallRespawnSpeed[i] };
+    const back = respawnOf(k);
+    return { x: 0, z: Math.max(CONFIG.startZ, k.z - rampLength(k) - back.before), speed: back.speed };
   }
   const half = PARK.width / 2 - 2;
   const x = Math.max(-half, Math.min(half, fallX));

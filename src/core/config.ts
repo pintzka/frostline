@@ -222,10 +222,12 @@ export const CONFIG = {
   fallFadeTime: 0.3,
   /**
    * Falt du på landingen til et hopp, settes du tilbake så mange meter før starten på rampen, med denne farten (m/s).
-   * Én verdi per hopp (Lite, Medium, Stort), valgt så farten på kanten blir som i en vanlig kjøring fra start.
+   * Hvert hopp har egne tall i park-fila ("respawnBefore", "respawnSpeed"); disse brukes når de mangler.
+   * Farten kan være høyst fallRespawnSpeedMax.
    */
-  fallRespawnBeforeRamp: [100, 75, 60],
-  fallRespawnSpeed: [14, 11, 10],
+  fallRespawnBeforeDefault: 75,
+  fallRespawnSpeedDefault: 11,
+  fallRespawnSpeedMax: 30,
   /** Avsatsen regnes som fra et hopp når du lettet innenfor så mange meter fra kanten. */
   fallTakeoffWindow: 3,
   /** Andre fall (f.eks. etter pop på flat bakke): tilbake så mange meter før fallstedet, med denne farten (m/s). */

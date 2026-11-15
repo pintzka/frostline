@@ -70,7 +70,7 @@ Slipp grabben før du lander: holder du fortsatt en grab som teller når skiene 
 - Andre fall (f.eks. pop på flat bakke): 35 m før fallstedet i 36 km/t. Havner du da på et hopp (rampe, platå eller kanten inn til landingen), settes du 10 m før rampen i stedet.
 - Mens du faller virker ingen taster. R virker først når skjermen er helt klar igjen. Pop holdt fra fallet teller ikke før du slipper.
 - R og slutten av bakken tømmer skisporet; respawn etter fall lar det gamle sporet ligge med et hull.
-- Tallene ligger i `src/core/config.ts` (`sloppy...` og `fall...`).
+- Tallene ligger i `src/core/config.ts` (`sloppy...` og `fall...`). Avstand og fart for respawn står per hopp i park-fila (`respawnBefore`, `respawnSpeed`, se `docs/PARK.md`).
 
 ## Poeng
 Tallene står i `src/core/config.ts` og regnes ut i `src/tricks/score.ts`.

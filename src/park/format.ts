@@ -27,6 +27,12 @@ export interface Kicker {
   landingStart: number;
   /** Hvor mye brattere enn bakken den bratte delen av landingen er (grader). */
   landingDeg: number;
+  /**
+   * Valgfritt. Faller du på landingen, settes du så mange meter før rampen (m), med denne farten (m/s).
+   * Velg dem så farten på kanten blir som i en vanlig kjøring. Mangler de, brukes standardverdier fra config.
+   */
+  respawnBefore?: number;
+  respawnSpeed?: number;
 }
 
 /** Hele parken slik den står i JSON-fila. */
@@ -50,6 +56,11 @@ export interface ParkData {
   landing: { knuckle: number; steep: number; runout: number };
   /** Hoppene, ovenfra og ned. */
   kickers: Kicker[];
+}
+
+/** Hvor du settes tilbake etter et fall på landingen til hoppet: meter før rampen og fart (m/s). */
+export function respawnOf(k: Kicker): { before: number; speed: number } {
+  return { before: k.respawnBefore ?? CONFIG.fallRespawnBeforeDefault, speed: k.respawnSpeed ?? CONFIG.fallRespawnSpeedDefault };
 }
 
 /** Rampens lengde: en parabel med gitt krumning ender i riktig vinkel når lengde = radius · tan(vinkel). */
@@ -94,6 +105,8 @@ const GROUP_FIELDS: Record<string, Shape> = {
 const KICKER_FIELDS: Shape = {
   name: 'string', z: 'number', lipDeg: 'number', radius: 'number', width: 'number', sideWidth: 'number', landingStart: 'number', landingDeg: 'number',
 };
+/** Felt et hopp kan ha, men ikke må ha. */
+const KICKER_OPTIONAL: Shape = { respawnBefore: 'number', respawnSpeed: 'number' };
 const TYPE_NAMES = { string: 'tekst', number: 'et tall', object: 'en gruppe { }', array: 'en liste [ ]' };
 
 function isObject(v: unknown): v is Record<string, unknown> {
@@ -108,8 +121,14 @@ function typeOk(v: unknown, t: Shape[string]): boolean {
 }
 
 /** Sjekker at alle felt finnes og har riktig type, og at det ikke er ukjente (feilstavede) felt. */
-function checkShape(obj: Record<string, unknown>, shape: Shape, where: string, errors: string[]): boolean {
+function checkShape(obj: Record<string, unknown>, shape: Shape, where: string, errors: string[], optional: Shape = {}): boolean {
   let ok = true;
+  for (const [key, t] of Object.entries(optional)) {
+    if (key in obj && !typeOk(obj[key], t)) {
+      errors.push(`${where}: "${key}" må være ${TYPE_NAMES[t]}.`);
+      ok = false;
+    }
+  }
   for (const [key, t] of Object.entries(shape)) {
     if (!(key in obj)) {
       errors.push(`${where}: mangler feltet "${key}".`);
@@ -120,7 +139,7 @@ function checkShape(obj: Record<string, unknown>, shape: Shape, where: string, e
     }
   }
   for (const key of Object.keys(obj)) {
-    if (!(key in shape)) errors.push(`${where}: ukjent felt "${key}". Er det feilstavet?`);
+    if (!(key in shape) && !(key in optional)) errors.push(`${where}: ukjent felt "${key}". Er det feilstavet?`);
   }
   return ok;
 }
@@ -144,7 +163,7 @@ export function validatePark(data: unknown): string[] {
   const list = data.kickers as unknown[];
   list.forEach((k, i) => {
     if (!isObject(k)) errors.push(`Hopp nr. ${i + 1}: må være en gruppe { }.`);
-    else checkShape(k, KICKER_FIELDS, `Hopp nr. ${i + 1}${typeof k.name === 'string' ? ` («${k.name}»)` : ''}`, errors);
+    else checkShape(k, KICKER_FIELDS, `Hopp nr. ${i + 1}${typeof k.name === 'string' ? ` («${k.name}»)` : ''}`, errors, KICKER_OPTIONAL);
   });
   // Ingen vits i å regne på tallene før alle felt finnes.
   if (errors.length > 0) return errors;
@@ -206,7 +225,17 @@ export function validatePark(data: unknown): string[] {
       errors.push(`${who}: utkjøringen etter landingen går forbi slutten av bakken (${p.length} m).`);
     }
 
+    // respawn etter fall på landingen: et stykke før rampen, med en rimelig fart, og ikke oppe på hoppet over
+    const back = respawnOf(k);
+    if (back.before <= 0) errors.push(`${who}: "respawnBefore" må være større enn 0.`);
+    if (back.speed <= 0 || back.speed > CONFIG.fallRespawnSpeedMax) {
+      errors.push(`${who}: "respawnSpeed" er ${back.speed} m/s. Den må være over 0 og høyst ${CONFIG.fallRespawnSpeedMax} m/s.`);
+    }
+    const spot = start - back.before;
     const prev = p.kickers[i - 1];
+    if (prev && spot > prev.z - rampLength(prev) - CONFIG.fallRampMargin && spot < prev.z + prev.landingStart + p.landing.knuckle) {
+      errors.push(`${who}: etter et fall settes du tilbake ved ${spot.toFixed(1)} m, oppe på «${prev.name}». Gjør "respawnBefore" mindre.`);
+    }
     if (prev) {
       if (k.z <= prev.z) {
         errors.push(`${who} står ved ${k.z} m, men må stå lenger ned enn «${prev.name}» (${prev.z} m). Skriv hoppene ovenfra og ned.`);
