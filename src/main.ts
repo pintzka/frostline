@@ -10,6 +10,7 @@ import { createPlaceholderSkier } from './character/placeholder';
 import { heightAt, normalAt } from './park/terrain';
 import { poseFor, smoothPose } from './character/pose';
 import { createSkiTrails } from './render/trailMesh';
+import { createAudio } from './audio/engine';
 
 const root = document.getElementById('app')!;
 const { renderer, scene, sun } = createScene(root);
@@ -17,6 +18,7 @@ const chase = createChaseCamera(innerWidth / innerHeight);
 addEventListener('resize', () => chase.resize(innerWidth / innerHeight));
 const input = createInput(renderer.domElement);
 const hud = createHud(root);
+const audio = createAudio();
 
 const skierModel = createPlaceholderSkier();
 const mesh = skierModel.root;
@@ -41,7 +43,9 @@ const loop = createLoop({
     // R, eller slutten av bakken: ny runde med en gang
     if (input.pressed('KeyR') || reachedEnd(skier)) { skier = createSkier(); }
     prev = { ...skier };
-    stepSkier(skier, input.read(), dt);
+    const inp = input.read();
+    stepSkier(skier, inp, dt);
+    audio.step(prev, skier, inp);
   },
   render(alpha, frameDt) {
     target.set(
@@ -78,6 +82,7 @@ const loop = createLoop({
       speed: v, distance: skier.z - startZ, airTime: skier.airTime, inAir: !skier.grounded,
       popCharge: skier.popCharge, lastPop: skier.lastPop, popAge: skier.popAge,
     });
+    audio.frame();
     renderer.render(scene, chase.camera);
   },
 });
