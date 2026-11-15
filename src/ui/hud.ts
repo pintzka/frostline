@@ -1,5 +1,4 @@
 import { CONFIG } from '../core/config';
-import type { Landing } from '../tricks/rotation';
 import { comboMult, type ScoreState, type TrickResult } from '../tricks/score';
 import { grabName, type GrabKind } from '../tricks/grabs';
 
@@ -19,9 +18,6 @@ export interface HudInfo {
   /** siste pop, og hvor mange sekunder siden */
   lastPop: '' | 'pop' | 'perfekt';
   popAge: number;
-  /** siste landing (triksnavn og ren/slurvete/fall), og hvor mange sekunder siden */
-  landing: Landing | null;
-  landingAge: number;
   /** poeng, kombo og siste triks med poeng */
   score: ScoreState;
   /** beste poengsum i en tidligere runde (0 = ingen ennå) */
@@ -42,12 +38,6 @@ export function smoothSpeed(shown: number, actual: number, dt: number): number {
 
 const LANDING_TEXT = { ren: 'Ren landing', slurvete: 'Slurvete landing', fall: 'Fall' } as const;
 const LANDING_COLOR = { ren: '#7fe3ff', slurvete: '#ffd166', fall: '#ff6b6b' } as const;
-
-/** Teksten som vises etter en landing. Tom når det ikke var noe å vise (et vanlig hopp uten triks). */
-export function landingText(l: Landing | null): { title: string; sub: string } {
-  if (!l || (l.name === '' && l.quality === 'ren')) return { title: '', sub: '' };
-  return { title: l.name, sub: LANDING_TEXT[l.quality] };
-}
 
 /** 4200 → «4 200». Samme resultat på alle maskiner (bruker ikke språkinnstillingene). */
 export function formatPoints(n: number): string {

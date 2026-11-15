@@ -119,7 +119,7 @@ describe('lydmotoren (falsk Web Audio)', () => {
     target.dispatchEvent(new Event('pointerup'));
     await flush();
     const s = createSkier();
-    audio.step({ ...s }, s, { steer: 0, brake: 0 });
+    audio.step({ ...s }, s, 0);
     audio.newRun();
     audio.frame();
     const t = FakeCtx.last.master().targets().slice(-2);
@@ -136,10 +136,10 @@ describe('lydmotoren (falsk Web Audio)', () => {
     const ctx = FakeCtx.last;
     const s = createSkier();
     const count = () => ctx.nodes.reduce((n, x) => n + x.gain.targets().length + x.frequency.targets().length, 0);
-    audio.step({ ...s }, s, { steer: 0, brake: 0 });
+    audio.step({ ...s }, s, 0);
     audio.frame();
     const first = count();
-    for (let i = 0; i < 10; i++) { audio.step({ ...s }, s, { steer: 0, brake: 0 }); audio.frame(); }
+    for (let i = 0; i < 10; i++) { audio.step({ ...s }, s, 0); audio.frame(); }
     expect(count()).toBe(first);
   });
 

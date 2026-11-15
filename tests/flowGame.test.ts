@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CONFIG } from '../src/core/config';
-import { createGame, createStats, resumeGame, scoreLines, soundSkier, stepGame, type Game, type GameInput } from '../src/ui/flow';
+import { createGame, createStats, resultLines, resumeGame, scoreLines, soundSkier, stepGame, type Game, type GameInput } from '../src/ui/flow';
 import { createScore } from '../src/tricks/score';
 import { heightAt, PARK } from '../src/park/terrain';
 import { isFalling } from '../src/tricks/fall';
@@ -143,18 +143,22 @@ describe('mållinja', () => {
 });
 
 describe('poeng på resultatskjermen', () => {
-  it('viser poeng, beste runde, ny rekord og trikset med flest poeng', () => {
+  it('viser poeng, beste runde og ny rekord', () => {
     const score = createScore();
-    const st = createStats();
-    expect(scoreLines(score, 0, st)).toEqual([['Poeng', '0'], ['Flest poeng', 'Ingen ennå']]);
+    expect(scoreLines(score, 0)).toEqual([['Poeng', '0']]);
     score.total = 4200;
-    st.bestScored = { name: '720 + Backflip', quality: 'ren', points: 1500, combo: 1, repeat: 1, perfectPop: false, tooSmall: false, smallJump: false, comboLost: false, landedGrabbing: false };
-    expect(scoreLines(score, 3000, st)).toEqual([
+    expect(scoreLines(score, 3000)).toEqual([
       ['Poeng', '4 200 · ny rekord!'],
       ['Beste runde', '4 200'],
-      ['Flest poeng', '720 + Backflip · 1 500'],
     ]);
-    expect(scoreLines(score, 5000, st)[0]).toEqual(['Poeng', '4 200']);
+    expect(scoreLines(score, 5000)[0]).toEqual(['Poeng', '4 200']);
+  });
+
+  it('beste triks på resultatskjermen har poengene med', () => {
+    const st = createStats();
+    expect(resultLines(st)[3]).toEqual(['Beste triks', 'Ingen ennå']);
+    st.bestTrick = { name: '720 + Backflip', quality: 'ren', points: 1500, combo: 1, repeat: 1, perfectPop: false, tooSmall: false, smallJump: false, comboLost: false, landedGrabbing: false };
+    expect(resultLines(st)[3]).toEqual(['Beste triks', '720 + Backflip · 1 500']);
   });
 });
 

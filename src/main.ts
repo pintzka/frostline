@@ -59,7 +59,7 @@ const loop = createLoop({
     }
     // prev er satt på nytt etter en flytting, så det ikke høres ut som en landing
     const heard = soundSkier(game);
-    audio.step(heard === game.skier ? prev : heard, heard, { steer: 0, brake: heard.brake, pop: false });
+    audio.step(heard === game.skier ? prev : heard, heard, heard.brake);
   },
   render(alpha, frameDt) {
     const { skier, tricks } = game;
@@ -74,7 +74,7 @@ const loop = createLoop({
     hud.update({
       speed: v, distance: skier.z - startZ, airTime: skier.airTime, inAir: !skier.grounded,
       popCharge: skier.popCharge, lastPop: skier.lastPop, popAge: skier.popAge,
-      landing: tricks.lastLanding, landingAge: tricks.landingAge, fade: fadeAmount(game.fall),
+      fade: fadeAmount(game.fall),
       score: game.score, best: game.best, controls: input.device(), grab: tricks.grabs.held, grabTime: tricks.grabs.holdTime,
     }, frameDt);
     hud.setOpacity(menu.update(game.flow, frameDt));

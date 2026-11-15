@@ -63,7 +63,7 @@ describe('sperren ved avsats tåler skjelving i analog styring', () => {
         }
         const noise = (r() - 0.5) * 0.002;
         const wasAir = !g.skier.grounded;
-        stepGame(g, { steer: Math.max(-1, Math.min(1, v + noise)), brake: 0, flip: 0, pop: false }, false, dt);
+        stepGame(g, { steer: Math.max(-1, Math.min(1, v + noise)), brake: 0, flip: 0, pop: false }, dt);
         if (wasAir && g.skier.grounded && g.tricks.lastLanding) {
           landings++;
           const l = g.tricks.lastLanding;

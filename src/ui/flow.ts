@@ -1,9 +1,8 @@
 import { CONFIG } from '../core/config';
-import { createGame as createCoreGame, restartGame, stepGame as stepCoreGame, type Game as CoreGame, type Move } from '../core/game';
+import { canRestart, createGame as createCoreGame, restartGame, stepGame as stepCoreGame, type Game as CoreGame, type Move } from '../core/game';
 import { reachedEnd, speedOf, type SkierState } from '../physics/skier';
-import type { Landing } from '../tricks/rotation';
 import type { RawControls } from '../tricks/controls';
-import { fallDone, isFalling } from '../tricks/fall';
+import { isFalling } from '../tricks/fall';
 import type { ScoreState, TrickResult } from '../tricks/score';
 
 /**
@@ -24,12 +23,8 @@ export interface RunStats {
   topSpeed: number;
   /** sekunder, lengste hopp i runden */
   longestAir: number;
-  /** største landede triks (ren eller slurvete), null hvis ingen */
-  bestTrick: Landing | null;
-  /** siste landing vi har sett, så samme landing ikke telles flere ganger */
-  lastLanding: Landing | null;
-  /** trikset som ga flest poeng i runden (fra poeng-systemet), null hvis ingen */
-  bestScored: TrickResult | null;
+  /** trikset som ga flest poeng i runden (fra poeng-systemet), null hvis ingen ga poeng */
+  bestTrick: TrickResult | null;
 }
 
 export interface Flow {
@@ -63,37 +58,18 @@ export interface GameInput {
 }
 
 export function createStats(): RunStats {
-  return { time: 0, topSpeed: 0, longestAir: 0, bestTrick: null, lastLanding: null, bestScored: null };
+  return { time: 0, topSpeed: 0, longestAir: 0, bestTrick: null };
 }
 
-/** Hvor mye et triks er verdt, for å finne det beste: grader rotert. Fall og vanlige hopp er 0. */
-export function trickValue(l: Landing): number {
-  if (l.quality === 'fall' || l.name === '') return 0;
-  const halves = Math.round(Math.abs(l.spinDeg) / 180);
-  const flips = Math.round(Math.abs(l.flipDeg) / 360);
-  return halves * 180 + flips * 360;
-}
-
-/** Det beste av to triks. Er de like store, vinner ren landing. */
-export function bestOf(a: Landing | null, b: Landing): Landing | null {
-  const vb = trickValue(b);
-  if (vb === 0) return a;
-  if (!a) return b;
-  const va = trickValue(a);
-  if (vb > va) return b;
-  if (vb === va && a.quality !== 'ren' && b.quality === 'ren') return b;
-  return a;
-}
-
-export function recordStats(st: RunStats, s: { dt: number; speed: number; inAir: boolean; airTime: number; landing: Landing | null; scored?: TrickResult | null }): void {
-  if (s.scored && s.scored.points > (st.bestScored?.points ?? 0)) st.bestScored = s.scored;
+/**
+ * Teller med i rundestatistikken. scored = siste triks fra poeng-systemet (tricks/score.ts):
+ * beste triks er det som ga flest poeng, så fall og triks uten poeng teller ikke.
+ */
+export function recordStats(st: RunStats, s: { dt: number; speed: number; inAir: boolean; airTime: number; scored: TrickResult | null }): void {
+  if (s.scored && s.scored.points > (st.bestTrick?.points ?? 0)) st.bestTrick = s.scored;
   st.time += s.dt;
   st.topSpeed = Math.max(st.topSpeed, s.speed);
   if (s.inAir) st.longestAir = Math.max(st.longestAir, s.airTime);
-  if (s.landing && s.landing !== st.lastLanding) {
-    st.lastLanding = s.landing;
-    st.bestTrick = bestOf(st.bestTrick, s.landing);
-  }
 }
 
 export function createGame(): Game {
@@ -158,9 +134,9 @@ export function stepGame(g: Game, inp: GameInput, dt: number): FlowEvent {
     const ready = f.phaseAge >= CONFIG.resultMinTime;
     if (ready && !space) f.resultArmed = true;
     // R virker med en gang, men ikke mens skjermen fortsatt blekes etter et fall
-    const go = (restartPressed && fallDone(g.fall)) || (ready && ((f.resultArmed && spacePressed) || inp.click));
+    const go = (restartPressed && canRestart(g)) || (ready && ((f.resultArmed && spacePressed) || inp.click));
     if (go) { newRun(g, spacePressed); event = 'ny-runde'; }
-  } else if (restartPressed && fallDone(g.fall)) {
+  } else if (restartPressed && canRestart(g)) {
     // R virker først når skjermen er helt klar igjen etter et fall (som i core/game.ts)
     newRun(g, false); event = 'ny-runde';
   }
@@ -169,14 +145,13 @@ export function stepGame(g: Game, inp: GameInput, dt: number): FlowEvent {
   if (f.phase === 'start') return event;
 
   // kjøringen: fysikk, triks, fall og poeng. Slutten av bakken gir resultat her, ikke ny runde.
-  const move = stepCoreGame(g, f.phase === 'kjorer' ? inp.raw : STOP, false, dt, false);
+  const move = stepCoreGame(g, f.phase === 'kjorer' ? inp.raw : STOP, dt);
   if (f.move === 'none') f.move = move;
 
   if (f.phase === 'resultat') { stopAtFinish(g.skier, dt); return event; }
 
   recordStats(f.stats, {
-    dt, speed: speedOf(g.skier), inAir: !g.skier.grounded, airTime: g.skier.airTime, landing: g.tricks.lastLanding,
-    scored: g.score.last,
+    dt, speed: speedOf(g.skier), inAir: !g.skier.grounded, airTime: g.skier.airTime, scored: g.score.last,
   });
   // i mål først når du står på snøen og ikke faller: krysser du mållinja i lufta, teller landingen
   // (med poeng, eller fall og respawn) før resultatet, så tabellen stemmer med det som skjedde
@@ -202,7 +177,7 @@ export function resultLines(st: RunStats): [string, string][] {
     ['Tid', time],
     ['Toppfart', `${Math.round(st.topSpeed * 3.6)} km/t`],
     ['Lengste lufttid', `${comma(st.longestAir, 1)} s`],
-    ['Beste triks', t ? t.name + (t.quality === 'slurvete' ? ' (slurvete)' : '') : 'Ingen ennå'],
+    ['Beste triks', t ? `${t.name}${t.quality === 'slurvete' ? ' (slurvete)' : ''} · ${points(t.points)}` : 'Ingen ennå'],
   ];
 }
 
@@ -211,13 +186,11 @@ function points(n: number): string {
   return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 }
 
-/** Poeng-linjene på resultatskjermen: poengene i runden, beste runde og trikset med flest poeng. */
-export function scoreLines(score: ScoreState, bestBefore: number, st: RunStats): [string, string][] {
+/** Poeng-linjene på resultatskjermen: poengene i runden og beste runde (beste triks står i resultLines). */
+export function scoreLines(score: ScoreState, bestBefore: number): [string, string][] {
   const record = score.total > 0 && score.total > bestBefore;
   const lines: [string, string][] = [['Poeng', points(score.total) + (record && bestBefore > 0 ? ' · ny rekord!' : '')]];
   if (bestBefore > 0) lines.push(['Beste runde', points(Math.max(bestBefore, score.total))]);
-  const t = st.bestScored;
-  lines.push(['Flest poeng', t ? `${t.name} · ${points(t.points)}` : 'Ingen ennå']);
   return lines;
 }
 

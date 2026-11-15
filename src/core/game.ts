@@ -1,4 +1,4 @@
-import { createSkier, reachedEnd, stepSkier, type SkierState } from '../physics/skier';
+import { createSkier, stepSkier, type SkierState } from '../physics/skier';
 import { createTricks, stepTricks, type TrickState } from '../tricks/rotation';
 import { createLatch, resetLatch, splitControls, type ControlLatch, type RawControls } from '../tricks/controls';
 import { createFall, fallDone, isFalling, startFall, stepFall, stepSloppy, type FallState } from '../tricks/fall';
@@ -26,7 +26,7 @@ export interface Game {
 
 /**
  * Om skiløperen ble flyttet et langt stykke på ett steg:
- * 'restart' = ny runde (R eller slutten av bakken), alt starter på nytt og skisporet tømmes.
+ * 'restart' = ny runde (R, eller ny runde fra start- eller resultatskjermen), alt starter på nytt og skisporet tømmes.
  * 'respawn' = satt tilbake etter et fall, det gamle sporet blir liggende med et hull.
  */
 export type Move = 'none' | 'restart' | 'respawn';
@@ -50,10 +50,15 @@ export function skisOnSnow(g: Game): boolean {
 }
 
 /**
- * Kjører ett fysikksteg. restart = R-tasten. Sier om skiløperen ble flyttet (se Move).
- * endRestarts = false: slutten av bakken starter ikke ny runde (da viser ui/flow.ts resultatskjermen i stedet).
+ * Kan en ny runde starte nå (R)? Ikke før fallet er helt ferdig, også blekingen inn igjen, så den ikke kuttes brått.
+ * Selve den nye runden (restartGame) og når R virker, styres av ui/flow.ts.
  */
-export function stepGame(g: Game, raw: RawControls, restart: boolean, dt: number, endRestarts = true): Move {
+export function canRestart(g: Game): boolean {
+  return fallDone(g.fall);
+}
+
+/** Kjører ett fysikksteg: taster, fysikk, triks, fall og poeng. Sier om skiløperen ble satt tilbake etter et fall. */
+export function stepGame(g: Game, raw: RawControls, dt: number): Move {
   // under fallet virker ingen taster
   if (isFalling(g.fall)) {
     stepTricks(g.tricks, { spin: 0, flip: 0, grounded: true }, dt);
@@ -63,11 +68,6 @@ export function stepGame(g: Game, raw: RawControls, restart: boolean, dt: number
     g.popLock = true;
     resetLatch(g.latch);
     return 'respawn';
-  }
-  // R virker først når skjermen er helt klar igjen etter et fall, så blekingen ikke kuttes brått
-  if ((restart && fallDone(g.fall)) || (endRestarts && reachedEnd(g.skier))) {
-    restartGame(g);
-    return 'restart';
   }
   // blekingen inn igjen etter fallet fortsetter, men nå kjører du som vanlig
   stepFall(g.fall, g.skier, dt);

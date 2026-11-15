@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CONFIG } from '../src/core/config';
-import { createGame, skisOnSnow, stepGame, type Game, type Move } from '../src/core/game';
+import { canRestart, createGame, restartGame, skisOnSnow, stepGame, type Game, type Move } from '../src/core/game';
 import { createSkier, speedOf, stepSkier } from '../src/physics/skier';
 import { createCameraRig, type CameraPose } from '../src/camera/rig';
 import { createTrail } from '../src/render/trail';
@@ -41,7 +41,10 @@ function ride(goalDeg: number, after: number, mash: (time: number) => RawControl
     const after0 = landedAt >= 0 ? time - landedAt : -1;
     const raw = landedAt < 0 ? spinTo(g, goalDeg) : mash(after0);
     const wasAir = !g.skier.grounded;
-    const move = stepGame(g, raw, restartDuring && landedAt >= 0, dt);
+    // R (som ui/flow.ts gjør det): ny runde bare når fallet er helt ferdig, ellers et vanlig steg
+    const restart = restartDuring && landedAt >= 0 && canRestart(g);
+    if (restart) restartGame(g);
+    const move: Move = restart ? 'restart' : stepGame(g, raw, dt);
     time += dt;
     if (!g.skier.grounded && g.skier.z > medium.z - 5) tookOff = true;
     if (tookOff && landedAt < 0 && wasAir && g.skier.grounded) landedAt = time;
@@ -269,7 +272,7 @@ function flights(g: Game, untilZ: number) {
   for (let i = 0; i < 60 * CONFIG.physicsHz && g.skier.z < untilZ; i++) {
     const s = g.skier;
     const was = s.grounded, vx = s.vx, vy = s.vy, vz = s.vz;
-    stepGame(g, none, false, dt);
+    stepGame(g, none, dt);
     if (was && !s.grounded) cur = { z: s.z, speed: speedOf(s), angle: 0 };
     if (!was && s.grounded && cur) {
       const [nx, ny, nz] = normalAt(s.x, s.z);
@@ -286,7 +289,7 @@ function respawnAt(fallX: number, fallZ: number, takeoffZ: number): Game {
   const g = createGame();
   const spot = respawnSpot(fallX, fallZ, takeoffZ);
   Object.assign(g.fall, { respawnX: spot.x, respawnZ: spot.z, respawnSpeed: spot.speed, respawned: false, time: CONFIG.fallRespawnAt - dt / 2 });
-  stepGame(g, none, false, dt);
+  stepGame(g, none, dt);
   return g;
 }
 
@@ -341,7 +344,7 @@ describe('hvor du settes tilbake', () => {
       const pop = s.z > 80 && s.z < 95 && s.grounded && fallZ < 0;
       const left = 90 * DEG - (g.tricks.spin + spinCoast(g.tricks.spinRate));
       const steer = !s.grounded && Math.abs(left) > 0.02 ? Math.sign(left) : 0;
-      move = stepGame(g, { ...none, pop, steer }, false, dt);
+      move = stepGame(g, { ...none, pop, steer }, dt);
       if (isFalling(g.fall) && fallZ < 0) fallZ = g.skier.z;
     }
     expect(g.tricks.lastLanding?.quality).toBe('fall');
@@ -368,8 +371,9 @@ describe('restart og respawn', () => {
 
   it('R gir restart, ikke respawn', () => {
     const g = createGame();
-    for (let i = 0; i < 240; i++) stepGame(g, none, false, dt);
-    expect(stepGame(g, none, true, dt)).toBe('restart');
+    for (let i = 0; i < 240; i++) stepGame(g, none, dt);
+    expect(canRestart(g)).toBe(true);
+    restartGame(g);
     expect(g.skier.z).toBe(CONFIG.startZ);
   });
 
@@ -378,7 +382,8 @@ describe('restart og respawn', () => {
     const g = steps[steps.length - 1].game;
     let fade = fadeAmount(g.fall), biggest = 0, restarted = false;
     for (let i = 0; i < 2 * CONFIG.physicsHz; i++) {
-      if (stepGame(g, none, true, dt) === 'restart') { restarted = true; break; }
+      if (canRestart(g)) { restartGame(g); restarted = true; break; }
+      stepGame(g, none, dt);
       const f = fadeAmount(g.fall);
       biggest = Math.max(biggest, Math.abs(f - fade));
       fade = f;

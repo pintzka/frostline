@@ -76,7 +76,7 @@ export function createMenu(root: HTMLElement) {
     onEvent(ev: FlowEvent, game: Game) {
       const flow = game.flow;
       // poengene først, så tid, fart og lufttid
-      if (ev === 'mål') resultBody.replaceChildren(table([...scoreLines(game.score, flow.bestBefore, flow.stats), ...resultLines(flow.stats)], 22));
+      if (ev === 'mål') resultBody.replaceChildren(table([...scoreLines(game.score, flow.bestBefore), ...resultLines(flow.stats)], 22));
       // første start skjer der skiløperen alt står, så da trengs ikke sløret
       if (ev === 'ny-runde' && shown !== 'start') veilO = CONFIG.restartVeil;
     },

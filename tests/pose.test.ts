@@ -81,7 +81,7 @@ describe('leningen ved switch-landing', () => {
         steer = s.airTime < 0.03 ? 0 : Math.abs(left) > 0.02 ? Math.sign(left) : 0;
       }
       const wasAir = !s.grounded;
-      stepGame(g, { steer, brake: 0, flip: 0, pop }, false, dt);
+      stepGame(g, { steer, brake: 0, flip: 0, pop }, dt);
       time += dt;
       if (wasAir && g.skier.grounded && isSwitch(g.tricks)) { landedSwitch = true; leanAtLanding = g.skier.lean; }
       sign = follow(sign, isSwitch(g.tricks), dt);

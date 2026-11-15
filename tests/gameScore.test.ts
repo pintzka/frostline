@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CONFIG } from '../src/core/config';
-import { createGame, stepGame, type Game } from '../src/core/game';
+import { createGame, restartGame, stepGame, type Game } from '../src/core/game';
 import { spinCoast } from '../src/tricks/rotation';
 import { PARK } from '../src/park/terrain';
 import type { RawControls } from '../src/tricks/controls';
@@ -28,7 +28,7 @@ function ride(g: Game, goalDeg: number, after: number, grab: 0 | 1 = 0, onTakeof
   let landedAt = -1, time = 0, tookOff = false, respawned = false;
   for (let i = 0; i < 60 * CONFIG.physicsHz; i++) {
     const wasAir = !g.skier.grounded;
-    const move = stepGame(g, landedAt < 0 ? spinTo(g, goalDeg, grab) : none, false, dt);
+    const move = stepGame(g, landedAt < 0 ? spinTo(g, goalDeg, grab) : none, dt);
     if (move === 'respawn') respawned = true;
     time += dt;
     if (!tookOff && !g.skier.grounded && g.skier.z > medium.z - 5) { tookOff = true; onTakeoff(); }
@@ -67,13 +67,13 @@ describe('poeng i spillsteget', () => {
     const g = createGame();
     g.score.total = 1200;
     g.best = 800;
-    expect(stepGame(g, none, true, dt)).toBe('restart');
+    restartGame(g);
     expect(g.score.total).toBe(0);
     expect(g.score.last).toBeNull();
     expect(g.best).toBe(1200);
     // en dårligere runde senker ikke beste runde
     g.score.total = 300;
-    stepGame(g, none, true, dt);
+    restartGame(g);
     expect(g.best).toBe(1200);
   });
 });

@@ -396,11 +396,16 @@ describe('triks på det medium hoppet (ekte fysikk)', () => {
 
 describe('visning i HUD', () => {
   it('viser triksnavn og landing, men ikke et vanlig hopp uten triks', async () => {
-    const { landingText } = await import('../src/ui/hud');
-    expect(landingText(judgeLanding(0, 0)).sub).toBe('');
-    expect(landingText(judgeLanding(540 * DEG, 360 * DEG))).toEqual({ title: '540 + Frontflip', sub: 'Ren landing' });
-    expect(landingText(judgeLanding(395 * DEG, 0)).sub).toBe('Slurvete landing');
-    expect(landingText(judgeLanding(90 * DEG, 0)).sub).toBe('Fall');
+    // HUD-en viser trikset slik poeng-systemet gir det (resultText), ikke rett fra landingen
+    const { resultText } = await import('../src/ui/hud');
+    const { createScore, scoreLanding } = await import('../src/tricks/score');
+    const shown = (spin: number, flip: number) => scoreLanding(createScore(), { ...judgeLanding(spin, flip), airTime: 2 });
+    expect(shown(0, 0)).toBeNull();
+    const ren = resultText(shown(540 * DEG, 360 * DEG)!);
+    expect(ren.title.startsWith('540 + Frontflip')).toBe(true);
+    expect(ren.sub.startsWith('Ren landing')).toBe(true);
+    expect(resultText(shown(395 * DEG, 0)!).sub.startsWith('Slurvete landing')).toBe(true);
+    expect(resultText(shown(90 * DEG, 0)!).title).toBe('Fall');
   });
 });
 

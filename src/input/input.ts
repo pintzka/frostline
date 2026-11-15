@@ -155,6 +155,5 @@ export function createInput(target: HTMLElement, touch?: TouchSurface) {
     onPause(fn: () => void) { pauseListeners.push(fn); },
     /** Hva ble sist brukt, så hjelpeteksten kan vise riktige knapper. */
     device(): InputDevice { return device; },
-    pressed(code: string) { return keys.isDown(code); },
   };
 }

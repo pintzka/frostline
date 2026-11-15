@@ -1,12 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { CONFIG } from '../src/core/config';
-import { bestOf, createGame, createStats, fade, recordStats, resultLines, stepGame, trickValue, type Game, type GameInput } from '../src/ui/flow';
+import { createGame, createStats, fade, recordStats, resultLines, stepGame, type Game, type GameInput } from '../src/ui/flow';
+import { createScore, scoreLanding, type TrickResult } from '../src/tricks/score';
 import { judgeLanding } from '../src/tricks/rotation';
 import { PARK } from '../src/park/terrain';
-import type { Landing } from '../src/tricks/rotation';
 
 const dt = 1 / CONFIG.physicsHz;
 const DEG = Math.PI / 180;
+
+/** Et triks gjennom poeng-systemet (et ekte hopp, 2 s i lufta), slik spillet teller det. */
+const scored = (spin: number, flip: number): TrickResult | null =>
+  scoreLanding(createScore(), { ...judgeLanding(spin * DEG, flip * DEG), airTime: 2 });
 
 /** Input uten noen taster. Overstyr det du trenger. */
 function keys(over: Partial<GameInput['raw']> & { click?: boolean; restart?: boolean } = {}): GameInput {
@@ -212,37 +216,39 @@ describe('rundestatistikk', () => {
     expect(g.flow.stats.topSpeed).toBeLessThan(5);
   });
 
-  it('beste triks er det største landede trikset, og fall teller ikke', () => {
+  it('beste triks er trikset med flest poeng, og fall teller ikke', () => {
     const st = createStats();
-    const land = (spin: number, flip: number) => judgeLanding(spin * DEG, flip * DEG);
-    const sample = (l: Landing | null) => recordStats(st, { dt, speed: 10, inAir: false, airTime: 0, landing: l });
-    sample(land(360, 0));
-    expect(st.bestTrick?.name).toBe('360');
-    sample(land(180, 0));
-    expect(st.bestTrick?.name).toBe('360');
-    sample(land(720, -360));
+    const sample = (r: TrickResult | null) => recordStats(st, { dt, speed: 10, inAir: false, airTime: 0, scored: r });
+    sample(scored(540, 0));
+    expect(st.bestTrick?.name).toBe('540');
+    sample(scored(180, 0));
+    expect(st.bestTrick?.name).toBe('540');
+    sample(scored(720, -360));
     expect(st.bestTrick?.name).toBe('720 + Backflip');
     // et større triks som endte i fall, teller ikke
-    const fall = land(1080 + 90, 0);
+    const fall = scored(1080 + 90, 0)!;
     expect(fall.quality).toBe('fall');
     sample(fall);
     expect(st.bestTrick?.name).toBe('720 + Backflip');
   });
 
-  it('samme landing telles bare én gang, og et vanlig hopp er ikke et triks', () => {
+  it('et vanlig hopp eller et triks uten poeng er ikke et beste triks', () => {
     const st = createStats();
-    const l = judgeLanding(0, 0);
-    recordStats(st, { dt, speed: 10, inAir: false, airTime: 0, landing: l });
+    recordStats(st, { dt, speed: 10, inAir: false, airTime: 0, scored: scored(0, 0) });
+    recordStats(st, { dt, speed: 10, inAir: false, airTime: 0, scored: scored(360, 0) });
     expect(st.bestTrick).toBeNull();
-    expect(trickValue(l)).toBe(0);
   });
 
-  it('ved likt triks vinner ren landing over slurvete', () => {
-    const ren = judgeLanding(360 * DEG, 0);
-    const slurvete = judgeLanding((360 + 40) * DEG, 0);
+  it('ved likt triks vinner ren landing over slurvete (den gir flere poeng)', () => {
+    const st = createStats();
+    const ren = scored(540, 0)!;
+    const slurvete = scored(540 + 40, 0)!;
     expect(slurvete.quality).toBe('slurvete');
-    expect(bestOf(slurvete, ren)).toBe(ren);
-    expect(bestOf(ren, slurvete)).toBe(ren);
+    recordStats(st, { dt, speed: 10, inAir: false, airTime: 0, scored: slurvete });
+    recordStats(st, { dt, speed: 10, inAir: false, airTime: 0, scored: ren });
+    expect(st.bestTrick).toBe(ren);
+    recordStats(st, { dt, speed: 10, inAir: false, airTime: 0, scored: slurvete });
+    expect(st.bestTrick).toBe(ren);
   });
 
   it('lengste lufttid og toppfart er de største verdiene i runden', () => {
@@ -253,7 +259,7 @@ describe('rundestatistikk', () => {
       { speed: 15, inAir: true, airTime: 1.4 },
       { speed: 12, inAir: true, airTime: 0.2 },
     ];
-    for (const s of steps) recordStats(st, { dt: 0.5, landing: null, ...s });
+    for (const s of steps) recordStats(st, { dt: 0.5, scored: null, ...s });
     expect(st.topSpeed).toBe(22);
     expect(st.longestAir).toBe(1.4);
     expect(st.time).toBe(2);
@@ -264,12 +270,12 @@ describe('resultatskjermen og overganger', () => {
   it('viser tid, toppfart, lufttid og beste triks på norsk', () => {
     const st = createStats();
     st.time = 27.08; st.topSpeed = 31; st.longestAir = 2.53;
-    st.bestTrick = judgeLanding((540 + 40) * DEG, 0);
+    st.bestTrick = scored(540 + 40, 0);
     expect(resultLines(st)).toEqual([
       ['Tid', '27,1 s'],
       ['Toppfart', '112 km/t'],
       ['Lengste lufttid', '2,5 s'],
-      ['Beste triks', '540 (slurvete)'],
+      ['Beste triks', '540 (slurvete) · 200'],
     ]);
     st.time = 65.3; st.bestTrick = null;
     expect(resultLines(st)[0][1]).toBe('1:05,3');

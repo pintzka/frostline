@@ -1,6 +1,6 @@
 import { AUDIO } from './config';
 import { changedEnough, detectEvents, skidAmount, soundLevels, type SoundLevels } from './mix';
-import { speedOf, type SkierInput, type SkierState } from '../physics/skier';
+import { speedOf, type SkierState } from '../physics/skier';
 
 /**
  * Lyden i spillet, laget i kode med Web Audio (ingen lydfiler).
@@ -11,7 +11,7 @@ import { speedOf, type SkierInput, type SkierState } from '../physics/skier';
  */
 export interface GameAudio {
   /** Kalles etter hvert fysikksteg. Husker tilstanden og finner pop og landing. */
-  step(prev: SkierState, cur: SkierState, inp: SkierInput): void;
+  step(prev: SkierState, cur: SkierState, brake: number): void;
   /** Kalles én gang per bilde. Sender de nye nivåene mykt til lyden. */
   frame(): void;
   /** Ny runde: lyden dukkes kort, så den ikke faller brått. */
@@ -63,9 +63,9 @@ export function createAudio(env: AudioEnv | null = browserEnv()): GameAudio {
 
   const api: GameAudio = {
     get muted() { return muted; },
-    step(prev, s, inp) {
+    step(prev, s, b) {
       cur = s;
-      brake = inp.brake;
+      brake = b;
       const e = detectEvents(prev, s);
       // flere hendelser på ett bilde: behold den sterkeste
       if (e.pop !== null) popQueue = Math.max(popQueue, e.pop);
