@@ -15,6 +15,9 @@ import { createPauseUi } from './ui/pause';
 import { createMenu } from './ui/menu';
 import { createGame, stepGame } from './ui/flow';
 import { createAudio } from './audio/engine';
+import { createChallengesUi } from './ui/challengesUi';
+import { CURRENT_CHALLENGES, CURRENT_PARK_KEY } from './challenges/index';
+import { PARK } from './park/terrain';
 
 const root = document.getElementById('app')!;
 const { renderer, scene, env, sunFollow } = createScene(root);
@@ -24,6 +27,7 @@ const hud = createHud(root);
 const input = createInput(renderer.domElement, createTouchControls(root));
 const menu = createMenu(root);
 const audio = createAudio();
+const challenges = createChallengesUi(root, menu, CURRENT_PARK_KEY, PARK, CURRENT_CHALLENGES);
 
 const view = createSkierView(scene);
 const trails = createSkiTrails(scene);
@@ -45,6 +49,7 @@ const loop = createLoop({
     // R (eller Y på gamepad) gir ny runde med en gang; mellomrom eller klikk starter fra start- og resultatskjermen
     const ev = stepGame(game, { raw: input.read(), click: menu.takeClick(), restart: input.takeRestart() }, dt);
     if (ev) menu.onEvent(ev, game);
+    challenges.step(game, ev);
     const m = game.flow.move;
     if (m !== 'none') {
       // flyttet langt: ingen utjevning mellom gammel og ny plass. Ny runde er viktigst (den tømmer også sporet)
@@ -74,7 +79,9 @@ const loop = createLoop({
       landing: tricks.lastLanding, landingAge: tricks.landingAge, fade: fadeAmount(game.fall),
       score: game.score, best: game.best, controls: input.device(), grab: tricks.grabs.held, grabTime: tricks.grabs.holdTime,
     }, frameDt);
-    hud.setOpacity(menu.update(game.flow, frameDt));
+    const hudOpacity = menu.update(game.flow, frameDt);
+    hud.setOpacity(hudOpacity);
+    challenges.update(frameDt, hudOpacity);
     moved = 'none';
     env.follow(chase.camera.position, performance.now() / 1000);
     audio.frame();

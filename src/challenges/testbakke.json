@@ -1,0 +1,13 @@
+{
+  "park": "testbakke",
+  "challenges": [
+    { "id": "ren-360", "text": "Land et rent 360", "type": "trick", "spin": 360 },
+    { "id": "backflip", "text": "Land en backflip", "type": "trick", "flips": 1, "flipDir": "back" },
+    { "id": "grab-1s", "text": "Hold en grab i 1 sekund og land rent", "type": "trick", "grabTime": 1 },
+    { "id": "kombo-1-5", "text": "Få kombo x1,5", "type": "combo", "mult": 1.5 },
+    { "id": "tid-28", "text": "Kom i mål på under 28 sekunder", "type": "time", "seconds": 28 },
+    { "id": "perfekt-pop-alle", "text": "Perfekt pop på alle tre hoppene i én runde", "type": "perfectPops", "count": 3 },
+    { "id": "poeng-3000", "text": "Få minst 3 000 poeng i én runde", "type": "score", "points": 3000 },
+    { "id": "stort-720", "text": "Land et rent 720 på det store hoppet", "type": "trick", "spin": 720, "kicker": "Stort" }
+  ]
+}
