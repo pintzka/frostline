@@ -436,6 +436,18 @@ export const CONFIG = {
   touchDeadzone: 0.06,
   touchCurve: 1.3,
   /**
+   * Mobil-flip: dra styretommelen så mange CSS-piksler opp (frontflip) eller ned (backflip).
+   * Flippen slipper først når tommelen er nærmere enn touchFlipRelease, så den ikke blinker av og på.
+   * Drar du lenger enn touchFlipLeash, følger midtpunktet etter, så du kan snu flippen fort.
+   * touchFlipRecenter: så mange piksler i sekundet flytter midtpunktet seg etter tommelen når den
+   * ikke flipper, så en tommel som sakte glir opp eller ned mens du styrer aldri gir flip.
+   * På bakken gjør flip ingenting, og holder du flip når du letter, sperres den (tricks/controls.ts).
+   */
+  touchFlipThreshold: 50,
+  touchFlipRelease: 30,
+  touchFlipLeash: 70,
+  touchFlipRecenter: 30,
+  /**
    * Brukes flere styringer samtidig (tastatur, gamepad, berøring), vinner den med størst utslag.
    * Den som styrer nå, beholder styringen til en annen er så mye større, så det ikke hopper fram og tilbake.
    */

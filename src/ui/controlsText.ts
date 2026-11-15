@@ -13,5 +13,5 @@ export const CONTROLS: [string, string][] = [
   ['Start på nytt', 'R'],
   ['Pause · lyd · fps', 'P / Esc · M · F'],
   ['Gamepad', 'stikke, A pop, LT/B brems, X/RB/LB grab, Y ny runde, Start pause'],
-  ['Mobil', 'dra tommelen på venstre side, POP og BREMS til høyre'],
+  ['Mobil', 'dra tommelen på venstre side (i lufta: sidelengs spinn, opp/ned flip), POP, BREMS og grabs til høyre'],
 ];

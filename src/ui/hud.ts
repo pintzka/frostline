@@ -89,7 +89,7 @@ export function countUp(shown: number, total: number, dt: number): number {
 const HELP = {
   keyboard: 'Styr: ← → / A D · Brems: ↓ / S · Pop: hold og slipp mellomrom (også av railen) · I lufta: ← → spinn, ↑ / W frontflip, ↓ / S backflip, hold J / K / L grab · Start på nytt: R · Pause: P / Esc · Lyd: M',
   gamepad: 'Styr: venstre stikke · Brems: LT / B · Pop: hold og slipp A · I lufta: stikke sidelengs spinn, opp/ned flip, hold X / RB / LB grab · Start på nytt: Y · Pause: Start',
-  touch: 'Styr: dra tommelen sidelengs på venstre side · POP: hold og slipp · BREMS: hold · I lufta: dra sidelengs for å spinne',
+  touch: 'Venstre tommel: dra sidelengs for å styre · POP: hold og slipp · BREMS: hold · I lufta: dra sidelengs = spinn, dra opp/ned = frontflip/backflip, hold NORDLYS / ISBIT / SNØUGLE = grab',
 } as const;
 
 export function createHud(parent: HTMLElement) {
@@ -180,8 +180,8 @@ export function createHud(parent: HTMLElement) {
       const helpText = HELP[h.controls ?? 'keyboard'];
       if (helpText !== shownHelp) {
         help.textContent = shownHelp = helpText;
-        // på mobil skal teksten ikke gå inn under knappene nede til høyre
-        help.style.maxWidth = h.controls === 'touch' ? 'calc(100vw - 150px)' : '';
+        // på mobil står knappene på høyre halvdel, så teksten holder seg på venstre halvdel
+        help.style.maxWidth = h.controls === 'touch' ? 'calc(50vw - 28px)' : '';
       }
 
       fade.style.opacity = h.fade.toFixed(3);

@@ -1,6 +1,6 @@
 import type { RawControls } from '../tricks/controls';
 import { GRABS } from '../tricks/grabs';
-import { createEdge, createKeyLatch, createSteerTouches, mergeSteer, padInUse, readPad, readPadTricks, type PadInput, type PadTricks } from './logic';
+import { createEdge, createKeyLatch, createSteerTouches, mergeSteer, padInUse, pickGrab, readPad, readPadTricks, type PadInput, type PadTricks } from './logic';
 
 /**
  * Tastatur, gamepad og berøring. Arbeidsstrøm 2 (Kamera og input) eier denne fila.
@@ -8,15 +8,21 @@ import { createEdge, createKeyLatch, createSteerTouches, mergeSteer, padInUse, r
  *   I lufta: A-D/piltaster spinner, W/pil opp er frontflip, S/pil ned er backflip, J/K/L grabs (se tricks/controls.ts).
  * Gamepad: venstre stikke styrer, LT/B bremser, A pop, Y/Back restart, Start = pause.
  *   I lufta: stikka sidelengs spinner, opp/ned (eller piltastene opp/ned) flipper, X/RB/LB grabs.
- * Mobil: dra tommelen sidelengs på venstre halvdel, POP og BREMS nede til høyre. I lufta spinner tommelen.
+ * Mobil: dra tommelen sidelengs på venstre halvdel, POP og BREMS nede til høyre. I lufta spinner tommelen,
+ *   dra den tydelig opp/ned for frontflip/backflip, og hold NORDLYS / ISBIT / SNØUGLE for grab.
  */
 
 /** Knappene og styre-ringen på skjermen (lages i src/ui/touchControls.ts). */
 export interface TouchSurface {
   pop: HTMLElement;
   brake: HTMLElement;
+  /** Nordlys, Isbit, Snøugle (som J, K, L). */
+  grabs: readonly HTMLElement[];
   show(): void;
-  update(stick: { anchorX: number; y: number; x: number; radius: number } | null, popDown: boolean, brakeDown: boolean): void;
+  update(
+    stick: { anchorX: number; y: number; x: number; radius: number; flip: number } | null,
+    pressed: { pop: boolean; brake: boolean; grab: number },
+  ): void;
 }
 
 export type InputDevice = 'keyboard' | 'gamepad' | 'touch';
@@ -45,6 +51,8 @@ export function createInput(target: HTMLElement, touch?: TouchSurface) {
   // fingrene på knappene huskes på samme måte som tastene, så et raskt tapp på POP teller
   const popFingers = createKeyLatch();
   const brakeFingers = createKeyLatch();
+  const grabFingers = [createKeyLatch(), createKeyLatch(), createKeyLatch()];
+  const touchGrab = () => pickGrab(grabFingers.map((f) => f.count() > 0));
 
   const usedTouch = () => { device = 'touch'; touch?.show(); };
   target.addEventListener('pointerdown', (e) => {
@@ -74,12 +82,13 @@ export function createInput(target: HTMLElement, touch?: TouchSurface) {
   if (touch) {
     holdButton(touch.pop, popFingers);
     holdButton(touch.brake, brakeFingers);
+    touch.grabs.forEach((el, i) => holdButton(el, grabFingers[i]));
     // på mobil vises knappene og mobil-hjelpeteksten med en gang
     if (matchMedia('(pointer: coarse)').matches) { device = 'touch'; touch.show(); }
   }
 
   // bytter du app eller fane, slippes alt, så ingenting henger fast
-  const releaseAll = () => { keys.clear(); popFingers.clear(); brakeFingers.clear(); steer.clear(); };
+  const releaseAll = () => { keys.clear(); popFingers.clear(); brakeFingers.clear(); steer.clear(); for (const f of grabFingers) f.clear(); };
   addEventListener('blur', releaseAll);
   document.addEventListener('visibilitychange', () => { if (document.hidden) releaseAll(); });
 
@@ -89,7 +98,11 @@ export function createInput(target: HTMLElement, touch?: TouchSurface) {
   const pauseEdge = createEdge();
   const restartEdge = createEdge();
   const pauseListeners: (() => void)[] = [];
-  function pollPads() {
+  let lastFrame = -1;
+  function pollPads(now: number) {
+    // tommelen trenger tiden mellom bildene, så midtpunktet for flip kan gli sakte etter
+    if (lastFrame >= 0) steer.tick(Math.min(0.1, (now - lastFrame) / 1000));
+    lastFrame = now;
     let next: PadInput = NO_PAD;
     let nextTricks: PadTricks = NO_PAD_TRICKS;
     for (const gp of navigator.getGamepads?.() ?? []) {
@@ -112,7 +125,7 @@ export function createInput(target: HTMLElement, touch?: TouchSurface) {
     pad = next;
     padTricks = nextTricks;
 
-    touch?.update(steer.view(), popFingers.count() > 0, brakeFingers.count() > 0);
+    touch?.update(steer.view(), { pop: popFingers.count() > 0, brake: brakeFingers.count() > 0, grab: touchGrab() });
     requestAnimationFrame(pollPads);
   }
   requestAnimationFrame(pollPads);
@@ -132,15 +145,16 @@ export function createInput(target: HTMLElement, touch?: TouchSurface) {
       const down = has('ArrowDown') || has('KeyS');
       const forward = has('ArrowUp') || has('KeyW');
       state.brake = Math.max(down ? 1 : 0, pad.brake, brakeFingers.count() > 0 ? 1 : 0);
-      state.flip = (forward ? 1 : 0) - (down ? 1 : 0) || padTricks.flip;
+      state.flip = (forward ? 1 : 0) - (down ? 1 : 0) || padTricks.flip || steer.flip();
       state.pop = has('Space') || pad.pop || popFingers.count() > 0;
       // holder du flere grab-taster, vinner den første i lista (J, så K, så L)
       const g = GRABS.findIndex((x) => has(x.key));
-      state.grab = g >= 0 ? ((g + 1) as RawControls['grab']) : padTricks.grab;
+      state.grab = g >= 0 ? ((g + 1) as RawControls['grab']) : padTricks.grab || touchGrab();
       // raske tapp er nå lest; neste avlesning ser bare det som fortsatt holdes
       keys.endRead();
       popFingers.endRead();
       brakeFingers.endRead();
+      for (const f of grabFingers) f.endRead();
       return state;
     },
     /** Slipper alle taster og fingre (f.eks. når spillet fortsetter etter pause), så ingenting henger igjen. */
