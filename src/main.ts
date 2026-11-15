@@ -16,7 +16,7 @@ import { fadeAmount, fallBody, landingWobble } from './tricks/fall';
 import { isSwitch } from './tricks/rotation';
 
 const root = document.getElementById('app')!;
-const { renderer, scene, sun } = createScene(root);
+const { renderer, scene, env, sunFollow } = createScene(root);
 const chase = createChaseCamera(innerWidth / innerHeight);
 addEventListener('resize', () => chase.resize(innerWidth / innerHeight));
 const input = createInput(renderer.domElement);
@@ -97,8 +97,7 @@ const loop = createLoop({
     skierModel.setPose({ ...pose, pitch: pose.pitch + body.pitch + wobble.pitch });
     trails.update(target.x, target.y, target.z, heading, skisOnSnow(game), moved);
 
-    sun.position.set(target.x + 30, target.y + 60, target.z - 20);
-    sun.target.position.copy(target);
+    sunFollow(target);
 
     // den ekte farten: landingene følger flybanen, så den holder seg når du lander
     const v = speedOf(skier);
@@ -110,6 +109,7 @@ const loop = createLoop({
       score: game.score, best: game.best, grab: tricks.grabs.held, grabTime: tricks.grabs.holdTime,
     }, frameDt);
     moved = 'none';
+    env.follow(chase.camera.position, performance.now() / 1000);
     renderer.render(scene, chase.camera);
   },
 });
