@@ -12,6 +12,7 @@ import { poseFor, smoothPose } from './character/pose';
 import { createSkiTrails } from './render/trailMesh';
 import { createTricks, isSwitch, stepTricks } from './tricks/rotation';
 import { createLatch, resetLatch, splitControls } from './tricks/controls';
+import { createScore, scoreLanding, stepScore } from './tricks/score';
 
 const root = document.getElementById('app')!;
 const { renderer, scene, sun } = createScene(root);
@@ -29,6 +30,8 @@ let skier = createSkier();
 let prev = { ...skier };
 let tricks = createTricks();
 let prevTricks = { ...tricks };
+let score = createScore();
+let best = 0;
 const latch = createLatch();
 const startZ = skier.z;
 
@@ -49,6 +52,9 @@ function newRun() {
   skier = createSkier();
   tricks = createTricks();
   resetLatch(latch);
+  // husk beste poengsum, start poengene på nytt
+  best = Math.max(best, score.total);
+  score = createScore();
   pose = standingPose();
   up.copy(Y);
 }
@@ -63,7 +69,11 @@ const loop = createLoop({
     // på bakken styrer tastene skiene, i lufta spinner og flipper de
     const c = splitControls(input.read(), skier.grounded, latch, dt);
     stepSkier(skier, c.skier, dt);
-    stepTricks(tricks, { spin: c.spin, flip: c.flip, grounded: skier.grounded }, dt);
+    const perfectPop = skier.lastPop === 'perfekt' && skier.popAge < 0.05;
+    stepTricks(tricks, { spin: c.spin, flip: c.flip, grab: c.grab, grounded: skier.grounded, perfectPop }, dt);
+    // poeng og kombo: regnes ut én gang når du lander
+    if (tricks.justLanded && tricks.lastLanding) scoreLanding(score, tricks.lastLanding);
+    stepScore(score, skier.grounded, dt);
   },
   render(alpha, frameDt) {
     target.set(
@@ -92,6 +102,7 @@ const loop = createLoop({
       grounded: skier.grounded, popCharge: skier.popCharge, airTime: skier.airTime,
       heightAboveSnow: target.y - heightAt(target.x, target.z), sinceLanding: skier.sinceLanding,
     }), frameDt);
+    skierModel.setGrab(tricks.grabs.blend, pose.skiLift);
     skierModel.setPose(pose);
     trails.update(target.x, target.y, target.z, heading, skier.grounded);
 
@@ -105,6 +116,7 @@ const loop = createLoop({
       speed: v, distance: skier.z - startZ, airTime: skier.airTime, inAir: !skier.grounded,
       popCharge: skier.popCharge, lastPop: skier.lastPop, popAge: skier.popAge,
       landing: tricks.lastLanding, landingAge: tricks.landingAge,
+      score, best, grab: tricks.grabs.held, grabTime: tricks.grabs.holdTime,
     });
     renderer.render(scene, chase.camera);
   },

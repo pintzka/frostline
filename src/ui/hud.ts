@@ -1,5 +1,7 @@
 import { CONFIG } from '../core/config';
 import type { Landing } from '../tricks/rotation';
+import { comboMult, type ScoreState, type TrickResult } from '../tricks/score';
+import { grabName, type GrabKind } from '../tricks/grabs';
 
 /**
  * Enkel HUD. Arbeidsstrøm 8 (UI og flyt) eier denne fila.
@@ -20,6 +22,13 @@ export interface HudInfo {
   /** siste landing (triksnavn og ren/slurvete/fall), og hvor mange sekunder siden */
   landing: Landing | null;
   landingAge: number;
+  /** poeng, kombo og siste triks med poeng */
+  score: ScoreState;
+  /** beste poengsum i en tidligere runde (0 = ingen ennå) */
+  best: number;
+  /** grabben du holder nå i lufta, og hvor lenge */
+  grab: GrabKind;
+  grabTime: number;
 }
 
 const LANDING_TEXT = { ren: 'Ren landing', slurvete: 'Slurvete landing', fall: 'Fall' } as const;
@@ -29,6 +38,34 @@ const LANDING_COLOR = { ren: '#7fe3ff', slurvete: '#ffd166', fall: '#ff6b6b' } a
 export function landingText(l: Landing | null): { title: string; sub: string } {
   if (!l || (l.name === '' && l.quality === 'ren')) return { title: '', sub: '' };
   return { title: l.name, sub: LANDING_TEXT[l.quality] };
+}
+
+/** 4200 → «4 200». Samme resultat på alle maskiner (bruker ikke språkinnstillingene). */
+export function formatPoints(n: number): string {
+  return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+}
+
+/** 1.5 → «x1,5» */
+export function formatMult(m: number): string {
+  return 'x' + String(Math.round(m * 100) / 100).replace('.', ',');
+}
+
+/** Teksten etter et triks med poeng: «720 + Backflip + Nordlys · 4 200» og en linje under. */
+export function resultText(r: TrickResult): { title: string; sub: string } {
+  const title = r.points > 0 ? `${r.name} · ${formatPoints(r.points)}` : r.name;
+  const parts: string[] = [LANDING_TEXT[r.quality]];
+  if (r.tooSmall) parts.push('for lite for poeng');
+  if (r.points > 0 && r.combo > 1) parts.push(`kombo ${formatMult(r.combo)}`);
+  if (r.points > 0 && r.repeat < 1) parts.push(`gjentatt ${Math.round(r.repeat * 100)} %`);
+  return { title, sub: parts.join(' · ') };
+}
+
+/** Myk inn og ut: 0 → 1 de første 0,2 s, og ned til 0 det siste halve sekundet. */
+export function fadeInOut(age: number, showTime: number): number {
+  if (age < 0 || age >= showTime) return 0;
+  const inn = Math.min(1, age / 0.2);
+  const out = Math.min(1, (showTime - age) * 2);
+  return Math.min(inn * inn * (3 - 2 * inn), out);
 }
 
 export function createHud(root: HTMLElement) {
@@ -52,16 +89,46 @@ export function createHud(root: HTMLElement) {
 
   // triksnavn og landing, litt under pop-teksten
   const trick = document.createElement('div');
-  trick.style.cssText = 'position:fixed;left:0;right:0;top:38%;text-align:center;color:#fff;font:800 44px system-ui,sans-serif;text-shadow:0 2px 8px #0009;pointer-events:none;opacity:0;';
+  trick.style.cssText = 'position:fixed;left:0;right:0;top:38%;text-align:center;color:#fff;font:800 44px system-ui,sans-serif;text-shadow:0 0 3px #000c,0 2px 12px #000a;pointer-events:none;opacity:0;';
   const trickName = document.createElement('div');
   const trickSub = document.createElement('div');
   trickSub.style.cssText = 'font:700 22px system-ui,sans-serif;';
   trick.append(trickName, trickSub);
   root.appendChild(trick);
 
+  // poeng og kombo, oppe til høyre
+  const scoreBox = document.createElement('div');
+  scoreBox.style.cssText = 'position:fixed;right:16px;top:12px;text-align:right;color:#fff;text-shadow:0 1px 3px #0008;pointer-events:none;';
+  const total = document.createElement('div');
+  total.style.cssText = 'font:800 34px system-ui,sans-serif;font-variant-numeric:tabular-nums;';
+  total.textContent = '0';
+  const combo = document.createElement('div');
+  combo.style.cssText = 'opacity:0;transition:opacity .4s;';
+  const comboText = document.createElement('div');
+  comboText.style.cssText = 'font:700 20px system-ui,sans-serif;color:#7fe3ff;';
+  const comboBar = document.createElement('div');
+  comboBar.style.cssText = 'margin:4px 0 0 auto;width:110px;height:4px;border-radius:2px;background:#0005;overflow:hidden;';
+  const comboFill = document.createElement('div');
+  comboFill.style.cssText = 'height:100%;width:100%;background:#7fe3ff;';
+  comboBar.appendChild(comboFill);
+  combo.append(comboText, comboBar);
+  const bestEl = document.createElement('div');
+  bestEl.style.cssText = 'font:600 14px system-ui,sans-serif;color:#fffc;';
+  scoreBox.append(total, bestEl, combo);
+  root.appendChild(scoreBox);
+  let shownTotal = 0;
+  let lastTime = performance.now();
+  /** sekunder siden forrige bilde (for den myke opptellingen) */
+  const frameDt = () => { const now = performance.now(); const d = Math.min(0.1, (now - lastTime) / 1000); lastTime = now; return d; };
+
+  // grabben du holder, over ladestolpen
+  const grab = document.createElement('div');
+  grab.style.cssText = 'position:fixed;left:0;right:0;bottom:84px;text-align:center;color:#fff;font:700 24px system-ui,sans-serif;text-shadow:0 0 3px #000c,0 2px 8px #000a;pointer-events:none;opacity:0;transition:opacity .15s;';
+  root.appendChild(grab);
+
   const help = document.createElement('div');
   help.style.cssText = 'position:fixed;left:16px;bottom:16px;color:#fffc;font:14px system-ui,sans-serif;pointer-events:none;';
-  help.textContent = 'Styr: ← → / A D · Brems: ↓ / S · Pop: hold og slipp mellomrom · I lufta: ← → spinn, ↑ / W frontflip, ↓ / S backflip · Start på nytt: R · Mobil: trykk venstre/høyre';
+  help.textContent = 'Styr: ← → / A D · Brems: ↓ / S · Pop: hold og slipp mellomrom · I lufta: ← → spinn, ↑ / W frontflip, ↓ / S backflip, hold J / K / L grab · Start på nytt: R · Mobil: trykk venstre/høyre';
   root.appendChild(help);
 
   return {
@@ -78,14 +145,36 @@ export function createHud(root: HTMLElement) {
       const show = h.lastPop === 'perfekt' && h.popAge < 1.2;
       flash.style.opacity = show ? String(Math.min(1, (1.2 - h.popAge) * 2)) : '0';
 
-      const t = landingText(h.landing);
-      const left = CONFIG.trickShowTime - h.landingAge;
-      if (t.sub && left > 0) {
-        trickName.textContent = t.title;
-        trickSub.textContent = t.sub;
-        trickSub.style.color = LANDING_COLOR[h.landing!.quality];
-        trick.style.opacity = String(Math.min(1, left * 2));
-      } else trick.style.opacity = '0';
+      // triksnavn og poeng: glir inn ovenfra og blekner mykt bort (ingen blinking)
+      const r = h.score.last;
+      const a = r ? fadeInOut(h.score.lastAge, CONFIG.trickShowTime) : 0;
+      if (r && a > 0) {
+        const t = resultText(r);
+        if (trickName.textContent !== t.title) trickName.textContent = t.title;
+        if (trickSub.textContent !== t.sub) trickSub.textContent = t.sub;
+        trickSub.style.color = LANDING_COLOR[r.quality];
+        const slide = Math.max(0, 1 - h.score.lastAge / 0.25);
+        trick.style.transform = `translateY(${(-10 * slide * slide).toFixed(1)}px)`;
+      }
+      trick.style.opacity = a.toFixed(3);
+
+      // totalen teller seg mykt opp til riktig tall i stedet for å hoppe
+      shownTotal += (h.score.total - shownTotal) * (1 - Math.exp(-8 * frameDt()));
+      if (Math.abs(h.score.total - shownTotal) < 1) shownTotal = h.score.total;
+      total.textContent = formatPoints(shownTotal);
+      bestEl.textContent = h.best > 0 ? `Beste runde ${formatPoints(h.best)}` : '';
+      const m = comboMult(h.score);
+      combo.style.opacity = m > 1 ? '1' : '0';
+      if (m > 1) {
+        comboText.textContent = `Kombo ${formatMult(m)}`;
+        comboFill.style.width = `${Math.max(0, 1 - h.score.comboIdle / CONFIG.comboTimeout) * 100}%`;
+      }
+
+      // grabben du holder: svak før den teller (0,3 s), tydelig når den teller
+      if (h.grab) {
+        grab.textContent = `${grabName(h.grab)} ${h.grabTime.toFixed(1).replace('.', ',')} s`;
+        grab.style.opacity = h.grabTime >= CONFIG.grabMinHold ? '1' : '0.45';
+      } else grab.style.opacity = '0';
     },
   };
 }

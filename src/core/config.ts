@@ -106,8 +106,42 @@ export const CONFIG = {
   landKeyLock: 0.25,
   /** Skiløperen roterer rundt dette punktet (m over føttene), ca. midt på kroppen. */
   trickPivotHeight: 1.0,
-  /** Sekunder triksnavnet vises etter landing. */
-  trickShowTime: 1.6,
+  /** Sekunder triksnavnet og poengene vises etter landing. */
+  trickShowTime: 2.2,
+
+  // --- Grabs (src/tricks/grabs.ts) ---
+  /** En grab må holdes minst så lenge (s) i lufta for å telle. */
+  grabMinHold: 0.3,
+  /** Hvor fort kroppen bøyer seg mot skiene når du holder grab, og retter seg når du slipper (per sekund). */
+  grabBlendIn: 12,
+  grabBlendOut: 9,
+
+  // --- Poeng (src/tricks/score.ts). Se tabellen i docs/DESIGN.md ---
+  /** Grunnpoeng for spinn, etter antall halve runder: 0, 180, 360, 540, 720, 900, 1080, 1260, 1440, 1620. */
+  spinPoints: [0, 50, 150, 400, 800, 1400, 2200, 3200, 4400, 5800],
+  /** Hver halve runde over tabellen gir så mye ekstra. */
+  spinPointsExtra: 1500,
+  /** Ekstra poeng for flips: 0, 1, 2 og 3 hele flips. */
+  flipPoints: [0, 700, 1800, 3200],
+  flipPointsExtra: 1600,
+  /** En grab som teller gir så mange poeng, og ganger hele trikset med grabStartMult. */
+  grabPoints: 300,
+  grabStartMult: 1.25,
+  /** Gangetallet vokser så mye per sekund du holder grabben etter 0,3 s, opp til grabMaxMult. */
+  grabMultPerSec: 0.5,
+  grabMaxMult: 2,
+  /** Perfekt pop ganger trikset med så mye. */
+  popPerfectMult: 1.2,
+  /** Slurvete landing gir denne andelen, fall gir null. */
+  sloppyShare: 0.5,
+  /** Samme triks igjen på rad: ganges med dette for hver gang (0,6 = 60 %, 36 %, ...), men aldri under repeatMin. */
+  repeatFactor: 0.6,
+  repeatMin: 0.2,
+  /** Kombo: hvert ekte triks med ren landing øker gangetallet så mye, opp til comboMax. */
+  comboStep: 0.25,
+  comboMax: 4,
+  /** Så mange sekunder på snøen uten nytt ekte triks før komboen nullstilles. */
+  comboTimeout: 9,
 } as const;
 
 export type Config = typeof CONFIG;

@@ -1,4 +1,5 @@
 import { CONFIG } from '../core/config';
+import { countedGrab, createGrabs, grabName, resetGrabJump, stepGrabs, type GrabKind, type GrabState } from './grabs';
 
 /**
  * Spinn og flips i lufta. Ren logikk uten three.js, så den kan testes.
@@ -21,6 +22,21 @@ export interface Landing {
   /** Hvor langt unna en hel eller halv runde (spinn) og stående (flip) du landet (grader). */
   spinErrDeg: number;
   flipErrDeg: number;
+  /** Grabben som telte (0 = ingen), og hvor lenge den ble holdt (s). */
+  grab: GrabKind;
+  grabTime: number;
+  /** Startet hoppet med en perfekt pop? */
+  perfectPop: boolean;
+  /** Startet hoppet baklengs (switch)? */
+  fromSwitch: boolean;
+}
+
+/** Det som skjedde i hoppet i tillegg til rotasjonen. */
+export interface JumpExtras {
+  grab?: GrabKind;
+  grabTime?: number;
+  perfectPop?: boolean;
+  fromSwitch?: boolean;
 }
 
 export interface TrickInput {
@@ -30,6 +46,10 @@ export interface TrickInput {
   flip: number;
   /** står skiløperen på snøen etter dette fysikksteget? */
   grounded: boolean;
+  /** grabben som holdes (0 = ingen) */
+  grab?: GrabKind;
+  /** var hoppet en perfekt pop? Leses i steget hoppet starter. */
+  perfectPop?: boolean;
 }
 
 export interface TrickState {
@@ -49,6 +69,12 @@ export interface TrickState {
   lastLanding: Landing | null;
   /** Sekunder siden siste landing. */
   landingAge: number;
+  /** Sant bare i steget skiløperen landet. */
+  justLanded: boolean;
+  grabs: GrabState;
+  /** Om hoppet som pågår startet med perfekt pop, og om det startet baklengs. */
+  jumpPerfectPop: boolean;
+  jumpFromSwitch: boolean;
 }
 
 const DEG = Math.PI / 180;
@@ -59,7 +85,8 @@ export function createTricks(): TrickState {
   return {
     spin: 0, spinRate: 0, flip: 0, flipRate: 0, inAir: false,
     spinStart: 0, flipStart: 0, spinTarget: 0, flipTarget: 0,
-    lastLanding: null, landingAge: 99,
+    lastLanding: null, landingAge: 99, justLanded: false,
+    grabs: createGrabs(), jumpPerfectPop: false, jumpFromSwitch: false,
   };
 }
 
@@ -71,7 +98,7 @@ function offBy(angle: number, step: number): number {
 const FLIP_WORDS = ['', '', 'Dobbel ', 'Trippel '];
 
 /** Lager navnet på trikset ut fra hvor mye du roterte (rad). */
-export function trickName(spin: number, flip: number): string {
+export function trickName(spin: number, flip: number, grab: GrabKind = 0): string {
   const parts: string[] = [];
   // en rotasjon teller bare når den er nesten hel: innenfor det som fortsatt er en slurvete landing
   const spinTol = (CONFIG.landSpinClean + CONFIG.landSloppyExtra) * DEG;
@@ -85,18 +112,23 @@ export function trickName(spin: number, flip: number): string {
     const full = word + kind;
     parts.push(full.charAt(0).toUpperCase() + full.slice(1));
   }
+  if (grab) parts.push(grabName(grab));
   return parts.join(' + ');
 }
 
 /** Ren, slurvete eller fall, ut fra hvor mye du roterte i hoppet (rad). */
-export function judgeLanding(spin: number, flip: number): Landing {
+export function judgeLanding(spin: number, flip: number, extras: JumpExtras = {}): Landing {
   const spinErrDeg = offBy(spin, HALF);
   const flipErrDeg = offBy(flip, TURN);
   const extra = CONFIG.landSloppyExtra;
   let quality: LandingQuality = 'fall';
   if (spinErrDeg <= CONFIG.landSpinClean && flipErrDeg <= CONFIG.landFlipClean) quality = 'ren';
   else if (spinErrDeg <= CONFIG.landSpinClean + extra && flipErrDeg <= CONFIG.landFlipClean + extra) quality = 'slurvete';
-  return { quality, name: trickName(spin, flip), spinDeg: spin / DEG, flipDeg: flip / DEG, spinErrDeg, flipErrDeg };
+  const grab = extras.grab ?? 0;
+  return {
+    quality, name: trickName(spin, flip, grab), spinDeg: spin / DEG, flipDeg: flip / DEG, spinErrDeg, flipErrDeg,
+    grab, grabTime: extras.grabTime ?? 0, perfectPop: !!extras.perfectPop, fromSwitch: !!extras.fromSwitch,
+  };
 }
 
 /** Jevn brems (rad/s²) som gjør at full fart glir akkurat coastDeg grader etter slipp. */
@@ -137,12 +169,16 @@ function settle(x: number, v: number, target: number, w: number, dt: number): [n
 
 export function stepTricks(t: TrickState, inp: TrickInput, dt: number): void {
   t.landingAge += dt;
+  t.justLanded = false;
 
   // avsats: hoppet starter, rotasjonen måles fra stillingen kroppen skulle stå i
   if (!inp.grounded && !t.inAir) {
     t.inAir = true;
     t.spinStart = t.spinTarget;
     t.flipStart = t.flipTarget;
+    t.jumpPerfectPop = !!inp.perfectPop;
+    t.jumpFromSwitch = isSwitch(t);
+    resetGrabJump(t.grabs);
   }
 
   if (t.inAir && inp.grounded) {
@@ -150,12 +186,19 @@ export function stepTricks(t: TrickState, inp: TrickInput, dt: number): void {
     t.inAir = false;
     const ds = t.spin - t.spinStart;
     const df = t.flip - t.flipStart;
-    t.lastLanding = judgeLanding(ds, df);
+    const g = countedGrab(t.grabs);
+    t.lastLanding = judgeLanding(ds, df, {
+      grab: g, grabTime: g ? t.grabs.bestTime : 0, perfectPop: t.jumpPerfectPop, fromSwitch: t.jumpFromSwitch,
+    });
     t.landingAge = 0;
+    t.justLanded = true;
     // spinn: nærmeste halve runde (en halv runde = du kjører baklengs, switch). Flip: nærmeste hele runde.
     t.spinTarget = t.spinStart + Math.round(ds / HALF) * HALF;
     t.flipTarget = t.flipStart + Math.round(df / TURN) * TURN;
   }
+
+  // grab: teller bare i lufta; på bakken slipper kroppen mykt
+  stepGrabs(t.grabs, inp.grab ?? 0, t.inAir, dt);
 
   if (t.inAir) {
     t.spinRate = approach(t.spinRate, inp.spin, CONFIG.spinSpeedDeg * DEG, CONFIG.spinBuild, CONFIG.spinCoastDeg, dt);

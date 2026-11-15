@@ -1,12 +1,13 @@
 import { CONFIG } from '../core/config';
 import type { SkierInput } from '../physics/skier';
+import type { GrabKind } from './grabs';
 
 /**
  * Fordeler tastene mellom kjøring og triks. Ren logikk uten three.js.
  * Arbeidsstrøm 3 (Triks og poeng) eier denne fila.
  *
  * På bakken: venstre/høyre styrer, S/pil ned bremser.
- * I lufta: venstre/høyre spinner, W/pil opp er frontflip, S/pil ned er backflip.
+ * I lufta: venstre/høyre spinner, W/pil opp er frontflip, S/pil ned er backflip, J/K/L er grabs.
  *
  * To sperrer, så du ikke får triks eller svinger du ikke mente:
  * - Holder du en tast når du letter (f.eks. carving over kanten), starter den ikke spinn eller flip.
@@ -20,6 +21,8 @@ export interface RawControls {
   /** 1 = W/pil opp, -1 = S/pil ned */
   flip: number;
   pop?: boolean;
+  /** Grab-tasten som holdes: 0 = ingen, 1 = J, 2 = K, 3 = L. */
+  grab?: GrabKind;
 }
 
 export interface ControlLatch {
@@ -49,7 +52,7 @@ export function resetLatch(latch: ControlLatch): void {
   Object.assign(latch, createLatch());
 }
 
-export function splitControls(raw: RawControls, grounded: boolean, latch: ControlLatch, dt: number): { skier: SkierInput; spin: number; flip: number } {
+export function splitControls(raw: RawControls, grounded: boolean, latch: ControlLatch, dt: number): { skier: SkierInput; spin: number; flip: number; grab: GrabKind } {
   if (!grounded) {
     // akkurat lettet: tastene som allerede ble holdt på bakken, teller ikke som triks
     if (latch.wasGrounded) { latch.spinBlock = latch.groundSteer; latch.flipBlock = latch.groundFlip; }
@@ -59,7 +62,7 @@ export function splitControls(raw: RawControls, grounded: boolean, latch: Contro
     const spin = latch.spinBlock !== 0 ? 0 : raw.steer;
     const flip = latch.flipBlock !== 0 ? 0 : raw.flip;
     latch.lastSpin = spin; latch.lastFlip = flip;
-    return { skier: { steer: 0, brake: 0, pop: raw.pop }, spin, flip };
+    return { skier: { steer: 0, brake: 0, pop: raw.pop }, spin, flip, grab: raw.grab ?? 0 };
   }
 
   if (!latch.wasGrounded) {
@@ -79,5 +82,6 @@ export function splitControls(raw: RawControls, grounded: boolean, latch: Contro
     skier: { steer: latch.steerBlock !== 0 ? 0 : raw.steer, brake: latch.brakeBlock ? 0 : raw.brake, pop: raw.pop },
     spin: 0,
     flip: 0,
+    grab: 0,
   };
 }

@@ -15,6 +15,20 @@ export function createPlaceholderSkier() {
   head.position.y = 1.75;
   upper.add(body, head);
 
+  // armer: henger fra skuldrene og kan strekke seg mot skiene i en grab
+  const armGeo = new THREE.BoxGeometry(0.09, 0.7, 0.09);
+  const arms: THREE.Group[] = [];
+  for (const ax of [-0.33, 0.33]) {
+    const shoulder = new THREE.Group();
+    shoulder.position.set(ax, 1.32, 0);
+    const arm = new THREE.Mesh(armGeo, mat);
+    arm.position.y = -0.35;
+    shoulder.add(arm);
+    upper.add(shoulder);
+    arms.push(shoulder);
+  }
+  const [rightArm, leftArm] = arms;
+
   const skiMat = new THREE.MeshStandardMaterial({ color: 0x1b1f24 });
   const skis: THREE.Mesh[] = [];
   for (const sx of [-CONFIG.skiGap / 2, CONFIG.skiGap / 2]) {
@@ -32,8 +46,26 @@ export function createPlaceholderSkier() {
   root.add(pivot);
   root.traverse((o) => { if (o instanceof THREE.Mesh) o.castShadow = true; });
 
+  // hvor mye hver grab bøyer kroppen. Bøyen glir mykt (tricks/grabs.ts), så figuren hopper aldri.
+  let grabDrop = 0, grabPitch = 0, grabLift = 0;
+
   return {
     root,
+    /**
+     * Grab fra tricks/grabs.ts: blend er hvor mye hver av de tre grabbene holdes (0–1).
+     * tuck er hvor høyt skiene er trukket opp (fra pose.ts); nær snøen senkes skiene igjen før landing.
+     * 1 Nordlys: høyre hånd fram til skituppene. 2 Isbit: begge hender ned til midten. 3 Snøugle: venstre hånd bak til hælene.
+     */
+    setGrab(blend: readonly number[], tuck: number) {
+      const [a, b, c] = blend;
+      grabPitch = 0.35 * a + 0.45 * b + 0.12 * c;
+      grabDrop = 0.12 * a + 0.22 * b + 0.08 * c;
+      grabLift = 0.18 * Math.min(1, a + b + c) * Math.min(1, Math.max(0, tuck / 0.3));
+      // armene: negativ x-rotasjon er fram, positiv er bak
+      rightArm.rotation.set(-0.15 - 1.25 * a - 0.45 * b, 0, -0.12 + 0.1 * b);
+      leftArm.rotation.set(-0.15 - 0.45 * b + 1.0 * c, 0, 0.12 - 0.1 * b);
+      upper.rotation.y = 0.3 * c - 0.15 * a;
+    },
     /** Lener kroppen inn i svingen (rad, positiv = mot høyre). Skiene vipper bare litt på kanten. */
     setLean(lean: number) {
       upper.rotation.z = lean;
@@ -51,9 +83,9 @@ export function createPlaceholderSkier() {
      * og skiene trekkes opp under kroppen i lufta. Formen på kroppen endres ikke.
      */
     setPose(p: { drop: number; pitch: number; skiLift: number }) {
-      upper.position.y = -p.drop;
-      upper.rotation.x = p.pitch;
-      for (const ski of skis) ski.position.y = 0.02 + p.skiLift;
+      upper.position.y = -(p.drop + grabDrop);
+      upper.rotation.x = p.pitch + grabPitch;
+      for (const ski of skis) ski.position.y = 0.02 + p.skiLift + grabLift;
     },
   };
 }

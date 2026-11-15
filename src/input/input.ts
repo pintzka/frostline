@@ -1,9 +1,10 @@
 import type { RawControls } from '../tricks/controls';
+import { GRABS } from '../tricks/grabs';
 
 /**
  * Tastatur + berøring. Arbeidsstrøm 2 (Kamera og input) eier denne fila.
  * Piltaster/A-D styrer, S/pil ned bremser, mellomrom lader pop (slipp for å sprette). På mobil: venstre/høyre halvdel av skjermen.
- * I lufta: A-D/piltaster spinner, W/pil opp er frontflip, S/pil ned er backflip (se tricks/controls.ts).
+ * I lufta: A-D/piltaster spinner, W/pil opp er frontflip, S/pil ned er backflip, J/K/L grabs (se tricks/controls.ts og tricks/grabs.ts).
  */
 export function createInput(target: HTMLElement) {
   const keys = new Set<string>();
@@ -26,7 +27,7 @@ export function createInput(target: HTMLElement) {
   target.addEventListener('touchmove', onTouch, { passive: false });
   target.addEventListener('touchend', onTouch, { passive: false });
 
-  const state: RawControls = { steer: 0, brake: 0, flip: 0, pop: false };
+  const state: RawControls = { steer: 0, brake: 0, flip: 0, pop: false, grab: 0 };
   return {
     read(): RawControls {
       const left = keys.has('ArrowLeft') || keys.has('KeyA');
@@ -37,6 +38,9 @@ export function createInput(target: HTMLElement) {
       state.brake = down ? 1 : 0;
       state.flip = (forward ? 1 : 0) - (down ? 1 : 0);
       state.pop = keys.has('Space');
+      // holder du flere grab-taster, vinner den første i lista (J, så K, så L)
+      const g = GRABS.findIndex((x) => keys.has(x.key));
+      state.grab = (g + 1) as RawControls['grab'];
       return state;
     },
     pressed(code: string) { return keys.has(code); },
