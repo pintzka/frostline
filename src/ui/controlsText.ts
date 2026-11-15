@@ -8,6 +8,7 @@ export const CONTROLS: [string, string][] = [
   ['Pop', 'hold og slipp mellomrom (slipp rett før kanten = perfekt)'],
   ['Spinn i lufta', '← → / A D'],
   ['Frontflip / backflip', '↑ / W · ↓ / S'],
+  ['Cork / rodeo', 'spinn + W (cork) eller S (rodeo) rett etter kanten'],
   ['Grab i lufta', 'hold J / K / L (slipp før landing)'],
   ['Rail og boks', 'kjør opp rampen eller pop opp på den; på tvers = boardslide. Ikke hold styring for lenge, pop = hopp av'],
   ['Start på nytt', 'R'],
