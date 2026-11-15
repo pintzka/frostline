@@ -87,7 +87,7 @@ export function countUp(shown: number, total: number, dt: number): number {
 }
 
 const HELP = {
-  keyboard: 'Styr: ← → / A D · Brems: ↓ / S · Pop: hold og slipp mellomrom (også av railen) · I lufta: ← → spinn, ↑ / W frontflip, ↓ / S backflip, hold J / K / L grab · Start på nytt: R · Pause: P / Esc · Lyd: M',
+  keyboard: 'Styr: ← → / A D · Brems: ↓ / S · Pop: hold og slipp mellomrom (også av railen) · I lufta: ← → spinn, ↑ / W frontflip, ↓ / S backflip, hold J / K / L grab · Start på nytt: R · Pause: P / Esc · Lyd: M · FPS: F',
   gamepad: 'Styr: venstre stikke · Brems: LT / B · Pop: hold og slipp A · I lufta: stikke sidelengs spinn, opp/ned flip, hold X / RB / LB grab · Start på nytt: Y · Pause: Start',
   touch: 'Venstre tommel: dra sidelengs for å styre · POP: hold og slipp · BREMS: hold · I lufta: dra sidelengs = spinn, dra opp/ned = frontflip/backflip, hold NORDLYS / ISBIT / SNØUGLE = grab',
 } as const;
