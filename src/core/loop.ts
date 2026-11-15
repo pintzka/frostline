@@ -1,6 +1,7 @@
 /**
  * Fast-steg-løkke: fysikken kjører alltid med samme dt, uansett skjermens fps.
  * render() får alpha (0–1) for å interpolere mellom forrige og nåværende tilstand.
+ * På pause står fysikken helt stille, men bildet tegnes fortsatt, og tiden på pause tas ikke igjen.
  */
 export function createLoop(opts: {
   hz: number;
@@ -13,9 +14,17 @@ export function createLoop(opts: {
   let acc = 0;
   let last = -1;
   let raf = 0;
+  let paused = false;
 
   function frame(now: number) {
     const t = now / 1000;
+    if (paused) {
+      // ingen fysikk; husk tiden så vi ikke tar den igjen når pausen slutter
+      last = t;
+      opts.render(acc / dt, 0);
+      raf = requestAnimationFrame(frame);
+      return;
+    }
     const frameDt = last < 0 ? 0 : Math.min(t - last, 0.25);
     last = t;
     acc += frameDt;
@@ -33,5 +42,10 @@ export function createLoop(opts: {
   return {
     start() { raf = requestAnimationFrame(frame); },
     stop() { cancelAnimationFrame(raf); last = -1; acc = 0; },
+    pause() { paused = true; },
+    resume() { paused = false; },
+    /** Bytter mellom pause og spill. Gir true hvis spillet nå er på pause. */
+    toggle() { paused = !paused; return paused; },
+    isPaused() { return paused; },
   };
 }

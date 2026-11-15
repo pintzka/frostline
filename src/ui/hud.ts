@@ -95,8 +95,8 @@ export function countUp(shown: number, total: number, dt: number): number {
 }
 
 const HELP = {
-  keyboard: 'Styr: ← → / A D · Brems: ↓ / S · Pop: hold og slipp mellomrom · I lufta: ← → spinn, ↑ / W frontflip, ↓ / S backflip, hold J / K / L grab · Start på nytt: R',
-  gamepad: 'Styr: venstre stikke · Brems: LT / B · Pop: hold og slipp A · I lufta: stikke sidelengs spinn, opp/ned flip, hold X / RB / LB grab · Start på nytt: Y',
+  keyboard: 'Styr: ← → / A D · Brems: ↓ / S · Pop: hold og slipp mellomrom · I lufta: ← → spinn, ↑ / W frontflip, ↓ / S backflip, hold J / K / L grab · Start på nytt: R · Pause: P / Esc · Lyd: M',
+  gamepad: 'Styr: venstre stikke · Brems: LT / B · Pop: hold og slipp A · I lufta: stikke sidelengs spinn, opp/ned flip, hold X / RB / LB grab · Start på nytt: Y · Pause: Start',
   touch: 'Styr: dra tommelen sidelengs på venstre side · POP: hold og slipp · BREMS: hold · I lufta: dra sidelengs for å spinne',
 } as const;
 
@@ -135,7 +135,7 @@ export function createHud(root: HTMLElement) {
 
   // poeng og kombo, oppe til høyre
   const scoreBox = document.createElement('div');
-  scoreBox.style.cssText = 'position:fixed;right:16px;top:12px;text-align:right;color:#fff;text-shadow:0 1px 3px #0008;pointer-events:none;';
+  scoreBox.style.cssText = 'position:fixed;right:16px;top:60px;text-align:right;color:#fff;text-shadow:0 1px 3px #0008;pointer-events:none;';
   const total = document.createElement('div');
   total.style.cssText = 'font:800 34px system-ui,sans-serif;font-variant-numeric:tabular-nums;';
   total.textContent = '0';

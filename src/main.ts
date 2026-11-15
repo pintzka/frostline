@@ -7,6 +7,7 @@ import { createChaseCamera } from './camera/chase';
 import { createScene } from './render/scene';
 import { createHud } from './ui/hud';
 import { createTouchControls } from './ui/touchControls';
+import { createPauseUi } from './ui/pause';
 import { createPlaceholderSkier } from './character/placeholder';
 import { heightAt, normalAt } from './park/terrain';
 import { poseFor, smoothPose } from './character/pose';
@@ -126,3 +127,12 @@ const loop = createLoop({
   },
 });
 loop.start();
+
+// pause: fysikken står, lyden tones ned, og R trykket på pause gir ikke ny runde når du fortsetter
+const pausable = {
+  pause() { loop.pause(); audio.suspend(); },
+  resume() { input.takeRestart(); loop.resume(); audio.resume(); },
+  toggle() { if (loop.isPaused()) pausable.resume(); else pausable.pause(); return loop.isPaused(); },
+  isPaused: () => loop.isPaused(),
+};
+input.onPause(createPauseUi(root, pausable).toggle);

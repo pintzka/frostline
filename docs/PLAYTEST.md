@@ -19,3 +19,4 @@ Tips: Ta opptak av feilen med Windows + Shift + R og legg det ved.
 | 2026-11-10 | fase-1-restart | Testet sammen med leningen | Ingenting meldt | Gå til neste steg |
 | 2026-11-10 | Fase 1 (port) | «Ja, start fase 2»: gøy nok bare å kjøre | – | Start fase 2 |
 | 2026-11-10 | fase-2-hopp | «Dette er bra» | Første versjon: hakkete letting, brått oppover og brå landing, mest på det lille hoppet (rettet: myke ramper maks 2,1 g, platå og bratte landinger 1–5°) | Fortsett |
+| 2026-11-10 | fase-2-pause | «Dette er bra» | Ingenting meldt (ønsket fordi spillet kjørte i det uendelige) | Fortsett |
