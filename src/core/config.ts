@@ -170,11 +170,11 @@ export const CONFIG = {
   hudSlidePx: 10,
   /** Hvor fort totalen teller seg opp (per sekund). */
   hudCountUp: 8,
-  /** Lufttiden vises i HUD-en først når du har vært i lufta lenger enn dette (s), så små kuler ikke blinker. */
-/** Hjelpeteksten på mobil står i styresonen: vises så mange sekunder av hver runde, og blekner så bort over hudTouchHelpFade s. */
+  /** Hjelpeteksten på mobil står i styresonen: vises så mange sekunder av hver runde, og blekner så bort over hudTouchHelpFade s. */
   hudTouchHelpTime: 6,
   hudTouchHelpFade: 1,
-    hudAirTimeMin: 0.3,
+  /** Lufttiden vises i HUD-en først når du har vært i lufta lenger enn dette (s), så små kuler ikke blinker. */
+  hudAirTimeMin: 0.3,
 
   // --- Grabs (src/tricks/grabs.ts) ---
   /** En grab må holdes minst så lenge (s) i lufta for å telle. */
