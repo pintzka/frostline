@@ -73,7 +73,7 @@ describe('målet: nærmeste rene stilling i retningen du roterer', () => {
     expect(deg(t(-300))).toBe(-360);
     // for lite: ingen hjelp
     expect(t(225)).toBeNull();
-    expect(t(70 + 180)).toBeNull();
+    expect(t(60 + 180)).toBeNull();
   });
   it('regner med glidet: 300° i full fart glir til ca. 325°, målet er 360', () => {
     expect(deg(t(300, CONFIG.spinSpeedDeg))).toBe(360);
@@ -83,7 +83,7 @@ describe('målet: nærmeste rene stilling i retningen du roterer', () => {
   it(`flip: bare hele runder, opptil ${CONFIG.landAssistFlipAheadDeg}° fram`, () => {
     expect(deg(t(-290, 0, 360))).toBe(-360);
     expect(deg(t(280, 0, 360))).toBe(360);
-    expect(t(-150, 0, 360)).toBeNull();
+    expect(t(-200, 0, 360)).toBeNull();
     expect(t(200, 0, 360)).toBeNull();
     expect(deg(t(20, 0, 360))).toBe(0);
   });

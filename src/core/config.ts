@@ -190,13 +190,13 @@ export const CONFIG = {
    * Slipper du spinn- eller flip-tasten når rotasjonen (med glidet) mangler opptil så mange grader
    * til neste rene stilling (hel/halv runde for spinn, hel runde for flip), fullfører hjelpen rolig resten.
    */
-  landAssistSpinAheadDeg: 100,
-  landAssistFlipAheadDeg: 90,
+  landAssistSpinAheadDeg: 115,
+  landAssistFlipAheadDeg: 110,
   /** Er du litt forbi en ren stilling (opptil så mange grader), trekker hjelpen deg tilbake. */
-  landAssistBackDeg: 30,
+  landAssistBackDeg: 35,
   /** Største fart hjelpen roterer med (grader per sekund). Mye saktere enn spinnfarten du har selv. */
-  landAssistSpinMaxDeg: 120,
-  landAssistFlipMaxDeg: 100,
+  landAssistSpinMaxDeg: 150,
+  landAssistFlipMaxDeg: 120,
   /** Langt fra landingen roterer hjelpen med minst så stor del av største fart; nær landingen opp til full. */
   landAssistMinShare: 0.5,
   /** Hvor fort hjelpe-farten bygger seg opp (grader per sekund per sekund). Bremsing er som glidet når du slipper. */
