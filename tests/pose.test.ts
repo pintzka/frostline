@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { followLeanSign, poseFor, smoothPose, type Pose, type PoseInput } from '../src/character/pose';
 import { CONFIG } from '../src/core/config';
 import { createGame, stepGame } from '../src/core/game';
-import { PARK } from '../src/park/terrain';
 import { isSwitch, spinCoast } from '../src/tricks/rotation';
 
 const standing: PoseInput = { grounded: true, popCharge: 0, airTime: 0, heightAboveSnow: 0, sinceLanding: 10 };
