@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CONFIG } from '../src/core/config';
-import { createTricks, isSwitch, judgeLanding, stepTricks, trickName, type TrickState } from '../src/tricks/rotation';
+import { createTricks, flipCoast, isSwitch, judgeLanding, spinCoast, stepTricks, trickName, type TrickState } from '../src/tricks/rotation';
 import { createLatch, resetLatch, splitControls } from '../src/tricks/controls';
 import { createSkier, speedOf, stepSkier, type SkierState } from '../src/physics/skier';
 import { createCameraRig } from '../src/camera/rig';
@@ -78,21 +78,28 @@ describe('spinn og flips i lufta', () => {
     expect(r.biggestFlip).toBeLessThan(flipMax * 0.05);
   });
 
-  it('fortsetter litt når du slipper, og stopper så (ingen automatisk fullføring)', () => {
+  it(`glir ca. ${CONFIG.spinCoastDeg}° når du slipper i full fart, og stopper så (ingen automatisk fullføring)`, () => {
     const t = createTricks();
     fly(t, 0.6, () => ({ spin: 1, flip: 0 }));
     const atRelease = t.spin;
     fly(t, 1.5, () => ({ spin: 0, flip: 0 }));
     const coast = (t.spin - atRelease) / DEG;
-    expect(coast).toBeGreaterThan(40);
-    expect(coast).toBeLessThan(80);
-    expect(Math.abs(t.spinRate) / DEG).toBeLessThan(1);
+    expect(coast).toBeGreaterThan(20);
+    expect(coast).toBeLessThan(30);
+    expect(t.spinRate).toBe(0);
+    // flip: også kort gli, godt innenfor ±25°
+    const f = createTricks();
+    fly(f, 1, () => ({ spin: 0, flip: -1 }));
+    const flipAt = f.flip;
+    fly(f, 1, () => ({ spin: 0, flip: 0 }));
+    expect((flipAt - f.flip) / DEG).toBeGreaterThan(12);
+    expect((flipAt - f.flip) / DEG).toBeLessThan(22);
   });
 
   it('du kan rotere for lite og for mye: stillingen blir der du slipper', () => {
-    // slipper for tidlig: ca. 200° + glid, langt unna både 180 og 360
+    // slipper for tidlig: ca. 230° + glid, langt unna både 180 og 360
     const under = createTricks();
-    fly(under, 2, (time) => ({ spin: under.spin < 200 * DEG && time < 1 ? 1 : 0, flip: 0 }));
+    fly(under, 2, (time) => ({ spin: under.spin < 230 * DEG && time < 1 ? 1 : 0, flip: 0 }));
     expect(under.spin / DEG).toBeGreaterThan(240);
     expect(under.spin / DEG).toBeLessThan(300);
     expect(judgeLanding(under.spin, 0).quality).toBe('fall');
@@ -341,8 +348,8 @@ function rideMedium(spinGoalDeg: number, flipGoalDeg: number, withCamera = false
     let steer = 0, flip = 0;
     if (!s.grounded && nearMedium) {
       tookOff = true;
-      const spinLeft = spinGoalDeg * DEG - (t.spin + t.spinRate / CONFIG.spinRelease);
-      const flipLeft = flipGoalDeg * DEG - (t.flip + t.flipRate / CONFIG.flipRelease);
+      const spinLeft = spinGoalDeg * DEG - (t.spin + spinCoast(t.spinRate));
+      const flipLeft = flipGoalDeg * DEG - (t.flip + flipCoast(t.flipRate));
       steer = Math.abs(spinLeft) > 0.02 && spinGoalDeg !== 0 ? Math.sign(spinLeft) : 0;
       flip = Math.abs(flipLeft) > 0.02 && flipGoalDeg !== 0 ? Math.sign(flipLeft) : 0;
     }
@@ -406,5 +413,59 @@ describe('switch (lening)', () => {
     t.spin = 185 * DEG;
     stepTricks(t, { spin: 0, flip: 0, grounded: true }, dt);
     expect(isSwitch(t)).toBe(true);
+  });
+});
+
+/**
+ * Ekte fysikk på et hopp: spilleren trykker spinn (eller backflip) rett etter avsats og slipper
+ * nøyaktig når rotasjonen når releaseDeg, slik Daniel gjør når han ser at han er rundt.
+ */
+function releaseAt(kickerIndex: number, releaseDeg: number, axis: 'spin' | 'flip') {
+  const s = createSkier();
+  const t = createTricks();
+  const latch = createLatch();
+  const kicker = PARK.kickers[kickerIndex];
+  let tookOff = false, released = false;
+  for (let i = 0; i < 80 * CONFIG.physicsHz; i++) {
+    const near = s.z > kicker.z - 5 && s.z < kicker.z + 90;
+    let steer = 0, flip = 0;
+    if (!s.grounded && near) {
+      tookOff = true;
+      const done = axis === 'spin' ? t.spin - t.spinStart : -(t.flip - t.flipStart);
+      if (done >= releaseDeg * DEG) released = true;
+      if (!released) { if (axis === 'spin') steer = 1; else flip = -1; }
+    }
+    const onSnow = s.grounded;
+    const c = splitControls({ steer, brake: 0, flip }, onSnow, latch, dt);
+    stepSkier(s, c.skier, dt);
+    stepTricks(t, { spin: c.spin, flip: c.flip, grounded: s.grounded }, dt);
+    if (tookOff && s.grounded) break;
+  }
+  return { landing: t.lastLanding!, released };
+}
+
+describe('slipp når trikset er nådd = ren landing (ekte fysikk på hoppene)', () => {
+  const cases: [number, number][] = [[0, 360], [1, 360], [1, 540], [1, 720], [2, 360], [2, 540], [2, 720]];
+  for (const [k, deg] of cases) {
+    const name = PARK.kickers[k].name;
+    it(`${name} hopp: slipp ved ${deg} gir ren ${deg}`, () => {
+      const r = releaseAt(k, deg, 'spin');
+      expect(r.released).toBe(true);
+      expect(r.landing.name).toBe(String(deg));
+      expect(r.landing.quality).toBe('ren');
+    });
+    it(`${name} hopp: slipp 90° for tidlig eller hold 90° for lenge er ikke ren`, () => {
+      expect(releaseAt(k, deg - 90, 'spin').landing.quality).not.toBe('ren');
+      const long = releaseAt(k, deg + 90, 'spin');
+      expect(long.released).toBe(true);
+      expect(long.landing.quality).not.toBe('ren');
+    });
+  }
+  it('backflip: slipp ved 360 gir ren backflip (medium og stort hopp)', () => {
+    for (const k of [1, 2]) {
+      const r = releaseAt(k, 360, 'flip');
+      expect(r.landing.name).toBe('Backflip');
+      expect(r.landing.quality).toBe('ren');
+    }
   });
 });

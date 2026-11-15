@@ -44,6 +44,7 @@ Justert 15. november: Daniel valgte et høyere stort hopp. Rampen på det store 
 |---|---|
 | Spinnfart | ca. 540° per sekund (et 720 på et medium hopp) |
 | Flipfart | ca. 360° per 0,9 s |
+| Gli etter slipp | ca. 25° (spinn) og 18° (flip), så du lander rent hvis du slipper når trikset er rundt |
 | Grab | holdes for poeng, minst 0,3 s for å telle |
 | Landing | ren hvis vinkelen mot bakken er under 25° og spinnet er innenfor ±30° av en hel eller halv runde (switch) |
 | Poeng og boost | bare for ekte triks: 540 eller mer, en flip eller en grab |

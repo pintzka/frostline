@@ -83,9 +83,12 @@ export const CONFIG = {
   /** Hvor fort rotasjonen bygger seg opp når du holder (per sekund). 10 ≈ 0,1 s til nesten full fart. */
   spinBuild: 10,
   flipBuild: 8,
-  /** Hvor fort rotasjonen bremses når du slipper (per sekund). Lavere = den fortsetter lenger. 9 ≈ 60° ekstra. */
-  spinRelease: 9,
-  flipRelease: 8,
+  /**
+   * Hvor mange grader rotasjonen glir videre når du slipper i full fart. Den bremses jevnt ned,
+   * så du lander der du slapp (pluss litt), godt innenfor grensen for ren landing (±30° / ±25°).
+   */
+  spinCoastDeg: 25,
+  flipCoastDeg: 18,
   /** Ren landing: spinnet innenfor så mange grader av en hel eller halv runde, flipen innenfor så mange av stående. */
   landSpinClean: 30,
   landFlipClean: 25,

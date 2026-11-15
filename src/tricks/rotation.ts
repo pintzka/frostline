@@ -5,7 +5,7 @@ import { CONFIG } from '../core/config';
  * Arbeidsstrøm 3 (Triks og poeng) eier denne fila.
  *
  * Ingen automatisk fullføring: holder du tasten, bygger rotasjonen seg mykt opp. Slipper du,
- * fortsetter den litt med farten den har og bremses så. Du kan altså rotere for lite eller for mye.
+ * glir den litt videre (ca. 25°) og bremses så. Du kan altså rotere for lite eller for mye.
  * Ved landing sjekkes hvor nær en hel eller halv runde du er, og kroppen retter seg mykt opp.
  */
 
@@ -99,12 +99,28 @@ export function judgeLanding(spin: number, flip: number): Landing {
   return { quality, name: trickName(spin, flip), spinDeg: spin / DEG, flipDeg: flip / DEG, spinErrDeg, flipErrDeg };
 }
 
-/** Farten følger målet mykt: holder du, bygges den opp; slipper du, bremses den. Aldri et hopp i farten. */
-function approach(rate: number, held: number, maxRate: number, build: number, release: number, dt: number): number {
+/** Jevn brems (rad/s²) som gjør at full fart glir akkurat coastDeg grader etter slipp. */
+function stopDecel(maxRate: number, coastDeg: number): number {
+  return (maxRate * maxRate) / (2 * coastDeg * DEG);
+}
+
+/**
+ * Farten følger målet mykt: holder du, bygges den opp. Slipper du, bremses den jevnt ned til null,
+ * så den stopper kort etter der du slapp. Aldri et hopp i farten.
+ */
+function approach(rate: number, held: number, maxRate: number, build: number, coastDeg: number, dt: number): number {
   const h = Math.max(-1, Math.min(1, held));
-  const want = h * maxRate;
-  const k = h !== 0 ? build : release;
-  return rate + (want - rate) * (1 - Math.exp(-k * dt));
+  if (h !== 0) return rate + (h * maxRate - rate) * (1 - Math.exp(-build * dt));
+  const slow = stopDecel(maxRate, coastDeg) * dt;
+  return Math.abs(rate) <= slow ? 0 : rate - Math.sign(rate) * slow;
+}
+
+/** Hvor langt (rad) spinnet eller flipen glir videre hvis du slipper nå. */
+export function spinCoast(rate: number): number {
+  return (Math.sign(rate) * rate * rate) / (2 * stopDecel(CONFIG.spinSpeedDeg * DEG, CONFIG.spinCoastDeg));
+}
+export function flipCoast(rate: number): number {
+  return (Math.sign(rate) * rate * rate) / (2 * stopDecel(CONFIG.flipSpeedDeg * DEG, CONFIG.flipCoastDeg));
 }
 
 /**
@@ -142,8 +158,8 @@ export function stepTricks(t: TrickState, inp: TrickInput, dt: number): void {
   }
 
   if (t.inAir) {
-    t.spinRate = approach(t.spinRate, inp.spin, CONFIG.spinSpeedDeg * DEG, CONFIG.spinBuild, CONFIG.spinRelease, dt);
-    t.flipRate = approach(t.flipRate, inp.flip, CONFIG.flipSpeedDeg * DEG, CONFIG.flipBuild, CONFIG.flipRelease, dt);
+    t.spinRate = approach(t.spinRate, inp.spin, CONFIG.spinSpeedDeg * DEG, CONFIG.spinBuild, CONFIG.spinCoastDeg, dt);
+    t.flipRate = approach(t.flipRate, inp.flip, CONFIG.flipSpeedDeg * DEG, CONFIG.flipBuild, CONFIG.flipCoastDeg, dt);
     t.spin += t.spinRate * dt;
     t.flip += t.flipRate * dt;
   } else {
