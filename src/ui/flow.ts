@@ -44,6 +44,8 @@ export interface Flow {
   move: Move;
   /** Beste runde før denne runden startet, så resultatskjermen kan si «ny rekord». */
   bestBefore: number;
+  /** Resultatskjermen: mellomrom er sluppet etter at resultatet har vist seg lenge nok, så neste trykk teller. */
+  resultArmed: boolean;
 }
 
 /** Hele spillet: kjøringen fra core/game.ts pluss flyten rundt. */
@@ -95,7 +97,7 @@ export function recordStats(st: RunStats, s: { dt: number; speed: number; inAir:
 }
 
 export function createGame(): Game {
-  const flow: Flow = { phase: 'start', phaseAge: 0, stats: createStats(), spaceWas: false, restartWas: false, move: 'none', bestBefore: 0 };
+  const flow: Flow = { phase: 'start', phaseAge: 0, stats: createStats(), spaceWas: false, restartWas: false, move: 'none', bestBefore: 0, resultArmed: false };
   return Object.assign(createCoreGame(), { flow });
 }
 
@@ -114,10 +116,10 @@ function newRun(g: Game, bySpace: boolean): void {
   g.flow.move = 'restart';
 }
 
-/** Etter målet: bremser mykt men bestemt inn, så skiløperen stopper før bakken tar slutt. */
+/** Etter målet: bremser mykt men bestemt inn, så skiløperen stopper før bakken tar slutt. Bare på snøen, ikke i lufta. */
 function stopAtFinish(s: SkierState, dt: number): void {
   const v = speedOf(s);
-  if (v <= 0) return;
+  if (v <= 0 || !s.grounded) return;
   const k = Math.max(0, v - CONFIG.finishStopDecel * dt) / v;
   s.vx *= k; s.vy *= k; s.vz *= k;
 }
@@ -137,9 +139,13 @@ export function stepGame(g: Game, inp: GameInput, dt: number): FlowEvent {
   if (f.phase === 'start') {
     if (spacePressed || inp.click) { newRun(g, spacePressed); event = 'ny-runde'; }
   } else if (f.phase === 'resultat') {
-    // kort pause først, så et trykk rett etter målet ikke hopper over resultatet
+    // kort pause først, så et trykk rett etter målet ikke hopper over resultatet. Mellomrom må i tillegg
+    // slippes etter pausen og trykkes på nytt, så tapping på pop inn i mål ikke hopper over det.
     const ready = f.phaseAge >= CONFIG.resultMinTime;
-    if (restartPressed || (ready && (spacePressed || inp.click))) { newRun(g, spacePressed); event = 'ny-runde'; }
+    if (ready && !space) f.resultArmed = true;
+    // R virker med en gang, men ikke mens skjermen fortsatt blekes etter et fall
+    const go = (restartPressed && fallDone(g.fall)) || (ready && ((f.resultArmed && spacePressed) || inp.click));
+    if (go) { newRun(g, spacePressed); event = 'ny-runde'; }
   } else if (restartPressed && fallDone(g.fall)) {
     // R virker først når skjermen er helt klar igjen etter et fall (som i core/game.ts)
     newRun(g, false); event = 'ny-runde';
@@ -158,8 +164,12 @@ export function stepGame(g: Game, inp: GameInput, dt: number): FlowEvent {
     dt, speed: speedOf(g.skier), inAir: !g.skier.grounded, airTime: g.skier.airTime, landing: g.tricks.lastLanding,
     scored: g.score.last,
   });
-  // i mål, men ikke midt i et fall (da settes du tilbake først)
-  if (reachedEnd(g.skier) && !isFalling(g.fall)) { f.phase = 'resultat'; f.phaseAge = 0; return 'mål'; }
+  // i mål først når du står på snøen og ikke faller: krysser du mållinja i lufta, teller landingen
+  // (med poeng, eller fall og respawn) før resultatet, så tabellen stemmer med det som skjedde
+  if (reachedEnd(g.skier) && g.skier.grounded && !isFalling(g.fall)) {
+    f.phase = 'resultat'; f.phaseAge = 0; f.resultArmed = false;
+    return 'mål';
+  }
   return event;
 }
 

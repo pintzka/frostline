@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { CONFIG } from '../src/core/config';
 import { createGame, createStats, scoreLines, stepGame, type Game, type GameInput } from '../src/ui/flow';
 import { createScore } from '../src/tricks/score';
-import { PARK } from '../src/park/terrain';
+import { heightAt, PARK } from '../src/park/terrain';
+import { isFalling } from '../src/tricks/fall';
+import { reachedEnd, speedOf } from '../src/physics/skier';
 import { spinCoast } from '../src/tricks/rotation';
 
 /** Flyten (start, resultat) sammen med kjøringen fra core/game.ts: fall, respawn, poeng og beste runde. */
@@ -62,6 +64,81 @@ describe('flyt og kjøring sammen', () => {
     expect(g.score.total).toBe(0);
     expect(g.best).toBe(2500);
     expect(g.flow.bestBefore).toBe(2500);
+  });
+});
+
+describe('mållinja', () => {
+  /** Skiløperen i lufta rett før mållinja, snurret 90° (lander sidelengs = fall). */
+  function airborneAtFinish(): Game {
+    const g = createGame();
+    stepGame(g, idle({ click: true }), dt);
+    const z = PARK.length - CONFIG.runEndMargin - 1;
+    Object.assign(g.skier, { z, x: 0, y: heightAt(0, z) + 2.5, vx: 0, vy: 2, vz: 14, grounded: false, airTime: 1 });
+    g.tricks.inAir = true;
+    g.tricks.spin = Math.PI / 2;
+    return g;
+  }
+
+  it('krysser du mållinja i lufta, kommer resultatet først når du står på snøen, og et fall teller', () => {
+    const g = airborneAtFinish();
+    const events: string[] = [];
+    let crossedInAir = false;
+    for (let i = 0; i < 20 * CONFIG.physicsHz && g.flow.phase === 'kjorer'; i++) {
+      const ev = stepGame(g, idle(), dt);
+      if (reachedEnd(g.skier) && !g.skier.grounded) crossedInAir = true;
+      if (g.flow.move === 'respawn') events.push('respawn');
+      if (ev) events.push(ev);
+      if (ev === 'mål') {
+        expect(g.skier.grounded).toBe(true);
+        expect(isFalling(g.fall)).toBe(false);
+      }
+    }
+    expect(crossedInAir).toBe(true);
+    // landingen ble et fall: du ble satt tilbake og kom i mål på nytt, ingen respawn bak resultatskjermen
+    expect(events[0]).toBe('respawn');
+    expect(events[events.length - 1]).toBe('mål');
+    for (let i = 0; i < 3 * CONFIG.physicsHz; i++) stepGame(g, idle(), dt);
+    expect(g.flow.phase).toBe('resultat');
+    expect(g.score.last?.quality).toBe('fall');
+  });
+
+  it('bremsen etter målet tar bare på snøen, ikke i lufta', () => {
+    const g = airborneAtFinish();
+    g.flow.phase = 'resultat';
+    const v0 = speedOf(g.skier);
+    stepGame(g, idle(), dt);
+    // bare tyngden og luftmotstand: langt under finishStopDecel
+    expect(Math.abs(speedOf(g.skier) - v0) / dt).toBeLessThan(CONFIG.finishStopDecel / 2);
+  });
+
+  it('tapping på mellomrom inn i mål hopper ikke over resultatet; slipp og trykk etter pausen gjør', () => {
+    const g = createGame();
+    stepGame(g, idle({ click: true }), dt);
+    rideToEnd(g);
+    let ev: string | null = null;
+    // tapper pop hver 0,1 s like til pausen er over
+    for (let t = 0; t < CONFIG.resultMinTime - dt; t += dt) {
+      ev = stepGame(g, idle({ raw: { steer: 0, brake: 0, flip: 0, pop: Math.floor(t / 0.05) % 2 === 1 } }), dt) ?? ev;
+    }
+    expect(ev).toBeNull();
+    expect(CONFIG.resultMinTime).toBeGreaterThanOrEqual(0.9);
+    // holdt inn over pausen: fortsatt ingen ny runde
+    for (let i = 0; i < 0.2 / dt; i++) ev = stepGame(g, idle({ raw: { steer: 0, brake: 0, flip: 0, pop: true } }), dt) ?? ev;
+    expect(ev).toBeNull();
+    stepGame(g, idle(), dt);
+    expect(stepGame(g, idle({ raw: { steer: 0, brake: 0, flip: 0, pop: true } }), dt)).toBe('ny-runde');
+  });
+
+  it('R på resultatskjermen venter til blekingen etter et fall er ferdig', () => {
+    const g = createGame();
+    stepGame(g, idle({ click: true }), dt);
+    rideToEnd(g);
+    // blekingen inn igjen etter et fall pågår fortsatt
+    g.fall.time = CONFIG.fallRespawnAt + 0.05;
+    expect(stepGame(g, idle({ restart: true }), dt)).toBeNull();
+    stepGame(g, idle(), dt);
+    for (let i = 0; i < CONFIG.fallFadeTime / dt; i++) stepGame(g, idle(), dt);
+    expect(stepGame(g, idle({ restart: true }), dt)).toBe('ny-runde');
   });
 });
 

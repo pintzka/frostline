@@ -372,8 +372,8 @@ export const CONFIG = {
   /** Sekunder resultatskjermen bruker på å komme fram, og på å blekne bort ved ny runde. */
   resultFadeIn: 0.35,
   resultFadeOut: 0.2,
-  /** Så lenge (s) resultatet vises før mellomrom eller klikk kan starte ny runde (R virker alltid). */
-  resultMinTime: 0.4,
+  /** Så lenge (s) resultatet vises før mellomrom eller klikk kan starte ny runde (R virker alltid). Mellomrom må også slippes etter dette. */
+  resultMinTime: 1,
   /** Etter målet bremser skiløperen inn med så mye ekstra (m/s²), så den stopper før bakken tar slutt. */
   finishStopDecel: 20,
   /** Ved ny runde dekker et mørkt slør skjermen så mye (0–1) og blekner bort på så mange sekunder. Skjuler hoppet til toppen. */
