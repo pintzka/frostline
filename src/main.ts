@@ -12,7 +12,7 @@ import { poseFor, smoothPose } from './character/pose';
 import { createSkiTrails } from './render/trailMesh';
 
 const root = document.getElementById('app')!;
-const { renderer, scene, sun } = createScene(root);
+const { renderer, scene, sun, env } = createScene(root);
 const chase = createChaseCamera(innerWidth / innerHeight);
 addEventListener('resize', () => chase.resize(innerWidth / innerHeight));
 const input = createInput(renderer.domElement);
@@ -78,6 +78,7 @@ const loop = createLoop({
       speed: v, distance: skier.z - startZ, airTime: skier.airTime, inAir: !skier.grounded,
       popCharge: skier.popCharge, lastPop: skier.lastPop, popAge: skier.popAge,
     });
+    env.follow(chase.camera.position, performance.now() / 1000);
     renderer.render(scene, chase.camera);
   },
 });

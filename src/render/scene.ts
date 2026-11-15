@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 import { heightAt, PARK } from '../park/terrain';
+import { createEnvironment, HAZE } from './environment';
 
 /**
- * Scene, lys og grå testbakke. Arbeidsstrøm 6 (Grafikk og effekter) eier denne fila.
+ * Scene, lys og testbakken, med miljøet rundt (environment.ts). Arbeidsstrøm 6 (Grafikk og effekter) eier denne fila.
  */
 export function createScene(root: HTMLElement) {
   const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -12,8 +13,9 @@ export function createScene(root: HTMLElement) {
   root.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0xa9c4dc);
-  scene.fog = new THREE.Fog(0xa9c4dc, 60, 260);
+  // tåka har samme farge som disen i horisonten, så bakken glir over i himmelen
+  scene.background = new THREE.Color(HAZE);
+  scene.fog = new THREE.Fog(HAZE, 60, 280);
 
   scene.add(new THREE.HemisphereLight(0xdfeeff, 0x8899aa, 1.1));
   const sun = new THREE.DirectionalLight(0xffffff, 1.6);
@@ -39,8 +41,11 @@ export function createScene(root: HTMLElement) {
   ground.receiveShadow = true;
   scene.add(ground);
 
+  // himmel, fjell, skog og lykter rundt bakken
+  const env = createEnvironment(scene, sun.position.clone().normalize());
+
   addEventListener('resize', () => renderer.setSize(innerWidth, innerHeight));
-  return { renderer, scene, sun };
+  return { renderer, scene, sun, env };
 }
 
 /** Teksturen dekker så mange meter i hver retning. */
