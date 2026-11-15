@@ -34,11 +34,15 @@ describe('kamera', () => {
     expect(pose.pz).toBeLessThan(s.z);
   });
 
-  it('ligger ca. camHeight over snøen', () => {
+  // Før målte kameraet høyden over snøen bak deg (som ligger 1,8 m høyere i vanlig bakke), og sto 3,7 m over
+  // skiløperen. Nå måles den mot skiløperen, og løftes bare så mye snøen bak krever.
+  it('ligger litt over camHeight over skiløperen i vanlig bakke, og godt over snøen bak', () => {
     // 6 s: på bakken, før det første hoppet
     const { pose, s } = simulate(6, 60, () => 0);
     expect(s.grounded).toBe(true);
-    expect(pose.py - heightAt(pose.px, pose.pz)).toBeCloseTo(CONFIG.camHeight, 0);
+    expect(pose.py - s.y).toBeGreaterThanOrEqual(CONFIG.camHeight);
+    expect(pose.py - s.y).toBeLessThan(CONFIG.camHeight + 1);
+    expect(pose.py - heightAt(pose.px, pose.pz)).toBeGreaterThan(CONFIG.camSnowClearance);
   });
 
   it('gir samme bilde uansett bildefrekvens', () => {

@@ -18,6 +18,8 @@ export const CONFIG = {
   snowFriction: 0.03,
   /** Hvor hardt bremsen tar i (m/s²) ved full brems. */
   brakeDecel: 11,
+  /** Hvor fort bremsen tas inn og slippes (per sekund), selv om tasten bare er av/på. 9 ≈ 0,1 s til nesten full brems. */
+  brakeResponse: 9,
   /** Hvor fort skiene svinger (rad/s) ved full styring i lav fart. */
   turnRate: 1.6,
   /** Hvor hardt kanten kan presse i en sving (m/s²). Gir ca. 15 m radius i 60 km/t, større radius i høyere fart. */
@@ -66,10 +68,22 @@ export const CONFIG = {
   camLookHeight: 0.8,
   /** Under denne farten (m/s) følger kameraet skiene i stedet for fartsretningen. */
   camDirMinSpeed: 2,
-  /** Kameraet holder alltid minst så mye avstand til snøen (m). */
-  camMinClearance: 0.6,
+  /** Kameraet holder alltid minst så mye avstand til snøen rett under seg (m). */
+  camSnowClearance: 0.8,
+  /** Hvor mykt kameraet går over fra «camHeight over skiløperen» til «over snøen bak» (m). Større = mykere. */
+  camHeightBlend: 0.8,
+  /** Hvor fort kameraet høyst kan vri seg (rad/s), så det aldri slenger rundt. 2 ≈ 115° per sekund. */
+  camMaxYawRate: 2,
   /** Hopper skiløperen lenger enn dette på ett bilde (restart), flytter kameraet seg rett dit. */
   camSnapDistance: 20,
+  /**
+   * Kroppens vinkel: hvor fort den følger snøen (rad/s i en myk fjær), og hvor høyt over snøen (m)
+   * den begynner å tippe fra loddrett over mot snøen den skal lande på. Tippingen starter først når du
+   * faller, og er helt med når du faller fortere enn bodyTiltFallSpeed (m/s).
+   */
+  bodyTiltSpeed: 12,
+  bodyTiltHeight: 3,
+  bodyTiltFallSpeed: 2,
   /** Skienes lengde (m). Sporet starter ved bakenden, halve lengden bak midten. */
   skiLength: 1.7,
   /** Skispor: avstand mellom punktene (m), hvor mange punkter som huskes, og avstand mellom skiene (m). */
@@ -213,8 +227,34 @@ export const CONFIG = {
   fallRampMargin: 10,
   /** Fartsmåleren følger den ekte farten mykt (per sekund), så tallet aldri hopper. */
   hudSpeedFollow: 6,
-  /** Hvor fort kroppen legger seg vinkelrett på bakken (per sekund), så den ikke rykker over kuler og ved landing. */
-  bodyUpFollow: 12,
+  /** Sekunder «PERFEKT POP!» vises. */
+  popFlashTime: 1.2,
+
+  // --- Kroppens stillinger rundt et hopp (src/character/pose.ts). Lengder i m, vinkler i rad, tider i s ---
+  pose: {
+    /** Hvor raskt kroppen glir mellom stillingene (rad/s i en myk fjær). 22 ≈ 0,15 s. */
+    speed: 22,
+    /** Sats mens pop lades: så langt ned og så mye framover ved full lading. */
+    crouchDrop: 0.22,
+    crouchPitch: 0.3,
+    /** Fjæring rett etter landing: så langt ned og framover, og hvor lenge til den er tilbake. */
+    landDrop: 0.18,
+    landPitch: 0.2,
+    landTime: 0.35,
+    /** Avsparket: starter så lenge etter at du letter, varer så lenge, og strekker kroppen så mye opp. */
+    kickStart: 0.08,
+    kickTime: 0.15,
+    kickStretch: 0.14,
+    /** Rolig stilling i lufta etter avsparket: så langt ned. */
+    airDrop: 0.04,
+    /** Skiene trekkes så høyt opp på så lang tid, og kroppen lener så mye framover. */
+    tuckTime: 0.2,
+    tuckLift: 0.3,
+    tuckPitch: 0.12,
+    /** Skiene går ned igjen mellom disse høydene over snøen: helt nede under den første, helt oppe over summen. */
+    tuckLowHeight: 0.1,
+    tuckFadeHeight: 0.7,
+  },
 } as const;
 
 export type Config = typeof CONFIG;

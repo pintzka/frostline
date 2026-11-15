@@ -9,6 +9,7 @@ import { createHud } from './ui/hud';
 import { createPlaceholderSkier } from './character/placeholder';
 import { heightAt, normalAt } from './park/terrain';
 import { poseFor, smoothPose } from './character/pose';
+import { createTilt, stepTilt } from './character/tilt';
 import { createSkiTrails } from './render/trailMesh';
 import { createGame, skisOnSnow, stepGame, type Move } from './core/game';
 import { fadeAmount, fallBody, landingWobble } from './tricks/fall';
@@ -35,7 +36,7 @@ const startZ = game.skier.z;
 
 const target = new THREE.Vector3();
 const up = new THREE.Vector3(0, 1, 0);
-const wantUp = new THREE.Vector3();
+const tilt = createTilt();
 const q = new THREE.Quaternion();
 const qYaw = new THREE.Quaternion();
 const Y = new THREE.Vector3(0, 1, 0);
@@ -58,7 +59,9 @@ const loop = createLoop({
       prev = { ...game.skier };
       prevTricks = { ...game.tricks };
     }
-    if (m === 'restart') { pose = standingPose(); up.copy(Y); }
+    // flyttet (ny runde eller respawn): kroppen står rett på snøen med en gang, uten å tippe dit
+    if (m !== 'none') Object.assign(tilt, createTilt());
+    if (m === 'restart') pose = standingPose();
   },
   render(alpha, frameDt) {
     const { skier, tricks, fall } = game;
@@ -68,11 +71,10 @@ const loop = createLoop({
       prev.z + (skier.z - prev.z) * alpha,
     );
     mesh.position.copy(target);
-    // på bakken står skiløperen vinkelrett på snøen; i lufta glir den mykt over til å stå rett opp
-    const [nx, ny, nz] = skier.grounded ? normalAt(target.x, target.z) : [0, 1, 0];
-    wantUp.set(nx, ny, nz);
-    up.lerp(wantUp, 1 - Math.exp(-CONFIG.bodyUpFollow * frameDt)).normalize();
-    q.setFromUnitVectors(Y, up);
+    // vinkelrett på snøen på bakken, rett opp høyt i lufta, og tipper mykt mot snøen før landing
+    const snowY = heightAt(target.x, target.z);
+    const [ux, uy, uz] = stepTilt(tilt, { grounded: skier.grounded, heightAboveSnow: target.y - snowY, vy: skier.vy, normal: normalAt(target.x, target.z) }, frameDt);
+    q.setFromUnitVectors(Y, up.set(ux, uy, uz));
     // retningen jevnes ut mellom fysikkstegene, som posisjonen, så svingene ikke rister
     const heading = prev.heading + (skier.heading - prev.heading) * alpha;
     qYaw.setFromAxisAngle(Y, heading);
@@ -89,7 +91,7 @@ const loop = createLoop({
     // kroppen glir mellom stillingene, så avspark og landing ikke rykker
     pose = smoothPose(pose, poseFor({
       grounded: skier.grounded, popCharge: skier.popCharge, airTime: skier.airTime,
-      heightAboveSnow: target.y - heightAt(target.x, target.z), sinceLanding: skier.sinceLanding,
+      heightAboveSnow: target.y - snowY, sinceLanding: skier.sinceLanding,
     }), frameDt);
     skierModel.setGrab(tricks.grabs.blend, pose.skiLift);
     skierModel.setPose({ ...pose, pitch: pose.pitch + body.pitch + wobble.pitch });

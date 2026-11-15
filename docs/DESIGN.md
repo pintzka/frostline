@@ -97,7 +97,7 @@ Poeng for ett triks = (spinn + flip + grab) × grab-gangetall × perfekt pop × 
 - Når runden starter på nytt (R eller nederst i bakken), huskes beste runde i HUD-en.
 
 ## Kamera
-- Lavt og nært bak skiløperen (5–6 m bak, 2 m opp).
+- Lavt og nært bak skiløperen (5–6 m bak, 2–3 m over skiløperen). Ligger snøen bak høyere (bratt landing), løftes kameraet akkurat så mye som trengs.
 - FOV øker med farten (62° til 78°).
 - I lufta følger kameraet jevnt uten å snurre med skiløperen.
 
