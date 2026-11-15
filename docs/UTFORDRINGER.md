@@ -1,6 +1,6 @@
 # Lage egne utfordringer
 
-Utfordringene for en park står i én fil: `src/challenges/testbakke.json`. Endre eller legg til der, du trenger ikke røre koden. Spillet sjekker fila når det starter, og sier på norsk hva som er feil.
+Utfordringene for en park står i én fil per park: `src/challenges/testbakke.json` og `src/challenges/nybegynner.json`. Endre eller legg til der, du trenger ikke røre koden. Spillet sjekker fila når det starter, og sier på norsk hva som er feil.
 
 ```json
 { "id": "stort-720", "text": "Land et rent 720 på det store hoppet", "type": "trick", "spin": 720, "kicker": "Stort" }

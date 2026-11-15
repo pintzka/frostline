@@ -1,5 +1,6 @@
 import { CURRENT_PARK_ID, PARKS } from '../park/parks';
 import { loadChallenges, type Challenge } from './format';
+import nybegynner from './nybegynner.json';
 import testbakke from './testbakke.json';
 
 /**
@@ -7,6 +8,7 @@ import testbakke from './testbakke.json';
  * importer den og legg den til i lista under. Se docs/UTFORDRINGER.md.
  */
 const FILES: Record<string, unknown> = {
+  nybegynner,
   testbakke,
 };
 

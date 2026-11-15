@@ -1,0 +1,10 @@
+{
+  "park": "nybegynner",
+  "challenges": [
+    { "id": "grab", "text": "Hold en grab og land rent", "type": "trick", "grabTime": 0.4 },
+    { "id": "backflip", "text": "Land en backflip", "type": "trick", "flips": 1, "flipDir": "back" },
+    { "id": "ren-540", "text": "Land et rent 540 (perfekt pop hjelper)", "type": "trick", "spin": 540 },
+    { "id": "perfekt-pop-alle", "text": "Perfekt pop på alle fire hoppene i én runde", "type": "perfectPops", "count": 4 },
+    { "id": "poeng-1500", "text": "Få minst 1 500 poeng i én runde", "type": "score", "points": 1500 }
+  ]
+}
