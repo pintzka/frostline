@@ -196,6 +196,7 @@ describe('lydmotoren uten Web Audio', () => {
     expect(() => {
       a.step({ ...s }, s, { steer: 0, brake: 0 });
       a.frame();
+      a.newRun();
       a.toggleMute();
       a.suspend();
       a.resume();

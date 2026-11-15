@@ -41,7 +41,7 @@ const loop = createLoop({
   hz: CONFIG.physicsHz,
   step(dt) {
     // R, eller slutten av bakken: ny runde med en gang
-    if (input.pressed('KeyR') || reachedEnd(skier)) { skier = createSkier(); }
+    if (input.pressed('KeyR') || reachedEnd(skier)) { skier = createSkier(); audio.newRun(); }
     prev = { ...skier };
     const inp = input.read();
     stepSkier(skier, inp, dt);

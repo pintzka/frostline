@@ -121,3 +121,13 @@ export function detectEvents(prev: SkierState, cur: SkierState): SoundEvents {
   }
   return { pop, landing };
 }
+
+/**
+ * Har verdien endret seg nok til at det er verdt å sende den til lyden?
+ * step = minste endring; relative = true betyr andel av verdien (for frekvenser).
+ */
+export function changedEnough(last: number | undefined, next: number, step: number, relative = false): boolean {
+  if (last === undefined || !Number.isFinite(last)) return true;
+  const limit = relative ? step * Math.max(Math.abs(last), 1e-6) : step;
+  return Math.abs(next - last) > limit;
+}
