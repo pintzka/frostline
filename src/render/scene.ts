@@ -60,13 +60,14 @@ export function createScene(root: HTMLElement, start: QualitySettings) {
 
   /**
    * Bytter kvalitetsnivå. Kalles hvert bilde; gjør bare noe når noe er endret.
-   * Oppløsning og skyggestørrelse byttes med en gang (det merkes knapt).
-   * Resten venter til heavyOk er sant (pause, startskjermen eller resultatskjermen): skog og tåke
-   * ville poppet midt i en runde, skygger av/på lager shaderne på nytt, og ny bakke tar ca. 0,3 s.
+   * Skyggestørrelsen byttes med en gang (det merkes knapt).
+   * Resten venter til heavyOk er sant (pause, startskjermen eller resultatskjermen): oppløsningen ville
+   * gjort bildet brått uskarpt, skog og tåke ville poppet midt i en runde, skygger av/på lager shaderne
+   * på nytt, og ny bakke tar ca. 0,3 s. Gir true hvis noe fortsatt venter (så Auto ikke måler i mellomtida).
    */
   let pixelRatio = start.pixelRatio, shadowSize = -1, forest = -1, fogFar = -1;
-  function applyQuality(q: QualitySettings, heavyOk: boolean) {
-    if (q.pixelRatio !== pixelRatio) {
+  function applyQuality(q: QualitySettings, heavyOk: boolean): boolean {
+    if (q.pixelRatio !== pixelRatio && heavyOk) {
       pixelRatio = q.pixelRatio;
       renderer.setPixelRatio(Math.min(devicePixelRatio, pixelRatio));
       renderer.setSize(innerWidth, innerHeight);
@@ -93,6 +94,8 @@ export function createScene(root: HTMLElement, start: QualitySettings) {
       ground.geometry = groundGeometry(tolerance);
       old.dispose();
     }
+    return q.pixelRatio !== pixelRatio || q.forest !== forest || q.fogFar !== fogFar
+      || (q.shadowMapSize > 0) !== sun.castShadow || q.groundTolerance !== tolerance;
   }
   applyQuality(start, true);
 

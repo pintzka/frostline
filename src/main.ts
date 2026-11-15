@@ -128,7 +128,7 @@ const loop = createLoop({
     const { skier, tricks } = shown;
     // nivåbytter som gir et hakk venter til pause, startskjerm eller resultat (ikke midt i en reprise)
     const q = quality.frame(frameDt);
-    applyQuality(q, loop.isPaused() || (!replay && game.flow.phase !== 'kjorer'));
+    quality.setWaiting(applyQuality(q, loop.isPaused() || (!replay && game.flow.phase !== 'kjorer')));
     spray.setAmount(q.spray);
     const { at, heading, normal } = view.update(shown, prev, prevTricks, alpha, frameDt);
     trails.update(at.x, at.y, at.z, heading, skisOnSnow(shown), moved);

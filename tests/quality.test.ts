@@ -3,7 +3,7 @@ import { heightAt } from '../src/park/terrain';
 import { buildGroundMesh, type GroundMesh } from '../src/render/groundGrid';
 import { LOOK } from '../src/render/look';
 import {
-  createAutoQuality, createFpsMeter, forestCount, LEVELS, lowerLevel, parseChoice, settingsFor, spreadOrder, startLevel,
+  createAutoQuality, looksCapped, createFpsMeter, forestCount, LEVELS, lowerLevel, parseChoice, settingsFor, spreadOrder, startLevel,
 } from '../src/render/quality';
 import { createSpray, type SprayFrame } from '../src/render/spray';
 
@@ -121,6 +121,22 @@ function feed(auto: ReturnType<typeof createAutoQuality>, fps: number[]) {
   return drops;
 }
 const secs = (n: number, fps: number) => Array.from({ length: n }, () => fps);
+/**
+ * Tregt fordi skjermkortet ikke henger med: snittene varierer litt (ikke et fast tak).
+ * Tilpasset ved kvalitetskontrollen: før brukte testene helt like 30 og 20 fps, men det er akkurat
+ * slik en skjerm låst til 30 fps ser ut, og det skal Auto nå ikke senke for.
+ */
+const NOISE = [-2, 1.5, 3, -1];
+const noisy = (n: number, fps: number) => Array.from({ length: n }, (_, i) => fps + NOISE[i % NOISE.length]);
+/** Kjører Auto der fps-en avhenger av nivået (lavere nivå = raskere), som på en ekte maskin. */
+function simulate(auto: ReturnType<typeof createAutoQuality>, n: number, fpsAt: Record<string, number>) {
+  const changes: string[] = [];
+  for (let i = 0; i < n; i++) {
+    const d = auto.update(fpsAt[auto.level] + NOISE[i % NOISE.length], 1);
+    if (d) changes.push(d);
+  }
+  return changes;
+}
 
 describe('Auto senker kvaliteten når det går tregt', () => {
   it('holder nivået når fps er god', () => {
@@ -131,9 +147,9 @@ describe('Auto senker kvaliteten når det går tregt', () => {
 
   it('går ett nivå ned etter noen sekunder under 45 fps (etter innsvingningen)', () => {
     const auto = createAutoQuality('hoy');
-    const drops = feed(auto, secs(A.settle + A.slowFor - 1, 30));
+    const drops = feed(auto, noisy(A.settle + A.slowFor - 1, 30));
     expect(drops).toEqual([]);
-    expect(feed(auto, [30])).toEqual(['middels']);
+    expect(feed(auto, [31.5])).toEqual(['middels']);
     expect(auto.level).toBe('middels');
   });
 
@@ -156,30 +172,49 @@ describe('Auto senker kvaliteten når det går tregt', () => {
 
   it('venter før den måler igjen etter et bytte, og stopper på Lav', () => {
     const auto = createAutoQuality('hoy');
-    const drops = feed(auto, secs(120, 20));
-    expect(drops).toEqual(['middels', 'lav']);
+    const fpsAt = { hoy: 20, middels: 27, lav: 34 };
+    expect(simulate(auto, 120, fpsAt)).toEqual(['middels', 'lav']);
     expect(auto.level).toBe('lav');
     // det andre byttet kom ikke rett etter det første
     const b = createAutoQuality('hoy');
     const at: number[] = [];
-    for (let i = 0; i < 40; i++) if (b.update(20, 1)) at.push(i);
+    for (let i = 0; i < 40; i++) if (b.update(fpsAt[b.level] + NOISE[i % NOISE.length], 1)) at.push(i);
     expect(at[1] - at[0]).toBeGreaterThanOrEqual(A.settle + A.slowFor);
   });
 
   it('går aldri opp igjen av seg selv, selv om fps blir god', () => {
     const auto = createAutoQuality('hoy');
-    feed(auto, secs(A.settle + A.slowFor, 30));
+    feed(auto, noisy(A.settle + A.slowFor, 30));
     expect(auto.level).toBe('middels');
-    expect(feed(auto, secs(300, 144))).toEqual([]);
+    expect(feed(auto, noisy(300, 144))).toEqual([]);
     expect(auto.level).toBe('middels');
   });
 
   it('hold() (pause eller bytte) gir ny innsvingning og nullstiller tellingen', () => {
     const auto = createAutoQuality('hoy');
-    feed(auto, secs(A.settle + A.slowFor - 1, 30));
+    feed(auto, noisy(A.settle + A.slowFor - 1, 30));
     auto.hold();
-    expect(feed(auto, secs(A.settle + A.slowFor - 1, 30))).toEqual([]);
-    expect(feed(auto, [30])).toEqual(['middels']);
+    expect(feed(auto, noisy(A.settle + A.slowFor - 1, 30))).toEqual([]);
+    expect(feed(auto, [31.5])).toEqual(['middels']);
+  });
+
+  it('en skjerm låst til 30 fps (helt jevne snitt): Auto senker ikke', () => {
+    for (const cap of [30, 30.4, 29.7, 24]) {
+      const auto = createAutoQuality('hoy');
+      expect(feed(auto, secs(120, cap)), String(cap)).toEqual([]);
+      expect(auto.level).toBe('hoy');
+    }
+    expect(looksCapped([30, 30.2, 29.9])).toBe(true);
+    expect(looksCapped([30, 33, 28])).toBe(false);
+    expect(looksCapped([33, 33, 33])).toBe(false);
+  });
+
+  it('ga et hakk ned ingen bedre fps, var det et tak: tilbake ett hakk, og ingen flere hakk', () => {
+    const auto = createAutoQuality('hoy');
+    // tregt, men ikke jevnt nok til å se ut som et tak, og like tregt på alle nivåer
+    const changes = simulate(auto, 200, { hoy: 33, middels: 33, lav: 33 });
+    expect(changes).toEqual(['middels', 'hoy']);
+    expect(auto.level).toBe('hoy');
   });
 });
 

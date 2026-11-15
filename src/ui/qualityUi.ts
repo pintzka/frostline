@@ -30,6 +30,7 @@ export function createQualityUi(root: HTMLElement) {
   const meter = createFpsMeter();
   let fpsOn = load(FPS_KEY) === '1';
   let lastFps = 0;
+  let waiting = false;
 
   // FPS-måleren: liten tekst nede til høyre, oppdateres én gang i sekundet
   const fps = document.createElement('div');
@@ -38,6 +39,9 @@ export function createQualityUi(root: HTMLElement) {
   root.appendChild(fps);
 
   const pickers: Map<Choice, HTMLButtonElement>[] = [];
+  // myke kanter (antialias) velges når rendereren lages, så de byttes først når siden lastes på nytt
+  const startAntialias = settingsFor(level).antialias;
+  const notes: HTMLElement[] = [];
 
   function refresh() {
     for (const buttons of pickers) {
@@ -48,6 +52,8 @@ export function createQualityUi(root: HTMLElement) {
         b.style.color = on ? '#0d1620' : '#fff';
       }
     }
+    const reloadNote = settingsFor(level).antialias !== startAntialias;
+    for (const n of notes) n.style.display = reloadNote ? 'block' : 'none';
     fps.style.display = fpsOn ? 'block' : 'none';
     const n = lastFps > 0 ? String(Math.round(lastFps)) : '–';
     fps.textContent = `${n} fps · ${CHOICE_NAME[level]}${choice === 'auto' ? ' (auto)' : ''}`;
@@ -94,6 +100,11 @@ export function createQualityUi(root: HTMLElement) {
         buttons.set(c, b);
         row.appendChild(b);
       }
+      const note = document.createElement('div');
+      note.textContent = 'Myke kanter byttes først når siden lastes på nytt';
+      note.style.cssText = 'flex-basis:100%;text-align:center;font-size:13px;opacity:.75;';
+      row.appendChild(note);
+      notes.push(note);
       row.addEventListener('pointerdown', (e) => e.stopPropagation());
       row.addEventListener('click', (e) => e.stopPropagation());
       pickers.push(buttons);
@@ -101,13 +112,17 @@ export function createQualityUi(root: HTMLElement) {
       return row;
     },
 
+    /** Sier om deler av forrige nivåbytte fortsatt venter på å bli tatt i bruk (fra scene.applyQuality). */
+    setWaiting(w: boolean) { waiting = w; },
+
     /**
      * Kalles hvert bilde med tiden siden forrige (0 på pause). Måler fps, lar Auto senke nivået,
      * og gir innstillingene som skal gjelde.
      */
     frame(dt: number): QualitySettings {
-      if (!(dt > 0)) {
-        // pause: ikke mål, og vent litt etter pausen før Auto måler igjen
+      if (!(dt > 0) || waiting) {
+        // pause, eller et nivåbytte som ikke er tatt i bruk ennå (venter til pause/meny):
+        // ikke mål, og vent litt etterpå før Auto måler igjen, så den ikke senker ett hakk til for tidlig
         meter.reset();
         auto.hold();
       } else {

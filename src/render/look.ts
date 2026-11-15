@@ -64,7 +64,15 @@ export const LOOK = {
      * går den ett nivå ned. Over okFps nullstilles tellingen (mellom de to står den stille).
      * Etter et bytte eller en pause ventes det settle sekunder før det måles igjen. Den går aldri opp av seg selv.
      */
-    auto: { mobile: 'middels', desktop: 'hoy', minFps: 45, okFps: 50, slowFor: 4, settle: 3 },
+    /**
+     * capRates: vanlige faste fps-tak (halv/tredels skjermfrekvens o.l.). Like snitt (innenfor capSpread fps)
+     * over capSamples målinger nær et av dem (innenfor capNear) regnes som et tak, ikke som tregt.
+     * capGain: et hakk ned må gi mer enn så mange ganger fps-en før, ellers var det et tak.
+     */
+    auto: {
+      mobile: 'middels', desktop: 'hoy', minFps: 45, okFps: 50, slowFor: 4, settle: 3,
+      capRates: [20, 24, 30, 36, 40], capSpread: 1, capNear: 1.5, capSamples: 3, capGain: 1.08,
+    },
     /** FPS-måleren viser snittet over så mange sekunder, så tallet står rolig. */
     fpsWindow: 1,
   },
