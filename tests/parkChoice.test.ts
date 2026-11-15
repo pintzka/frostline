@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_PARK, loadParkChoice, nextPark, PARK_KEY, pickPark, saveParkChoice, type ParkStore } from '../src/park/choice';
+import { bestKey, DEFAULT_PARK, loadBest, loadParkChoice, nextPark, PARK_KEY, parkFromSearch, pickPark, saveBest, saveParkChoice, searchWithPark, type ParkStore } from '../src/park/choice';
 import { CURRENT_PARK, CURRENT_PARK_ID, PARK_IDS, PARKS } from '../src/park/parks';
 
 /** En liten lagring i minnet, som localStorage. */
@@ -60,5 +60,33 @@ describe('parkvalg', () => {
     expect(nextPark(ids, 'nybegynner', 1)).toBe('testbakke');
     expect(nextPark(ids, 'testbakke', -1)).toBe('nybegynner');
     expect(nextPark(ids, 'ukjent', 1)).toBe('testbakke');
+  });
+});
+
+describe('parkvalg: adressen som reserve, og beste runde per park', () => {
+  it('?park= i adressen vinner over lagret valg, og ukjent park i adressen ignoreres', () => {
+    const store = memory({ [PARK_KEY]: 'testbakke' });
+    expect(loadParkChoice(ids, store, '?park=nybegynner')).toBe('nybegynner');
+    expect(loadParkChoice(ids, store, '?park=finnesikke')).toBe('testbakke');
+    expect(loadParkChoice(ids, broken, '?park=nybegynner')).toBe('nybegynner');
+    expect(loadParkChoice(ids, null, '')).toBe(DEFAULT_PARK);
+    expect(parkFromSearch('?a=1&park=testbakke')).toBe('testbakke');
+    expect(searchWithPark('?a=1', 'nybegynner')).toBe('?a=1&park=nybegynner');
+    expect(searchWithPark('?park=testbakke', 'nybegynner')).toBe('?park=nybegynner');
+  });
+
+  it('beste runde lagres per park, bare når den er bedre, og blokkert lagring krasjer ikke', () => {
+    const store = memory();
+    expect(loadBest('testbakke', store)).toBe(0);
+    saveBest('testbakke', 2500, store);
+    saveBest('testbakke', 1200, store);
+    saveBest('nybegynner', 800, store);
+    expect(loadBest('testbakke', store)).toBe(2500);
+    expect(loadBest('nybegynner', store)).toBe(800);
+    store.data[bestKey('testbakke')] = 'tull';
+    expect(loadBest('testbakke', store)).toBe(0);
+    expect(loadBest('testbakke', broken)).toBe(0);
+    expect(() => saveBest('testbakke', 100, broken)).not.toThrow();
+    expect(() => saveBest('testbakke', 100, null)).not.toThrow();
   });
 });

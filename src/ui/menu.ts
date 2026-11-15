@@ -1,5 +1,5 @@
 import { CONFIG } from '../core/config';
-import { saveParkChoice } from '../park/choice';
+import { saveParkChoice, searchWithPark } from '../park/choice';
 import { CURRENT_PARK_ID, PARK_IDS, PARKS } from '../park/parks';
 import { CONTROLS } from './controlsText';
 import { fade, resultLines, scoreLines, type Flow, type FlowEvent, type Game, type Phase } from './flow';
@@ -14,7 +14,9 @@ function overlay(root: HTMLElement, bg: string, top = false): HTMLDivElement {
   const el = document.createElement('div');
   // top: innholdet ligger øverst, så skiløperen midt på skjermen synes
   el.style.cssText = `position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;gap:22px;`
-    + (top ? 'justify-content:flex-start;padding-top:9vh;box-sizing:border-box;' : 'justify-content:center;')
+    + (top ? 'justify-content:flex-start;padding-top:9vh;' : 'justify-content:safe center;')
+    // lave skjermer (mobil, laptop): menyen kan rulles i stedet for å bli kuttet
+    + 'box-sizing:border-box;padding-bottom:16px;overflow-y:auto;overscroll-behavior:contain;'
     + `background:${bg};color:#fff;font:600 18px/1.35 ${FONT};text-shadow:0 1px 4px #0009;cursor:pointer;user-select:none;opacity:0;pointer-events:none;`;
   root.appendChild(el);
   return el;
@@ -44,15 +46,17 @@ function text(content: string, css: string): HTMLDivElement {
 
 /**
  * Bytter park. Parken bygges når spillet lastes (bakke, fysikk, trær og fall-respawn leser den da),
- * så valget huskes i localStorage og siden lastes på nytt. Går det ikke å lagre, blir du på samme park.
+ * så valget huskes i localStorage og siden lastes på nytt med parken i adressen (?park=). Adressen er
+ * reserven når localStorage er blokkert, så knappen virker alltid.
  */
 function switchPark(id: string): void {
-  if (id === CURRENT_PARK_ID || !saveParkChoice(id)) return;
-  location.reload();
+  if (id === CURRENT_PARK_ID) return;
+  saveParkChoice(id);
+  location.search = searchWithPark(location.search, id);
 }
 
 /** Knappene for å velge park. Tastene 1, 2, … velger også (bare på start- og resultatskjermen). */
-function parkPicker(): HTMLDivElement {
+function parkPicker(enabled: () => boolean): HTMLDivElement {
   const row = document.createElement('div');
   row.style.cssText = 'display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:10px;max-width:92vw;';
   row.append(text('Bakke:', 'color:#fffb;font-size:17px;'));
@@ -63,8 +67,10 @@ function parkPicker(): HTMLDivElement {
     b.textContent = `${i + 1}  ${PARKS[id].name}`;
     b.style.cssText = `font:700 17px ${FONT};padding:8px 16px;border-radius:999px;cursor:pointer;color:#fff;`
       + (on ? 'background:#3a8fd9;border:2px solid #fff;' : 'background:#ffffff22;border:2px solid #ffffff55;');
-    // trykket på en knapp skal ikke også starte runden (det gjør et klikk ellers på skjermen)
-    b.addEventListener('pointerdown', (e) => { e.stopPropagation(); e.preventDefault(); switchPark(id); });
+    // trykket på en knapp skal ikke også starte runden (det gjør et klikk ellers på skjermen).
+    // click (ikke pointerdown), og på resultatskjermen først etter resultMinTime, så et trykk inn i mål ikke bytter park
+    b.addEventListener('pointerdown', (e) => e.stopPropagation());
+    b.addEventListener('click', (e) => { e.stopPropagation(); e.preventDefault(); if (enabled()) switchPark(id); });
     row.append(b);
   });
   return row;
@@ -80,20 +86,20 @@ export function createMenu(root: HTMLElement, extra?: HTMLElement) {
   const startPrompt = text('Trykk mellomrom eller klikk for å kjøre', `font:700 22px ${FONT};margin-top:8px;text-align:center;`);
   start.append(
     text('FROSTLINE', `font:800 clamp(44px,12vw,88px)/1 ${FONT};letter-spacing:.12em;`),
-    parkPicker(),
+    parkPicker(() => shown === 'start'),
     table(CONTROLS, 16),
     ...(extra ? [extra] : []),
     startPrompt,
   );
-  start.addEventListener('pointerdown', click);
+  start.addEventListener('click', click);
 
   // resultatskjerm: lysere, så du ser skiløperen bremse inn bak
   const result = overlay(root, 'linear-gradient(#0d1620dd,#0d162055 60%,#0d162033)', true);
   const resultTitle = text('Ferdig!', `font:800 52px/1 ${FONT};`);
   const resultBody = document.createElement('div');
   const prompt = text('Mellomrom for ny runde', `font:700 22px ${FONT};text-align:center;transition:opacity .15s;`);
-  result.append(resultTitle, resultBody, prompt, parkPicker());
-  result.addEventListener('pointerdown', click);
+  result.append(resultTitle, resultBody, prompt, parkPicker(() => resultReady));
+  result.addEventListener('click', click);
 
   // mørkt slør som skjuler at skiløperen og kameraet hopper tilbake til toppen
   const veil = document.createElement('div');
@@ -102,10 +108,12 @@ export function createMenu(root: HTMLElement, extra?: HTMLElement) {
 
   let startO = 1, resultO = 0, veilO = 0;
   let shown: Phase = 'start';
+  /** Resultatskjermen har vist seg lenge nok (resultMinTime) til at parkvalget virker. */
+  let resultReady = false;
 
   // tastene 1, 2, … velger park, men bare når en meny vises (ikke mens du kjører)
   addEventListener('keydown', (e) => {
-    if (shown === 'kjorer' || e.repeat || !/^Digit[1-9]$/.test(e.code)) return;
+    if (!(shown === 'start' || resultReady) || e.repeat || !/^Digit[1-9]$/.test(e.code)) return;
     const id = PARK_IDS[Number(e.code.slice(5)) - 1];
     if (id) switchPark(id);
   });
@@ -129,6 +137,7 @@ export function createMenu(root: HTMLElement, extra?: HTMLElement) {
     /** Kalles hvert bilde. Gir hvor synlig HUD-en skal være (0–1). */
     update(flow: Flow, dt: number): number {
       shown = flow.phase;
+      resultReady = flow.phase === 'resultat' && flow.phaseAge >= CONFIG.resultMinTime;
       startO = fade(startO, flow.phase === 'start' ? 1 : 0, dt, CONFIG.startFadeOut);
       const inResult = flow.phase === 'resultat';
       resultO = fade(resultO, inResult ? 1 : 0, dt, inResult ? CONFIG.resultFadeIn : CONFIG.resultFadeOut);

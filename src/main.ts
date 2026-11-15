@@ -23,6 +23,7 @@ import { createQualityUi } from './ui/qualityUi';
 import { createChallengesUi } from './ui/challengesUi';
 import { CURRENT_CHALLENGES } from './challenges/index';
 import { CURRENT_PARK_ID } from './park/parks';
+import { loadBest, saveBest } from './park/choice';
 import { PARK } from './park/terrain';
 
 const root = document.getElementById('app')!;
@@ -45,6 +46,8 @@ const spray = createSnowSpray(scene);
 
 // startskjerm → kjører → resultat (ui/flow.ts); selve kjøringen, fall og poeng er core/game.ts
 const game = createGame();
+// beste runde huskes per park i nettleseren (bare fra ekte runder, aldri fra reprisen)
+game.best = loadBest(CURRENT_PARK_ID);
 let prev = { ...game.skier };
 let prevTricks = { ...game.tricks };
 // om skiløperen ble flyttet siden forrige bilde: 'restart' (ny runde) eller 'respawn' (satt tilbake etter fall)
@@ -108,7 +111,7 @@ const loop = createLoop({
     const inp: GameInput = { raw: input.read(), click: menu.takeClick(), restart: input.takeRestart() };
     const ev = stepGame(game, inp, dt);
     recordStep(recorder, game, inp, ev);
-    if (ev) menu.onEvent(ev, game);
+    if (ev) { menu.onEvent(ev, game); saveBest(CURRENT_PARK_ID, Math.max(game.best, game.score.total)); }
     challenges.step(game, ev);
     if (game.flow.move !== 'none') onMoved(game.flow.move, game);
     hear(game);
